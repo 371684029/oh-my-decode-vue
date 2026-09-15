@@ -1,0 +1,10 @@
+node_modules
+dist
+.DS_Store
+*.local
+backend/storage/pages/*.json
+backend/storage/components/*.json
+backend/data/*.db
+!backend/storage/pages/.gitkeep
+!backend/storage/components/.gitkeep
+!backend/data/.gitkeep

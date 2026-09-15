@@ -1,0 +1,13 @@
+
+> low-code-platform@0.0.1 dev:frontend
+> npm --prefix frontend run dev
+
+
+> frontend@0.0.0 dev
+> vite
+
+
+  VITE v8.3.0  ready in 428 ms
+
+  ➜  Local:   http://localhost:5173/
+  ➜  Network: use --host to expose

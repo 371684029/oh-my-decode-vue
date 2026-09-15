@@ -1,0 +1,17 @@
+{
+  "name": "low-code-platform",
+  "version": "0.0.1",
+  "private": true,
+  "description": "Low-Code Frontend Platform",
+  "workspaces": [
+    "frontend",
+    "backend"
+  ],
+  "scripts": {
+    "dev:frontend": "npm --prefix frontend run dev",
+    "dev:backend": "npm --prefix backend run dev",
+    "build:frontend": "npm --prefix frontend run build",
+    "build:backend": "npm --prefix backend run build",
+    "build": "npm run build:backend && npm run build:frontend"
+  }
+}
