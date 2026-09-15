@@ -22,19 +22,64 @@
       <!-- Center Main Canvas -->
       <CanvasContainer v-slot="{ node }">
         <template v-if="node">
+          <!-- 自有高端组件 -->
           <ProTable v-if="node.type === 'pro-table'" :node="node" />
           <ProForm v-else-if="node.type === 'pro-form'" :node="node" />
+
+          <!-- Element Plus 原生组件 -->
           <el-button
             v-else-if="node.type === 'el-button'"
             :type="node.props.type || 'primary'"
+            :size="node.props.size || 'default'"
           >
             {{ node.props.text || '按钮' }}
           </el-button>
+
           <el-input
             v-else-if="node.type === 'el-input'"
             :placeholder="node.props.placeholder"
             :clearable="node.props.clearable"
           />
+
+          <el-card
+            v-else-if="node.type === 'el-card'"
+            :header="node.props.header"
+            :shadow="node.props.shadow || 'always'"
+            style="width: 100%"
+          >
+            <p style="color: #606266; font-size: 14px">这是 Element Plus Card 内容卡片区域</p>
+          </el-card>
+
+          <el-tag
+            v-else-if="node.type === 'el-tag'"
+            :type="node.props.type || 'success'"
+            :effect="node.props.effect || 'light'"
+          >
+            {{ node.props.text || '标签' }}
+          </el-tag>
+
+          <el-alert
+            v-else-if="node.type === 'el-alert'"
+            :title="node.props.title"
+            :type="node.props.type || 'info'"
+            :show-icon="node.props.showIcon"
+            :closable="node.props.closable"
+            style="width: 100%"
+          />
+
+          <el-switch
+            v-else-if="node.type === 'el-switch'"
+            v-model="node.props.value"
+            :active-text="node.props.activeText"
+            :inactive-text="node.props.inactiveText"
+          />
+
+          <el-divider
+            v-else-if="node.type === 'el-divider'"
+            :content-position="node.props.contentPosition || 'center'"
+          >
+            {{ node.props.text }}
+          </el-divider>
         </template>
       </CanvasContainer>
 

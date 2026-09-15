@@ -1,6 +1,19 @@
-import type { MaterialItem } from '../types/designer';
+export interface MaterialItem {
+  type: string;
+  label: string;
+  icon: string;
+  category: 'pro' | 'element';
+  defaultLayout: {
+    w: number;
+    h: number;
+  };
+  defaultProps: Record<string, any>;
+  defaultAttrs: Record<string, any>;
+  defaultConfig?: Record<string, any>;
+}
 
 export const MATERIAL_REGISTRY: MaterialItem[] = [
+  // --- 自有高端组件 ---
   {
     type: 'pro-table',
     label: '高端表格 (ProTable)',
@@ -56,11 +69,13 @@ export const MATERIAL_REGISTRY: MaterialItem[] = [
       ]
     }
   },
+
+  // --- Element Plus 常用组件 ---
   {
     type: 'el-button',
-    label: '基础按钮',
+    label: '按钮 (Button)',
     icon: 'Pointer',
-    category: 'basic',
+    category: 'element',
     defaultLayout: { w: 2, h: 2 },
     defaultProps: {
       type: 'primary',
@@ -71,13 +86,77 @@ export const MATERIAL_REGISTRY: MaterialItem[] = [
   },
   {
     type: 'el-input',
-    label: '文本输入框',
+    label: '输入框 (Input)',
     icon: 'EditPen',
-    category: 'basic',
+    category: 'element',
     defaultLayout: { w: 4, h: 2 },
     defaultProps: {
       placeholder: '请输入内容...',
       clearable: true
+    },
+    defaultAttrs: {}
+  },
+  {
+    type: 'el-card',
+    label: '卡片 (Card)',
+    icon: 'Box',
+    category: 'element',
+    defaultLayout: { w: 6, h: 4 },
+    defaultProps: {
+      header: '卡片标题',
+      shadow: 'always'
+    },
+    defaultAttrs: {}
+  },
+  {
+    type: 'el-tag',
+    label: '标签 (Tag)',
+    icon: 'PriceTag',
+    category: 'element',
+    defaultLayout: { w: 2, h: 2 },
+    defaultProps: {
+      text: '标签内容',
+      type: 'success',
+      effect: 'light'
+    },
+    defaultAttrs: {}
+  },
+  {
+    type: 'el-alert',
+    label: '警告提示 (Alert)',
+    icon: 'Warning',
+    category: 'element',
+    defaultLayout: { w: 6, h: 3 },
+    defaultProps: {
+      title: '温馨提示信息',
+      type: 'info',
+      showIcon: true,
+      closable: true
+    },
+    defaultAttrs: {}
+  },
+  {
+    type: 'el-switch',
+    label: '开关 (Switch)',
+    icon: 'Switch',
+    category: 'element',
+    defaultLayout: { w: 2, h: 2 },
+    defaultProps: {
+      value: true,
+      activeText: '开启',
+      inactiveText: '关闭'
+    },
+    defaultAttrs: {}
+  },
+  {
+    type: 'el-divider',
+    label: '分割线 (Divider)',
+    icon: 'SemiSelect',
+    category: 'element',
+    defaultLayout: { w: 12, h: 1 },
+    defaultProps: {
+      contentPosition: 'center',
+      text: '分割线文字'
     },
     defaultAttrs: {}
   }

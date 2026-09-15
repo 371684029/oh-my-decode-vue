@@ -34,7 +34,7 @@ export interface MaterialItem {
   type: string;
   label: string;
   icon: string;
-  category: 'pro' | 'basic' | 'layout';
+  category: 'pro' | 'element' | 'basic' | 'layout';
   defaultLayout: {
     w: number;
     h: number;

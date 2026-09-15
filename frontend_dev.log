@@ -11,3 +11,8 @@
 
   ➜  Local:   http://localhost:5173/
   ➜  Network: use --host to expose
+8:59:28 AM [vite] (client) hmr update /src/components/MaterialList.vue
+8:59:56 AM [vite] (client) hmr update /src/components/MaterialList.vue, /src/components/MaterialList.vue?vue&type=style&index=0&scoped=4887ef7d&lang.css
+9:00:29 AM [vite] (client) hmr update /src/App.vue
+9:00:42 AM [vite] (client) hmr update /src/components/PropertyDrawer.vue
+9:01:39 AM [vite] (client) hmr update /src/components/ProTable.vue, /src/components/ProForm.vue

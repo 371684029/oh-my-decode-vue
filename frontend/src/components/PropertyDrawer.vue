@@ -18,6 +18,7 @@
               <el-input v-model="node.label" />
             </el-form-item>
 
+            <!-- ProTable 属性 -->
             <template v-if="node.type === 'pro-table'">
               <el-form-item label="显示边框 (Border)">
                 <el-switch v-model="node.props.border" />
@@ -34,6 +35,7 @@
               </el-form-item>
             </template>
 
+            <!-- ProForm 属性 -->
             <template v-if="node.type === 'pro-form'">
               <el-form-item label="Label 宽度">
                 <el-input v-model="node.props.labelWidth" />
@@ -46,6 +48,7 @@
               </el-form-item>
             </template>
 
+            <!-- el-button 属性 -->
             <template v-if="node.type === 'el-button'">
               <el-form-item label="按钮文案">
                 <el-input v-model="node.props.text" />
@@ -56,6 +59,64 @@
                   <el-option label="Success" value="success" />
                   <el-option label="Warning" value="warning" />
                   <el-option label="Danger" value="danger" />
+                </el-select>
+              </el-form-item>
+            </template>
+
+            <!-- el-card 属性 -->
+            <template v-if="node.type === 'el-card'">
+              <el-form-item label="卡片标题">
+                <el-input v-model="node.props.header" />
+              </el-form-item>
+              <el-form-item label="阴影时机">
+                <el-select v-model="node.props.shadow" style="width: 100%">
+                  <el-option label="Always" value="always" />
+                  <el-option label="Hover" value="hover" />
+                  <el-option label="Never" value="never" />
+                </el-select>
+              </el-form-item>
+            </template>
+
+            <!-- el-tag 属性 -->
+            <template v-if="node.type === 'el-tag'">
+              <el-form-item label="标签文案">
+                <el-input v-model="node.props.text" />
+              </el-form-item>
+              <el-form-item label="标签类型">
+                <el-select v-model="node.props.type" style="width: 100%">
+                  <el-option label="Success" value="success" />
+                  <el-option label="Info" value="info" />
+                  <el-option label="Warning" value="warning" />
+                  <el-option label="Danger" value="danger" />
+                </el-select>
+              </el-form-item>
+            </template>
+
+            <!-- el-alert 属性 -->
+            <template v-if="node.type === 'el-alert'">
+              <el-form-item label="提示标题">
+                <el-input v-model="node.props.title" />
+              </el-form-item>
+              <el-form-item label="提示类型">
+                <el-select v-model="node.props.type" style="width: 100%">
+                  <el-option label="Success" value="success" />
+                  <el-option label="Info" value="info" />
+                  <el-option label="Warning" value="warning" />
+                  <el-option label="Error" value="error" />
+                </el-select>
+              </el-form-item>
+            </template>
+
+            <!-- el-divider 属性 -->
+            <template v-if="node.type === 'el-divider'">
+              <el-form-item label="分割线文案">
+                <el-input v-model="node.props.text" />
+              </el-form-item>
+              <el-form-item label="文案位置">
+                <el-select v-model="node.props.contentPosition" style="width: 100%">
+                  <el-option label="Left" value="left" />
+                  <el-option label="Center" value="center" />
+                  <el-option label="Right" value="right" />
                 </el-select>
               </el-form-item>
             </template>

@@ -5,12 +5,12 @@
       <span>组件物料库</span>
     </div>
     <el-tabs v-model="activeTab" class="material-tabs">
-      <el-tab-pane label="高端物料" name="pro">
+      <el-tab-pane label="自有高端组件" name="pro">
         <div class="material-grid">
           <div
             v-for="item in proMaterials"
             :key="item.type"
-            class="material-item"
+            class="material-item pro-item"
             draggable="true"
             @dragstart="handleDragStart($event, item)"
             @click="handleClickAdd(item)"
@@ -20,12 +20,12 @@
           </div>
         </div>
       </el-tab-pane>
-      <el-tab-pane label="基础 UI" name="basic">
+      <el-tab-pane label="Element-UI 组件" name="element">
         <div class="material-grid">
           <div
-            v-for="item in basicMaterials"
+            v-for="item in elementMaterials"
             :key="item.type"
-            class="material-item"
+            class="material-item element-item"
             draggable="true"
             @dragstart="handleDragStart($event, item)"
             @click="handleClickAdd(item)"
@@ -49,7 +49,7 @@ const designerStore = useDesignerStore();
 const activeTab = ref('pro');
 
 const proMaterials = computed(() => MATERIAL_REGISTRY.filter((m) => m.category === 'pro'));
-const basicMaterials = computed(() => MATERIAL_REGISTRY.filter((m) => m.category === 'basic'));
+const elementMaterials = computed(() => MATERIAL_REGISTRY.filter((m) => m.category === 'element'));
 
 const handleDragStart = (event: DragEvent, item: MaterialItem) => {
   if (event.dataTransfer) {
@@ -107,6 +107,11 @@ const handleClickAdd = (item: MaterialItem) => {
   background-color: #ecf5ff;
   color: #409eff;
   transform: translateY(-2px);
+}
+.pro-item:hover {
+  border-color: #67c23a;
+  background-color: #f0f9eb;
+  color: #67c23a;
 }
 .material-icon {
   font-size: 22px;
