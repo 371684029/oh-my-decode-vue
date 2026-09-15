@@ -2,6 +2,7 @@ node_modules
 dist
 .DS_Store
 *.local
+*.log
 backend/storage/pages/*.json
 backend/storage/components/*.json
 backend/data/*.db
