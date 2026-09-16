@@ -87,15 +87,11 @@
       <PropertyDrawer />
     </main>
 
-    <!-- Bottom Right Auto-Save Loading/Status Indicator -->
-    <div class="auto-save-indicator">
-      <el-tag v-if="isAutoSaving" type="warning" effect="dark" class="indicator-tag">
+    <!-- Bottom Right Auto-Save Loading Indicator -->
+    <div v-if="isAutoSaving" class="auto-save-indicator">
+      <el-tag type="warning" effect="dark" class="indicator-tag">
         <el-icon class="is-loading"><Loading /></el-icon>
-        <span>正在自动保存 JSON...</span>
-      </el-tag>
-      <el-tag v-else-if="lastAutoSaveTime" type="success" effect="light" class="indicator-tag">
-        <el-icon><Check /></el-icon>
-        <span>自动保存于 {{ lastAutoSaveTime }}</span>
+        <span>自动备份保存中...</span>
       </el-tag>
     </div>
 
@@ -135,7 +131,7 @@ import PropertyDrawer from './components/PropertyDrawer.vue';
 import ProTable from './components/ProTable.vue';
 import ProForm from './components/ProForm.vue';
 import { ElMessage } from 'element-plus';
-import { Loading, Check } from '@element-plus/icons-vue';
+import { Loading } from '@element-plus/icons-vue';
 
 const API_BASE = 'http://localhost:3001/api';
 const designerStore = useDesignerStore();
@@ -145,27 +141,22 @@ const logsDialogVisible = ref(false);
 const savedSchemas = ref<any[]>([]);
 const logsList = ref<any[]>([]);
 
-// Auto Save State
+// Silent Anti-Crash Auto Save State
 const isAutoSaving = ref(false);
-const lastAutoSaveTime = ref<string | null>(null);
 let autoSaveTimer: ReturnType<typeof setInterval> | null = null;
 
 const performAutoSave = async () => {
   if (isAutoSaving.value) return;
   isAutoSaving.value = true;
   try {
-    const res = await axios.post(`${API_BASE}/schemas`, designerStore.pageSchema);
-    if (res.data.success) {
-      const now = new Date();
-      lastAutoSaveTime.value = now.toLocaleTimeString();
-    }
+    await axios.post(`${API_BASE}/schemas`, designerStore.pageSchema);
   } catch (err: any) {
     console.error('Auto save failed:', err);
   } finally {
-    // Keep loading state visible briefly for user feedback
+    // Hide loading indicator silently upon completion
     setTimeout(() => {
       isAutoSaving.value = false;
-    }, 800);
+    }, 600);
   }
 };
 
