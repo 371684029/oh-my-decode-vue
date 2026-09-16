@@ -87,6 +87,18 @@
       <PropertyDrawer />
     </main>
 
+    <!-- Bottom Right Auto-Save Loading/Status Indicator -->
+    <div class="auto-save-indicator">
+      <el-tag v-if="isAutoSaving" type="warning" effect="dark" class="indicator-tag">
+        <el-icon class="is-loading"><Loading /></el-icon>
+        <span>正在自动保存 JSON...</span>
+      </el-tag>
+      <el-tag v-else-if="lastAutoSaveTime" type="success" effect="light" class="indicator-tag">
+        <el-icon><Check /></el-icon>
+        <span>自动保存于 {{ lastAutoSaveTime }}</span>
+      </el-tag>
+    </div>
+
     <!-- Dialogs -->
     <el-dialog v-model="loadDialogVisible" title="已保存的 JSON 配置列表" width="600px">
       <el-table :data="savedSchemas" style="width: 100%">
@@ -114,7 +126,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue';
+import { ref, onMounted, onUnmounted } from 'vue';
 import axios from 'axios';
 import { useDesignerStore } from './stores/designerStore';
 import MaterialList from './components/MaterialList.vue';
@@ -123,6 +135,7 @@ import PropertyDrawer from './components/PropertyDrawer.vue';
 import ProTable from './components/ProTable.vue';
 import ProForm from './components/ProForm.vue';
 import { ElMessage } from 'element-plus';
+import { Loading, Check } from '@element-plus/icons-vue';
 
 const API_BASE = 'http://localhost:3001/api';
 const designerStore = useDesignerStore();
@@ -131,6 +144,44 @@ const loadDialogVisible = ref(false);
 const logsDialogVisible = ref(false);
 const savedSchemas = ref<any[]>([]);
 const logsList = ref<any[]>([]);
+
+// Auto Save State
+const isAutoSaving = ref(false);
+const lastAutoSaveTime = ref<string | null>(null);
+let autoSaveTimer: ReturnType<typeof setInterval> | null = null;
+
+const performAutoSave = async () => {
+  if (isAutoSaving.value) return;
+  isAutoSaving.value = true;
+  try {
+    const res = await axios.post(`${API_BASE}/schemas`, designerStore.pageSchema);
+    if (res.data.success) {
+      const now = new Date();
+      lastAutoSaveTime.value = now.toLocaleTimeString();
+    }
+  } catch (err: any) {
+    console.error('Auto save failed:', err);
+  } finally {
+    // Keep loading state visible briefly for user feedback
+    setTimeout(() => {
+      isAutoSaving.value = false;
+    }, 800);
+  }
+};
+
+onMounted(() => {
+  // Set 3-minute interval timer (3 * 60 * 1000 ms)
+  const AUTO_SAVE_INTERVAL = 3 * 60 * 1000;
+  autoSaveTimer = setInterval(() => {
+    performAutoSave();
+  }, AUTO_SAVE_INTERVAL);
+});
+
+onUnmounted(() => {
+  if (autoSaveTimer) {
+    clearInterval(autoSaveTimer);
+  }
+});
 
 const handleSaveSchema = async () => {
   try {
@@ -217,5 +268,23 @@ html, body, #app {
   flex: 1;
   display: flex;
   overflow: hidden;
+}
+.auto-save-indicator {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  z-index: 2000;
+  display: flex;
+  align-items: center;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  border-radius: 4px;
+}
+.indicator-tag {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 12px;
+  font-size: 12px;
+  border-radius: 4px;
 }
 </style>
