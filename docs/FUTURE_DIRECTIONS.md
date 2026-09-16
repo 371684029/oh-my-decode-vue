@@ -8,10 +8,14 @@
 
 1. [画布与交互体验优化 (Canvas & Interactive UX)](#1-画布与交互体验优化-canvas--interactive-ux)
 2. [表达式与联动逻辑引擎 (Expression & Dynamic Linkage)](#2-表达式与联动逻辑引擎-expression--dynamic-linkage)
-3. [出码引擎与微前端集成 (Code Generation & Micro-Frontend)](#3-出码引擎与微前端集成-code-generation--micro-frontend)
+3. [多目标出码引擎与微前端集成 (Multi-Target Code Generation & Micro-Frontend)](#3-多目标出码引擎与微前端集成-multi-target-code-generation--micro-frontend)
 4. [版本控制与并发协作 (Version Control & Collaboration)](#4-版本控制与并发协作-version-control--collaboration)
 5. [物料生态与动态插件化 (Material Ecosystem & Plugins)](#5-物料生态与动态插件化-material-ecosystem--plugins)
 6. [性能与大数据量渲染优化 (Performance & Optimization)](#6-性能与大数据量渲染优化-performance--optimization)
+7. [全局主题与动态 CSS 变量配置 (Theme & Dynamic CSS Variables)](#7-全局主题与动态-css-变量配置-theme--dynamic-css-variables)
+8. [可视化表单校验与正则规则构建器 (Form Validation & Regex Builder)](#8-可视化表单校验与正则规则构建器-form-validation--regex-builder)
+9. [多语言国际化 (i18n) Key Path 字典映射 (Internationalization Engine)](#9-多语言国际化-i18n-key-path-字典映射-internationalization-engine)
+10. [接口 Mock 数据生成器与离线沙箱 (Mock Generator & API Interceptor)](#10-接口-mock-数据生成器与离线沙箱-mock-generator--api-interceptor)
 
 ---
 
@@ -131,6 +135,43 @@
 
 ### 6.2 Schema 分层与延迟加载 (Lazy Schema Hydration)
 * **方案**：对多 Tab / 弹窗 / 抽屉中的子 Schema，采用运行时懒加载策略（点击切换到对应 Tab 时才从后端请求或解析对应的子 Schema），显著提升首次打开与渲染性能。
+
+---
+
+## 7. 全局主题与动态 CSS 变量配置 (Theme & Dynamic CSS Variables)
+
+* **需求场景**：企级低代码页面需要支持深色模式（Dark Mode）、品牌主色切换（如科技蓝、活力橙）以及多套 UI 主题预设。
+* **优化方案**：
+  - **CSS 变量桥接**：全局抽取 `--primary-color`、`--bg-color` 等 CSS Variables。
+  - **动态注入**：在设计器与导出的页面根节点统一控制属性，通过属性抽屉可视化调节颜色盘，实时生成的主题配置打包写入 Schema。
+
+---
+
+## 8. 可视化表单校验与正则规则构建器 (Form Validation & Regex Builder)
+
+* **需求场景**：表单组件（ProForm）需要可视化配置必填、手机号、邮箱、身份证号及自定义正则表达式校验。
+* **优化方案**：
+  - 在 PropertyDrawer 中增加“校验规则 (Rules)”图表化列表。
+  - **预设正则词典**：提供内置常用正则（手机号、邮箱、URL、纯数字、汉字）。
+  - **触发时机配置**：支持配置 `trigger: 'blur' | 'change'` 以及自定义错误 Message 提示词。
+
+---
+
+## 9. 多语言国际化 (i18n) Key Path 字典映射 (Internationalization Engine)
+
+* **需求场景**：低代码生成的页面需要在多语言系统中使用（如中英双语切换）。
+* **优化方案**：
+  - 组件文本属性支持绑定 i18n Key Path（如 `{{ $t('user.title') }}`）。
+  - 提供全局 **i18n 字典管理弹窗**，允许用户在可视化平台中在线编辑多语言 JSON 资源包并随 Schema 一同发布。
+
+---
+
+## 10. 接口 Mock 数据生成器与离线沙箱 (Mock Generator & API Interceptor)
+
+* **需求场景**：前端页面搭建阶段，后端 REST API 尚未开发完毕。
+* **优化方案**：
+  - 集成 `Mock.js` 或基于 JSON Schema 的 Mock 引擎。
+  - 用户在配置数据源 API 时，可开启“Mock 模式”，自动生成满足类型结构的随机测试数据，实现完全的前后端并行开发。
 
 ---
 
