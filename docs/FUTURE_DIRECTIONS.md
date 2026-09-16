@@ -63,7 +63,7 @@
 
 ---
 
-## 3. 出码引擎与微前端集成 (Code Generation & Micro-Frontend)
+## 3. 多目标出码引擎与微前端集成 (Multi-Target Code Generation & Micro-Frontend)
 
 ### 3.1 干净零废码标准 Vue 3 SFC 生成器 (Clean SFC Exporter)
 * **目标**：拖拉拽生成的 Schema，可一键导出为标准的、符合企级规范的 `.vue` 单文件组件。
@@ -72,7 +72,20 @@
   - 自动将 ProTable/ProForm 转换为纯 Element Plus 标准代码（或保留轻量化二次封装组件）。
   - 支持下载完整 Vite + Vue 3 脚手架 Zip 压缩包，实现“零门槛二次开发”。
 
-### 3.2 页面在线发布与微前端嵌入 (Publish & Micro-Frontend Integration)
+### 3.2 Web Components 原生自定义元素导出 (Web Components Exporter)
+* **需求场景**：低代码生成的组件需要在 React、Angular、jQuery 或传统 JSP/PHP 系统中跨框架复用。
+* **技术实现**：
+  - 基于 Vue 3 官方 `defineCustomElement` API，将 Schema 构建为标准 W3C Web Component 自定义元素（如 `<my-lowcode-form></my-lowcode-form>`）。
+  - **Shadow DOM 隔离**：封装独立的样式与模板，避免与宿主页面的 CSS 样式冲突。
+  - **跨框架天然适配**：在 React 中直接 `<my-lowcode-table .data="${state}" />` 使用。
+
+### 3.3 独立 HTML + JS Bundle 导出 (Pure HTML & Vanilla JS Bundle)
+* **需求场景**：无需任何前端构建工具，直接在传统浏览器中通过 `<script src="...">` 引入使用。
+* **技术实现**：
+  - 引擎编译导出包含 `index.html` + 压缩 CSS + 单文件 JS 的静态 Bundle 包。
+  - 内嵌 Vue 3 / Element Plus 全量 CDN 或离线库，解压即用，适合快速内嵌至任何 Web 容器或 Webview 中。
+
+### 3.4 页面在线发布与微前端嵌入 (Publish & Micro-Frontend Integration)
 * **发布流**：
   - **一键发布**：点击发布按钮，后端根据 Schema 自动构建并生成静态资源 bundle。
   - **微前端接入**：支持将生成的低代码页面以 **qiankun / MicroApp / Module Federation** 子应用形式无缝嵌入已有企级后台管理系统。

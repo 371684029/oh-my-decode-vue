@@ -8,7 +8,7 @@
 
 ## 📖 项目简介
 
-本项目旨在打造一款可通过**可视化拖拉拽**快速生成 Vue 3 页面或独立 JS/Vue 组件的低代码平台。平台采用**完全解耦的架构设计**，以 **JSON Schema 为唯一映射桥梁**，连接 UI 组件、RESTful API 接口与事件动作链条。
+本项目旨在打造一款可通过**可视化拖拉拽**快速生成 Vue 3 页面、原生 Web Components 自定义元素或纯 HTML 独立 Bundle 的低代码平台。平台采用**完全解耦的架构设计**，以 **JSON Schema 为唯一映射桥梁**，连接 UI 组件、RESTful API 接口与事件动作链条。
 
 项目采用了 **Node.js + Express + SQLite** 架构，其中页面/组件的 Schema 配置文件**直接存储为本地 `.json` 文件**，而 SQLite 数据库专用于记录高可靠的**操作审计日志 (Operation Audit Logs)**。
 
@@ -28,6 +28,7 @@
 - **存储与审计解耦架构**：
   - **JSON 文件直接存储**： Schema 数据写入后端 `storage/pages/{page_id}.json`，实现极佳的人类可读性与无缝 Git 版本追踪。
   - **SQLite 审计留痕**：所有的修改、保存与删除操作均自动落盘至 SQLite 操作日志表（`logs.db`）。
+- **多目标零废码出码引擎**：一键生成纯正 Vue 3 SFC (`.vue`) 源码，或编译导出为 W3C 标准原生 Web Components（跨 React/jQuery/JSP 复用）与独立 HTML+JS 静态 Bundle。
 - **极佳的代码规范与组件解耦**：代码工整，严格遵循单职责原则 (SRP) 与 TypeScript 强类型标注。
 
 ---
