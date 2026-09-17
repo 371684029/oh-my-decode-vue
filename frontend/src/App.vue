@@ -8,8 +8,13 @@
         <el-tag size="small" type="primary" effect="plain" style="margin-left: 10px">v0.0.1</el-tag>
       </div>
       <div class="header-actions">
+        <el-button-group class="history-btn-group">
+          <el-button icon="RefreshLeft" :disabled="!designerStore.canUndo" @click="designerStore.undo()" title="撤销 (Ctrl+Z)">撤销</el-button>
+          <el-button icon="RefreshRight" :disabled="!designerStore.canRedo" @click="designerStore.redo()" title="重做 (Ctrl+Y)">重做</el-button>
+        </el-button-group>
         <el-button icon="FolderOpened" @click="handleOpenLoadDialog">加载配置</el-button>
         <el-button icon="View" @click="handleOpenLogsDialog">操作审计日志</el-button>
+        <el-button type="warning" icon="Download" @click="exportDialogVisible = true">导出代码</el-button>
         <el-button type="success" icon="Select" @click="handleSaveSchema">保存并写入 JSON</el-button>
       </div>
     </header>
@@ -87,6 +92,9 @@
       <PropertyDrawer />
     </main>
 
+    <!-- Code Export Dialog -->
+    <CodeExportDialog v-model="exportDialogVisible" />
+
     <!-- Bottom Right Auto-Save Loading Indicator -->
     <div v-if="isAutoSaving" class="auto-save-indicator">
       <el-tag type="warning" effect="dark" class="indicator-tag">
@@ -130,6 +138,7 @@ import CanvasContainer from './components/CanvasContainer.vue';
 import PropertyDrawer from './components/PropertyDrawer.vue';
 import ProTable from './components/ProTable.vue';
 import ProForm from './components/ProForm.vue';
+import CodeExportDialog from './components/CodeExportDialog.vue';
 import { ElMessage } from 'element-plus';
 import { Loading } from '@element-plus/icons-vue';
 
@@ -138,6 +147,7 @@ const designerStore = useDesignerStore();
 
 const loadDialogVisible = ref(false);
 const logsDialogVisible = ref(false);
+const exportDialogVisible = ref(false);
 const savedSchemas = ref<any[]>([]);
 const logsList = ref<any[]>([]);
 
@@ -160,18 +170,40 @@ const performAutoSave = async () => {
   }
 };
 
+const handleKeydown = (e: KeyboardEvent) => {
+  // Ctrl + Z -> Undo
+  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z' && !e.shiftKey) {
+    if (designerStore.canUndo) {
+      e.preventDefault();
+      designerStore.undo();
+      ElMessage.info('已撤销上一步操作');
+    }
+  }
+  // Ctrl + Y or Ctrl + Shift + Z -> Redo
+  else if ((e.ctrlKey || e.metaKey) && (e.key.toLowerCase() === 'y' || (e.shiftKey && e.key.toLowerCase() === 'z'))) {
+    if (designerStore.canRedo) {
+      e.preventDefault();
+      designerStore.redo();
+      ElMessage.info('已重做操作');
+    }
+  }
+};
+
 onMounted(() => {
   // Set 3-minute interval timer (3 * 60 * 1000 ms)
   const AUTO_SAVE_INTERVAL = 3 * 60 * 1000;
   autoSaveTimer = setInterval(() => {
     performAutoSave();
   }, AUTO_SAVE_INTERVAL);
+
+  window.addEventListener('keydown', handleKeydown);
 });
 
 onUnmounted(() => {
   if (autoSaveTimer) {
     clearInterval(autoSaveTimer);
   }
+  window.removeEventListener('keydown', handleKeydown);
 });
 
 const handleSaveSchema = async () => {
@@ -254,6 +286,14 @@ html, body, #app {
   font-size: 16px;
   font-weight: 600;
   letter-spacing: 0.5px;
+}
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.history-btn-group {
+  margin-right: 4px;
 }
 .designer-body {
   flex: 1;

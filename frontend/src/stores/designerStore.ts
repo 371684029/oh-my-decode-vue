@@ -17,20 +17,58 @@ export const useDesignerStore = defineStore('designer', {
     } as PageSchema,
     selectedNodeId: null as string | null,
     isDrawerOpen: false,
-    drawerTab: 'props' as 'props' | 'config' | 'attrs' | 'json'
+    drawerTab: 'props' as 'props' | 'config' | 'attrs' | 'json',
+    historyPast: [] as string[],
+    historyFuture: [] as string[]
   }),
   getters: {
     selectedNode(state): ComponentNode | null {
       if (!state.selectedNodeId) return null;
       return state.pageSchema.children.find((node: ComponentNode) => node.id === state.selectedNodeId) || null;
+    },
+    canUndo(state): boolean {
+      return state.historyPast.length > 0;
+    },
+    canRedo(state): boolean {
+      return state.historyFuture.length > 0;
     }
   },
   actions: {
+    recordHistory() {
+      const snapshot = JSON.stringify(this.pageSchema);
+      // 限制最大撤销步数为 30
+      if (this.historyPast.length >= 30) {
+        this.historyPast.shift();
+      }
+      this.historyPast.push(snapshot);
+      this.historyFuture = [];
+    },
+    undo() {
+      if (this.historyPast.length === 0) return;
+      const currentSnapshot = JSON.stringify(this.pageSchema);
+      this.historyFuture.push(currentSnapshot);
+
+      const previousSnapshot = this.historyPast.pop()!;
+      this.pageSchema = JSON.parse(previousSnapshot);
+      this.selectedNodeId = null;
+      this.isDrawerOpen = false;
+    },
+    redo() {
+      if (this.historyFuture.length === 0) return;
+      const currentSnapshot = JSON.stringify(this.pageSchema);
+      this.historyPast.push(currentSnapshot);
+
+      const nextSnapshot = this.historyFuture.pop()!;
+      this.pageSchema = JSON.parse(nextSnapshot);
+      this.selectedNodeId = null;
+      this.isDrawerOpen = false;
+    },
     selectNode(id: string | null) {
       this.selectedNodeId = id;
       this.isDrawerOpen = !!id;
     },
     addNodeFromMaterial(material: MaterialItem, x = 0, y = 0) {
+      this.recordHistory();
       const id = material.type + '_' + Date.now().toString(36).substring(4);
       const newNode: ComponentNode = {
         id,
@@ -53,9 +91,14 @@ export const useDesignerStore = defineStore('designer', {
       this.selectNode(id);
     },
     updateNodeLayout(layoutList: any[]) {
+      let isChanged = false;
       layoutList.forEach((item) => {
         const node = this.pageSchema.children.find((n) => n.id === item.i);
-        if (node) {
+        if (node && (node.layout.x !== item.x || node.layout.y !== item.y || node.layout.w !== item.w || node.layout.h !== item.h)) {
+          if (!isChanged) {
+            this.recordHistory();
+            isChanged = true;
+          }
           node.layout.x = item.x;
           node.layout.y = item.y;
           node.layout.w = item.w;
@@ -66,6 +109,7 @@ export const useDesignerStore = defineStore('designer', {
     removeNode(id: string) {
       const idx = this.pageSchema.children.findIndex((n) => n.id === id);
       if (idx !== -1) {
+        this.recordHistory();
         this.pageSchema.children.splice(idx, 1);
         if (this.selectedNodeId === id) {
           this.selectNode(null);
@@ -73,6 +117,7 @@ export const useDesignerStore = defineStore('designer', {
       }
     },
     setPageSchema(schema: PageSchema) {
+      this.recordHistory();
       this.pageSchema = schema;
       this.selectedNodeId = null;
       this.isDrawerOpen = false;
