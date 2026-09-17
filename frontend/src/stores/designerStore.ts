@@ -16,6 +16,7 @@ export const useDesignerStore = defineStore('designer', {
       children: [] as ComponentNode[]
     } as PageSchema,
     selectedNodeId: null as string | null,
+    copiedNode: null as ComponentNode | null,
     isDrawerOpen: false,
     drawerTab: 'props' as 'props' | 'config' | 'attrs' | 'json',
     historyPast: [] as string[],
@@ -121,6 +122,23 @@ export const useDesignerStore = defineStore('designer', {
       this.pageSchema = schema;
       this.selectedNodeId = null;
       this.isDrawerOpen = false;
+    },
+    copySelectedNode() {
+      if (!this.selectedNode) return false;
+      this.copiedNode = JSON.parse(JSON.stringify(this.selectedNode));
+      return true;
+    },
+    pasteNode() {
+      if (!this.copiedNode) return false;
+      this.recordHistory();
+      const newId = this.copiedNode.type + '_' + Date.now().toString(36).substring(4);
+      const pastedNode: ComponentNode = JSON.parse(JSON.stringify(this.copiedNode));
+      pastedNode.id = newId;
+      pastedNode.layout.i = newId;
+      pastedNode.layout.y += pastedNode.layout.h; // 下移一行排列
+      this.pageSchema.children.push(pastedNode);
+      this.selectNode(newId);
+      return true;
     }
   }
 });

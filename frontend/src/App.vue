@@ -5,7 +5,7 @@
       <div class="logo">
         <el-icon class="logo-icon"><Platform /></el-icon>
         <span class="logo-text">低代码前端可视化平台 (Low-Code Studio)</span>
-        <el-tag size="small" type="primary" effect="plain" style="margin-left: 10px">v0.0.1</el-tag>
+        <el-tag size="small" type="primary" effect="plain" style="margin-left: 10px">v0.2.0</el-tag>
       </div>
       <div class="header-actions">
         <el-button-group class="history-btn-group">
@@ -171,8 +171,36 @@ const performAutoSave = async () => {
 };
 
 const handleKeydown = (e: KeyboardEvent) => {
+  // 如果正在 input / textarea / contenteditable 中打字，则跳过快捷键
+  const activeEl = document.activeElement;
+  if (activeEl && (activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA' || (activeEl as HTMLElement).isContentEditable)) {
+    return;
+  }
+
+  // Ctrl + C -> Copy
+  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'c') {
+    if (designerStore.copySelectedNode()) {
+      e.preventDefault();
+      ElMessage.success('已复制选中的组件节点');
+    }
+  }
+  // Ctrl + V -> Paste
+  else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'v') {
+    if (designerStore.pasteNode()) {
+      e.preventDefault();
+      ElMessage.success('已粘贴组件节点');
+    }
+  }
+  // Delete / Backspace -> Delete Selected Node
+  else if (e.key === 'Delete' || e.key === 'Backspace') {
+    if (designerStore.selectedNodeId) {
+      e.preventDefault();
+      designerStore.removeNode(designerStore.selectedNodeId);
+      ElMessage.info('已删除选中节点');
+    }
+  }
   // Ctrl + Z -> Undo
-  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z' && !e.shiftKey) {
+  else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z' && !e.shiftKey) {
     if (designerStore.canUndo) {
       e.preventDefault();
       designerStore.undo();
