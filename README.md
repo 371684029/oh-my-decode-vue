@@ -172,4 +172,5 @@ npm run build
 2. **[0.1.0 接口与事件联动规划](docs/0.1.0_PLAN.md)**：包含 API 数据源绑定、参数映射与事件动作链条。
 3. **[Component - API - Event 三角解耦规范](docs/COMPONENT_API_EVENT_MAPPING.md)**：包含完整的 Schema 契约与 JSON 桥梁模型。
 4. **[架构演进与体验优化深度建议](docs/ARCH_RECOMMENDATIONS.md)**：包含零废码源码生成器、沙箱预览、时间旅行撤销历史栈、远程物料插件与规则引擎的落地方案。
-5. **[平台演进与优化方向指南](docs/FUTURE_DIRECTIONS.md)**：包含画布标尺/快捷键/嵌套容器、动态 JS 表达式、纯 Vue 3 SFC 出码、SQLite 版本对比回滚与 Module Federation 远程物料插件等 6 大演进方向。
+5. **[平台演进与优化方向指南](docs/FUTURE_DIRECTIONS.md)**：包含画布标尺/快捷键/嵌套容器、动态 JS 表达式、纯 Vue 3 SFC 出码、SQLite 版本对比回滚与 Module Federation 远程物料插件等 10 大演进方向。
+6. **[v0.2.0 已实现功能问题排查与优化报告](docs/0.2.0_OPTIMIZATIONS.md)**：包含 Web Component Shadow DOM 样式穿透、RFC 6902 JSON Patch 增量保存、历史栈 GC 优化、快捷键上下文隔离与 Prettier 代码美化解析器落地方案。
