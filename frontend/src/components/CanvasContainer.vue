@@ -7,6 +7,25 @@
   >
     <div class="canvas-header">
       <span class="page-title">{{ designerStore.pageSchema.title }}</span>
+
+      <!-- 多端响应式视口切换器 -->
+      <div class="viewport-selector">
+        <el-radio-group v-model="viewportMode" size="small">
+          <el-radio-button value="desktop">
+            <el-icon><Monitor /></el-icon> 桌面 100%
+          </el-radio-button>
+          <el-radio-button value="laptop">
+            <el-icon><Platform /></el-icon> 笔记本 1366px
+          </el-radio-button>
+          <el-radio-button value="tablet">
+            <el-icon><Cellphone /></el-icon> 平板 768px
+          </el-radio-button>
+          <el-radio-button value="mobile">
+            <el-icon><Iphone /></el-icon> 移动端 375px
+          </el-radio-button>
+        </el-radio-group>
+      </div>
+
       <span class="page-info">组件数: {{ layoutItems.length }}</span>
     </div>
 
@@ -15,18 +34,18 @@
       <p>拖拽左侧高端表单/表格组件投射至此处画布</p>
     </div>
 
-    <grid-layout
-      v-else
-      v-model:layout="layoutItems"
-      :col-num="12"
-      :row-height="50"
-      :is-draggable="true"
-      :is-resizable="true"
-      :vertical-compact="true"
-      :use-css-transforms="true"
-      @layout-updated="handleLayoutUpdated"
-      class="grid-canvas"
-    >
+    <div v-else class="canvas-viewport-wrapper" :style="viewportStyle">
+      <grid-layout
+        v-model:layout="layoutItems"
+        :col-num="colNum"
+        :row-height="50"
+        :is-draggable="true"
+        :is-resizable="true"
+        :vertical-compact="true"
+        :use-css-transforms="true"
+        @layout-updated="handleLayoutUpdated"
+        class="grid-canvas"
+      >
       <grid-item
         v-for="item in layoutItems"
         :key="item.i"
@@ -51,17 +70,42 @@
         </div>
       </grid-item>
     </grid-layout>
+    </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue';
+import { ref, computed } from 'vue';
 // @ts-ignore
 import { GridLayout, GridItem } from 'vue3-grid-layout-next';
 import { useDesignerStore } from '../stores/designerStore';
 import type { MaterialItem } from '../types/designer';
+import { Monitor, Platform, Cellphone, Iphone, UploadFilled, Delete } from '@element-plus/icons-vue';
 
 const designerStore = useDesignerStore();
+const viewportMode = ref<'desktop' | 'laptop' | 'tablet' | 'mobile'>('desktop');
+
+const colNum = computed(() => {
+  switch (viewportMode.value) {
+    case 'mobile': return 4;
+    case 'tablet': return 8;
+    case 'laptop': return 12;
+    default: return 12;
+  }
+});
+
+const viewportStyle = computed(() => {
+  switch (viewportMode.value) {
+    case 'laptop':
+      return { width: '1366px', margin: '0 auto' };
+    case 'tablet':
+      return { width: '768px', margin: '0 auto' };
+    case 'mobile':
+      return { width: '375px', margin: '0 auto' };
+    default:
+      return { width: '100%' };
+  }
+});
 
 const layoutItems = computed({
   get() {
@@ -125,6 +169,13 @@ const handleBackgroundClick = () => {
 .page-title {
   font-weight: 600;
   color: #303133;
+}
+.viewport-selector {
+  display: flex;
+  align-items: center;
+}
+.canvas-viewport-wrapper {
+  transition: width 0.3s ease;
 }
 .page-info {
   font-size: 13px;

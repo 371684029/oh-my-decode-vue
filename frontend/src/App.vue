@@ -5,7 +5,7 @@
       <div class="logo">
         <el-icon class="logo-icon"><Platform /></el-icon>
         <span class="logo-text">低代码前端可视化平台 (Low-Code Studio)</span>
-        <el-tag size="small" type="primary" effect="plain" style="margin-left: 10px">v0.2.0</el-tag>
+        <el-tag size="small" type="primary" effect="plain" style="margin-left: 10px">v0.3.0</el-tag>
       </div>
       <div class="header-actions">
         <el-button-group class="history-btn-group">
@@ -30,6 +30,21 @@
           <!-- 自有高端组件 -->
           <ProTable v-if="node.type === 'pro-table'" :node="node" />
           <ProForm v-else-if="node.type === 'pro-form'" :node="node" />
+
+          <el-card v-else-if="node.type === 'pro-container'" class="pro-container-box">
+            <template #header>
+              <div class="card-header">
+                <span style="font-weight: 600">{{ node.props.title || '嵌套弹性容器' }}</span>
+                <el-tag size="small" type="info">Flex {{ node.props.direction || 'row' }}</el-tag>
+              </div>
+            </template>
+            <div
+              class="container-inner"
+              :style="{ display: 'flex', flexDirection: node.props.direction || 'row', gap: '12px', padding: node.props.padding || '12px' }"
+            >
+              <p style="color: #909399; font-size: 13px; margin: 0">弹性嵌套容器 Slot 占位区域</p>
+            </div>
+          </el-card>
 
           <!-- Element Plus 原生组件 -->
           <el-button

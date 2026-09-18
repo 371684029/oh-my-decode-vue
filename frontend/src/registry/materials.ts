@@ -69,6 +69,19 @@ export const MATERIAL_REGISTRY: MaterialItem[] = [
       ]
     }
   },
+  {
+    type: 'pro-container',
+    label: '嵌套弹性容器 (FlexContainer)',
+    icon: 'FolderOpened',
+    category: 'pro',
+    defaultLayout: { w: 12, h: 4 },
+    defaultProps: {
+      title: '嵌套容器区域',
+      direction: 'row',
+      padding: '16px'
+    },
+    defaultAttrs: {}
+  },
 
   // --- Element Plus 常用组件 ---
   {
