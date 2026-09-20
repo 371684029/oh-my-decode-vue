@@ -176,3 +176,5 @@ npm run build
 6. **[v0.2.0 已实现功能问题排查与优化报告](docs/0.2.0_OPTIMIZATIONS.md)**：包含 Web Component Shadow DOM 样式穿透、RFC 6902 JSON Patch 增量保存、历史栈 GC 优化、快捷键上下文隔离与 Prettier 代码美化解析器落地方案。
 9. **[v0.4.0 功能规划与路线图](docs/0.4.0_PLAN.md)**：包含节点式可视化逻辑流编排、在线 API 数据源建模与 Mock 仿真、可视化 CSS 与样式微调编辑器、Schema 版本对比与 Diff 工具、第三方物料 SDK。
 10. **[低代码物料解析规范与技术对比指南](docs/MATERIAL_SPECIFICATION.md)**：包含 Vue 源码 (.vue) 与编译 JS (.js) 的解析机制、兼容性、扩展性对比及混合架构最佳落地建议。
+11. **[v0.5.0 功能规划与路线图](docs/0.5.0_PLAN.md)**：包含多工作区多项目物理隔离、自制组件入参/出参强校验规范、简易操作日志可视化控制台。
+12. **[自制组件入参/出参规范与契约强校验指南](docs/COMPONENT_IO_SPECIFICATION.md)**：包含自制物料组件必填 Inputs/Outputs 参数定义、类型约束、属性抽屉强校验规则。
