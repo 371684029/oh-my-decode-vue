@@ -198,4 +198,5 @@ npm run build
 8. **[低代码物料解析规范与技术对比指南](docs/MATERIAL_SPECIFICATION.md)**：包含 Vue 源码 (.vue) 与编译 JS (.js) 的解析机制、兼容性、扩展性对比及混合架构最佳落地建议。
 9. **[v0.5.0 功能规划与路线图](docs/0.5.0_PLAN.md)**：包含多工作区多项目物理隔离、自制组件入参/出参强校验规范、简易操作日志可视化控制台。
 10. **[自制组件入参/出参规范与契约强校验指南](docs/COMPONENT_IO_SPECIFICATION.md)**：包含自制物料组件必填 Inputs/Outputs 参数定义、类型约束、属性抽屉强校验规则。
-11. **[v1.0.0 正式版 (GA) 规划与落地方案](docs/1.0.0_PLAN.md)**：包含企业级 RBAC/SSO 单点登录、PostgreSQL/S3 高可用分布式存储、CRDT 多人实时协同、一键 CI/CD 灰度发布、VS Code 插件与 CLI 工具链。
+11. **[v1.0.0 基础正式版 (Base GA) 规划与路线图](docs/1.0.0_PLAN.md)**：包含基础拖拽布局、组件 I/O 契约强校验、JSON 文件存储与 SQLite 审计日志控制台、零废码多目标出码与基础页面发布。
+12. **[v3.0.0 远期企业级架构与生态规划](docs/3.0.0_PLAN.md)**：包含企业级 RBAC/SSO 单点登录、PostgreSQL/S3 高可用分布式存储、CRDT 多人实时协同、一键 CI/CD 灰度发布、VS Code 插件与 CLI 工具链。
