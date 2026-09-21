@@ -165,6 +165,26 @@ npm run build
 
 ---
 
+## 📝 版本变更历史 (Changelog)
+
+### 📌 v0.3.0 (当前版本 - 2026-09)
+- **多端响应式视图切换**：画布顶部支持一键切换桌面端 (100%)、笔记本 (1366px)、平板 (768px) 及移动端 (375px) 预览，网格列数自适应缩放。
+- **动态 JS 表达式解析**：新增 `frontend/src/utils/expression.ts`，支持组件属性绑定 `{{ ... }}` 动态模板表达式。
+- **嵌套弹性容器**：新增 `pro-container` (FlexContainer) 嵌套容器物料，支持组件自由嵌套与布局调整。
+- **全项目版本同步**：全量升级 Monorepo (`root`, `frontend`, `backend`) 版本标签至 `v0.3.0`。
+
+### 📌 v0.2.0
+- **静默 3 分钟自动保存**：实现无感后台 JSON 保存机制，右下角带有淡雅的加载指示器。
+- **多目标零废码出码引擎**：支持一键生成 Vue 3 Composition API SFC (`.vue`)、W3C Web Components (`.js`) 与单页独立 HTML (`.html`)。
+- **30 步撤销/重做历史栈**：Pinia 全局撤销/重做支持，集成 `Ctrl+Z` / `Ctrl+Y` / `Ctrl+C` / `Ctrl+V` / `Delete` 快捷键，且自动排除文本输入框焦点。
+
+### 📌 v0.0.1
+- **低代码平台基础Scaffold**：搭建基于 Vue 3 + Element Plus + Pinia + `vue3-grid-layout-next` + Node.js + Express + SQLite 的全栈 Monorepo。
+- **核心物料与属性抽屉**：实现 `ProTable`（高端表格）、`ProForm`（高端表单）及 Element Plus 原生 UI 物料。
+- **存储与审计双通道**：页面 Schema 直接存为本地 `.json` 文件，操作审计日志自动落盘 SQLite (`logs.db`)。
+
+---
+
 ## 📄 文档索引 (Documentation Index)
 
 所有的详细规划、技术架构标准与演进建议均存放于 `docs/` 目录：
@@ -174,7 +194,7 @@ npm run build
 4. **[架构演进与体验优化深度建议](docs/ARCH_RECOMMENDATIONS.md)**：包含零废码源码生成器、沙箱预览、时间旅行撤销历史栈、远程物料插件与规则引擎的落地方案。
 5. **[平台演进与优化方向指南](docs/FUTURE_DIRECTIONS.md)**：包含画布标尺/快捷键/嵌套容器、动态 JS 表达式、纯 Vue 3 SFC 出码、SQLite 版本对比回滚与 Module Federation 远程物料插件等 10 大演进方向。
 6. **[v0.2.0 已实现功能问题排查与优化报告](docs/0.2.0_OPTIMIZATIONS.md)**：包含 Web Component Shadow DOM 样式穿透、RFC 6902 JSON Patch 增量保存、历史栈 GC 优化、快捷键上下文隔离与 Prettier 代码美化解析器落地方案。
-9. **[v0.4.0 功能规划与路线图](docs/0.4.0_PLAN.md)**：包含节点式可视化逻辑流编排、在线 API 数据源建模与 Mock 仿真、可视化 CSS 与样式微调编辑器、Schema 版本对比与 Diff 工具、第三方物料 SDK。
-10. **[低代码物料解析规范与技术对比指南](docs/MATERIAL_SPECIFICATION.md)**：包含 Vue 源码 (.vue) 与编译 JS (.js) 的解析机制、兼容性、扩展性对比及混合架构最佳落地建议。
-11. **[v0.5.0 功能规划与路线图](docs/0.5.0_PLAN.md)**：包含多工作区多项目物理隔离、自制组件入参/出参强校验规范、简易操作日志可视化控制台。
-12. **[自制组件入参/出参规范与契约强校验指南](docs/COMPONENT_IO_SPECIFICATION.md)**：包含自制物料组件必填 Inputs/Outputs 参数定义、类型约束、属性抽屉强校验规则。
+7. **[v0.4.0 功能规划与路线图](docs/0.4.0_PLAN.md)**：包含节点式可视化逻辑流编排、在线 API 数据源建模与 Mock 仿真、可视化 CSS 与样式微调编辑器、Schema 版本对比与 Diff 工具、第三方物料 SDK。
+8. **[低代码物料解析规范与技术对比指南](docs/MATERIAL_SPECIFICATION.md)**：包含 Vue 源码 (.vue) 与编译 JS (.js) 的解析机制、兼容性、扩展性对比及混合架构最佳落地建议。
+9. **[v0.5.0 功能规划与路线图](docs/0.5.0_PLAN.md)**：包含多工作区多项目物理隔离、自制组件入参/出参强校验规范、简易操作日志可视化控制台。
+10. **[自制组件入参/出参规范与契约强校验指南](docs/COMPONENT_IO_SPECIFICATION.md)**：包含自制物料组件必填 Inputs/Outputs 参数定义、类型约束、属性抽屉强校验规则。
