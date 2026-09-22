@@ -14,6 +14,9 @@
         </el-button-group>
         <el-button icon="FolderOpened" @click="handleOpenLoadDialog">加载配置</el-button>
         <el-button icon="View" @click="handleOpenLogsDialog">操作审计日志</el-button>
+        <el-button :type="isPreviewMode ? 'info' : 'primary'" icon="VideoPlay" @click="isPreviewMode = !isPreviewMode">
+          {{ isPreviewMode ? '退出预览' : '纯预览模式' }}
+        </el-button>
         <el-button type="warning" icon="Download" @click="exportDialogVisible = true">导出代码</el-button>
         <el-button type="success" icon="Select" @click="handleSaveSchema">保存并写入 JSON</el-button>
       </div>
@@ -22,11 +25,11 @@
     <!-- Main Content Body -->
     <main class="designer-body">
       <!-- Left Material Palette -->
-      <MaterialList />
+      <MaterialList v-if="!isPreviewMode" />
 
       <!-- Center Main Canvas -->
       <CanvasContainer v-slot="{ node }">
-        <template v-if="node">
+        <ErrorBoundary v-if="node">
           <!-- 自有高端组件 -->
           <ProTable v-if="node.type === 'pro-table'" :node="node" />
           <ProForm v-else-if="node.type === 'pro-form'" :node="node" />
@@ -100,11 +103,11 @@
           >
             {{ node.props.text }}
           </el-divider>
-        </template>
+        </ErrorBoundary>
       </CanvasContainer>
 
       <!-- Right Property Drawer -->
-      <PropertyDrawer />
+      <PropertyDrawer v-if="!isPreviewMode" />
     </main>
 
     <!-- Code Export Dialog -->
@@ -154,12 +157,14 @@ import PropertyDrawer from './components/PropertyDrawer.vue';
 import ProTable from './components/ProTable.vue';
 import ProForm from './components/ProForm.vue';
 import CodeExportDialog from './components/CodeExportDialog.vue';
+import ErrorBoundary from './components/ErrorBoundary.vue';
 import { ElMessage } from 'element-plus';
 import { Loading } from '@element-plus/icons-vue';
 
 const API_BASE = 'http://localhost:3001/api';
 const designerStore = useDesignerStore();
 
+const isPreviewMode = ref(false);
 const loadDialogVisible = ref(false);
 const logsDialogVisible = ref(false);
 const exportDialogVisible = ref(false);

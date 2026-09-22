@@ -2,7 +2,7 @@
   <div class="material-panel">
     <div class="panel-header">
       <el-icon><Menu /></el-icon>
-      <span>组件物料库</span>
+      <span>物料与图层大纲</span>
     </div>
     <el-tabs v-model="activeTab" class="material-tabs">
       <el-tab-pane label="自有高端组件" name="pro">
@@ -20,7 +20,7 @@
           </div>
         </div>
       </el-tab-pane>
-      <el-tab-pane label="Element-UI 组件" name="element">
+      <el-tab-pane label="Element 组件" name="element">
         <div class="material-grid">
           <div
             v-for="item in elementMaterials"
@@ -35,6 +35,9 @@
           </div>
         </div>
       </el-tab-pane>
+      <el-tab-pane label="图层大纲" name="layers">
+        <LayerTree />
+      </el-tab-pane>
     </el-tabs>
   </div>
 </template>
@@ -44,6 +47,7 @@ import { ref, computed } from 'vue';
 import { MATERIAL_REGISTRY } from '../registry/materials';
 import type { MaterialItem } from '../types/designer';
 import { useDesignerStore } from '../stores/designerStore';
+import LayerTree from './LayerTree.vue';
 
 const designerStore = useDesignerStore();
 const activeTab = ref('pro');
@@ -64,7 +68,7 @@ const handleClickAdd = (item: MaterialItem) => {
 
 <style scoped>
 .material-panel {
-  width: 260px;
+  width: 280px;
   background-color: #ffffff;
   border-right: 1px solid #e4e7ed;
   display: flex;
@@ -83,6 +87,9 @@ const handleClickAdd = (item: MaterialItem) => {
 }
 .material-tabs {
   padding: 0 12px;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
 }
 .material-grid {
   display: grid;

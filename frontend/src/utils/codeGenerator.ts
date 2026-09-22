@@ -211,6 +211,33 @@ export default CustomElementClass;
 /**
  * 3. 生成独立纯 HTML + CDN 可运行文件 (index.html)
  */
+/**
+ * 4. 生成配套 package.json 依赖构建清单
+ */
+export function generatePackageJson(schema: PageSchema): string {
+  return JSON.stringify({
+    "name": `lowcode-export-${schema.id.toLowerCase().replace(/_/g, '-')}`,
+    "version": "1.0.0",
+    "private": true,
+    "scripts": {
+      "dev": "vite",
+      "build": "vue-tsc -b && vite build",
+      "preview": "vite preview"
+    },
+    "dependencies": {
+      "vue": "^3.4.0",
+      "element-plus": "^2.6.0",
+      "@element-plus/icons-vue": "^2.3.0"
+    },
+    "devDependencies": {
+      "@vitejs/plugin-vue": "^5.0.0",
+      "typescript": "^5.3.0",
+      "vite": "^5.1.0",
+      "vue-tsc": "^2.0.0"
+    }
+  }, null, 2);
+}
+
 export function generateHTML(schema: PageSchema): string {
   let nodesHtml = '';
   schema.children.forEach((child) => {

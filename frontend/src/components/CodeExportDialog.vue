@@ -50,6 +50,21 @@
         </div>
         <pre class="code-block"><code>{{ htmlCode }}</code></pre>
       </el-tab-pane>
+
+      <el-tab-pane label="package.json 清单" name="pkg">
+        <div class="code-header">
+          <span class="code-desc">自动提取当前低代码页面所依赖的项目构建 package.json：</span>
+          <div class="btn-group">
+            <el-button type="primary" size="small" icon="DocumentCopy" @click="handleCopy(pkgCode)">
+              复制 JSON 代码
+            </el-button>
+            <el-button type="success" size="small" icon="Download" @click="handleDownload(pkgCode, 'package.json')">
+              下载 package.json
+            </el-button>
+          </div>
+        </div>
+        <pre class="code-block"><code>{{ pkgCode }}</code></pre>
+      </el-tab-pane>
     </el-tabs>
 
     <template #footer>
@@ -63,7 +78,7 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue';
 import { useDesignerStore } from '../stores/designerStore';
-import { generateVueSFC, generateWebComponent, generateHTML } from '../utils/codeGenerator';
+import { generateVueSFC, generateWebComponent, generateHTML, generatePackageJson } from '../utils/codeGenerator';
 import { ElMessage } from 'element-plus';
 
 const props = defineProps<{
@@ -85,6 +100,7 @@ const dialogVisible = computed({
 const vueCode = computed(() => generateVueSFC(designerStore.pageSchema));
 const wcCode = computed(() => generateWebComponent(designerStore.pageSchema));
 const htmlCode = computed(() => generateHTML(designerStore.pageSchema));
+const pkgCode = computed(() => generatePackageJson(designerStore.pageSchema));
 
 const handleCopy = (text: string) => {
   navigator.clipboard.writeText(text);

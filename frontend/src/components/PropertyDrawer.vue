@@ -51,7 +51,11 @@
             <!-- el-button 属性 -->
             <template v-if="node.type === 'el-button'">
               <el-form-item label="按钮文案">
-                <el-input v-model="node.props.text" />
+                <el-input v-model="node.props.text" placeholder="支持绑定表达式，如 {{ '提交' }}" />
+                <div v-if="node.props.text && node.props.text.includes('{{')" class="expression-preview">
+                  <span class="preview-label">表达式实时计算结果：</span>
+                  <span class="preview-val">{{ getExpressionPreview(node.props.text) }}</span>
+                </div>
               </el-form-item>
               <el-form-item label="按钮类型">
                 <el-select v-model="node.props.type" style="width: 100%">
@@ -203,9 +207,18 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue';
 import { useDesignerStore } from '../stores/designerStore';
+import { parseExpression } from '../utils/expression';
 import SchemaJsonViewer from './SchemaJsonViewer.vue';
 
 const designerStore = useDesignerStore();
+
+const getExpressionPreview = (exprStr: string) => {
+  try {
+    return parseExpression(exprStr, designerStore.pageSchema.state || {});
+  } catch (err: any) {
+    return '求值出错: ' + err.message;
+  }
+};
 const activeTab = ref('props');
 
 const node = computed(() => designerStore.selectedNode);
@@ -277,5 +290,20 @@ const removeFormItem = (index: number) => {
 }
 .no-selection {
   padding-top: 40px;
+}
+.expression-preview {
+  margin-top: 4px;
+  padding: 4px 8px;
+  background-color: #f4f4f5;
+  border-radius: 4px;
+  font-size: 11px;
+  color: #606266;
+}
+.preview-label {
+  color: #909399;
+}
+.preview-val {
+  color: #409eff;
+  font-weight: 600;
 }
 </style>
