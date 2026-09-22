@@ -14,12 +14,17 @@ export class SchemaController {
 
       await storageService.saveSchema(schema);
 
-      // 记录 SQLite 操作日志
+      // 记录 SQLite 操作日志 (包含更细化的 Schema 快照概要)
       logDatabase.addLog({
         page_id: schema.id,
         action: 'SAVE_SCHEMA',
         operator: req.headers['x-operator'] as string || 'designer_user',
-        details: JSON.stringify({ title: schema.title, nodeCount: schema.children?.length || 0 })
+        details: JSON.stringify({
+          title: schema.title,
+          nodeCount: schema.children?.length || 0,
+          version: schema.meta?.version || '1.0.0',
+          childrenSummary: schema.children?.map((c) => ({ id: c.id, type: c.type, label: c.label, layout: c.layout }))
+        }, null, 2)
       });
 
       res.json({ success: true, message: 'Schema saved successfully', data: { id: schema.id } });

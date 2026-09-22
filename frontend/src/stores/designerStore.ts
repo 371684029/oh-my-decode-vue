@@ -139,6 +139,19 @@ export const useDesignerStore = defineStore('designer', {
       this.pageSchema.children.push(pastedNode);
       this.selectNode(newId);
       return true;
+    },
+    moveSelectedNodeBy(deltaX: number, deltaY: number) {
+      if (!this.selectedNode) return false;
+      const layout = this.selectedNode.layout;
+      const newX = Math.max(0, layout.x + deltaX);
+      const newY = Math.max(0, layout.y + deltaY);
+      if (newX !== layout.x || newY !== layout.y) {
+        this.recordHistory();
+        layout.x = newX;
+        layout.y = newY;
+        return true;
+      }
+      return false;
     }
   }
 });

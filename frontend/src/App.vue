@@ -136,19 +136,42 @@
       </el-table>
     </el-dialog>
 
-    <el-dialog v-model="logsDialogVisible" title="SQLite 操作审计日志" width="700px">
+    <el-dialog v-model="logsDialogVisible" title="SQLite 操作审计日志" width="800px">
       <el-table :data="logsList" style="width: 100%" max-height="400px">
-        <el-table-column prop="created_at" label="时间" width="180" />
-        <el-table-column prop="action" label="操作类型" width="140" />
-        <el-table-column prop="page_id" label="关联ID" width="140" />
-        <el-table-column prop="operator" label="操作人" width="120" />
+        <el-table-column prop="created_at" label="时间" width="170" />
+        <el-table-column prop="action" label="操作类型" width="130" />
+        <el-table-column prop="page_id" label="关联ID" width="130" />
+        <el-table-column prop="operator" label="操作人" width="110" />
+        <el-table-column label="改动详情 / Schema Diff" align="center">
+          <template #default="scope">
+            <el-button type="primary" size="small" plain @click="handleViewLogDiff(scope.row)">
+              查看 Details Diff
+            </el-button>
+          </template>
+        </el-table-column>
       </el-table>
+    </el-dialog>
+
+    <!-- Visual Log Details / Diff Dialog -->
+    <el-dialog v-model="logDiffDialogVisible" title="操作日志 Schema 细节 & JSON Diff 快照" width="650px">
+      <div v-if="selectedLog">
+        <el-descriptions border :column="2" style="margin-bottom: 16px">
+          <el-descriptions-item label="日志 ID">{{ selectedLog.id }}</el-descriptions-item>
+          <el-descriptions-item label="操作类型">{{ selectedLog.action }}</el-descriptions-item>
+          <el-descriptions-item label="关联 Page ID">{{ selectedLog.page_id }}</el-descriptions-item>
+          <el-descriptions-item label="记录时间">{{ selectedLog.created_at }}</el-descriptions-item>
+        </el-descriptions>
+        <div style="font-weight: 600; font-size: 13px; margin-bottom: 8px; color: #303133">
+          JSON 结构化快照 Diff 细节：
+        </div>
+        <pre class="diff-json-code">{{ formattedLogDetails }}</pre>
+      </div>
     </el-dialog>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted } from 'vue';
+import { ref, computed, onMounted, onUnmounted } from 'vue';
 import axios from 'axios';
 import { useDesignerStore } from './stores/designerStore';
 import MaterialList from './components/MaterialList.vue';
@@ -170,6 +193,22 @@ const logsDialogVisible = ref(false);
 const exportDialogVisible = ref(false);
 const savedSchemas = ref<any[]>([]);
 const logsList = ref<any[]>([]);
+const logDiffDialogVisible = ref(false);
+const selectedLog = ref<any>(null);
+const formattedLogDetails = computed(() => {
+  if (!selectedLog.value || !selectedLog.value.details) return '{}';
+  try {
+    const parsed = typeof selectedLog.value.details === 'string' ? JSON.parse(selectedLog.value.details) : selectedLog.value.details;
+    return JSON.stringify(parsed, null, 2);
+  } catch (e) {
+    return selectedLog.value.details;
+  }
+});
+
+const handleViewLogDiff = (log: any) => {
+  selectedLog.value = log;
+  logDiffDialogVisible.value = true;
+};
 
 // Silent Anti-Crash Auto Save State
 const isAutoSaving = ref(false);
@@ -233,6 +272,21 @@ const handleKeydown = (e: KeyboardEvent) => {
       e.preventDefault();
       designerStore.redo();
       ElMessage.info('已重做操作');
+    }
+  }
+  // 方向键微调选中组件位置 (ArrowUp, ArrowDown, ArrowLeft, ArrowRight)
+  else if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) {
+    if (designerStore.selectedNodeId) {
+      e.preventDefault();
+      const step = e.shiftKey ? 2 : 1;
+      let deltaX = 0;
+      let deltaY = 0;
+      if (e.key === 'ArrowUp') deltaY = -step;
+      else if (e.key === 'ArrowDown') deltaY = step;
+      else if (e.key === 'ArrowLeft') deltaX = -step;
+      else if (e.key === 'ArrowRight') deltaX = step;
+
+      designerStore.moveSelectedNodeBy(deltaX, deltaY);
     }
   }
 };
@@ -365,5 +419,16 @@ html, body, #app {
   padding: 8px 12px;
   font-size: 12px;
   border-radius: 4px;
+}
+.diff-json-code {
+  background-color: #1e1e1e;
+  color: #a9b7c6;
+  padding: 12px;
+  border-radius: 6px;
+  font-family: 'Fira Code', 'Courier New', monospace;
+  font-size: 12px;
+  max-height: 300px;
+  overflow: auto;
+  margin: 0;
 }
 </style>

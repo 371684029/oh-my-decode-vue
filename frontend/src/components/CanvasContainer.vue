@@ -35,6 +35,26 @@
     </div>
 
     <div v-else class="canvas-viewport-wrapper" :style="viewportStyle">
+      <!-- 对齐参考线与吸附指示器 -->
+      <div v-if="activeSnapXLines.length > 0 || activeSnapYLines.length > 0" class="snap-guides-overlay">
+        <div
+          v-for="(xCol, index) in activeSnapXLines"
+          :key="'x-' + index"
+          class="snap-guide-line snap-guide-line-v"
+          :style="{ left: `calc(${(xCol / colNum) * 100}% - 1px)` }"
+        >
+          <span class="snap-badge">网格 Column {{ xCol }}</span>
+        </div>
+        <div
+          v-for="(yRow, index) in activeSnapYLines"
+          :key="'y-' + index"
+          class="snap-guide-line snap-guide-line-h"
+          :style="{ top: `${yRow * 50}px` }"
+        >
+          <span class="snap-badge">网格 Row {{ yRow }}</span>
+        </div>
+      </div>
+
       <grid-layout
         v-model:layout="layoutItems"
         :col-num="colNum"
@@ -57,6 +77,10 @@
         class="grid-node-wrapper"
         :class="{ selected: designerStore.selectedNodeId === item.i }"
         @click.stop="designerStore.selectNode(item.i)"
+        @move="handleItemMove"
+        @moved="handleItemMoved"
+        @resize="handleItemResize"
+        @resized="handleItemResized"
       >
         <div class="node-toolbar">
           <span class="node-type-tag">{{ getNodeLabel(item.i) }}</span>
@@ -125,6 +149,61 @@ const getNodeLabel = (id: string) => {
   return node ? node.label : id;
 };
 
+const activeSnapXLines = ref<number[]>([]);
+const activeSnapYLines = ref<number[]>([]);
+
+const calculateSnapLines = (movingId: string | number, newX: number, newY: number, newW?: number, newH?: number) => {
+  const item = layoutItems.value.find((l) => l.i === movingId);
+  const w = newW ?? item?.w ?? 1;
+  const h = newH ?? item?.h ?? 1;
+
+  const xLinesSet = new Set<number>();
+  const yLinesSet = new Set<number>();
+
+  const otherItems = layoutItems.value.filter((l) => l.i !== movingId);
+
+  otherItems.forEach((other) => {
+    // 检查 X 轴左右边缘与中心对齐吸附
+    if (newX === other.x || newX === other.x + other.w) {
+      xLinesSet.add(newX);
+    }
+    if (newX + w === other.x || newX + w === other.x + other.w) {
+      xLinesSet.add(newX + w);
+    }
+    // 检查 Y 轴上下边缘对齐吸附
+    if (newY === other.y || newY === other.y + other.h) {
+      yLinesSet.add(newY);
+    }
+    if (newY + h === other.y || newY + h === other.y + other.h) {
+      yLinesSet.add(newY + h);
+    }
+  });
+
+  activeSnapXLines.value = Array.from(xLinesSet);
+  activeSnapYLines.value = Array.from(yLinesSet);
+};
+
+const handleItemMove = (i: string | number, newX: number, newY: number) => {
+  calculateSnapLines(i, newX, newY);
+};
+
+const handleItemMoved = () => {
+  activeSnapXLines.value = [];
+  activeSnapYLines.value = [];
+};
+
+const handleItemResize = (i: string | number, newH: number, newW: number) => {
+  const item = layoutItems.value.find((l) => l.i === i);
+  if (item) {
+    calculateSnapLines(i, item.x, item.y, newW, newH);
+  }
+};
+
+const handleItemResized = () => {
+  activeSnapXLines.value = [];
+  activeSnapYLines.value = [];
+};
+
 const handleLayoutUpdated = (newLayout: any[]) => {
   designerStore.updateNodeLayout(newLayout);
 };
@@ -176,6 +255,50 @@ const handleBackgroundClick = () => {
 }
 .canvas-viewport-wrapper {
   transition: width 0.3s ease;
+  position: relative;
+}
+.snap-guides-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  pointer-events: none;
+  z-index: 100;
+}
+.snap-guide-line {
+  position: absolute;
+  pointer-events: none;
+}
+.snap-guide-line-v {
+  top: 0;
+  bottom: 0;
+  border-left: 2px dashed #f56c6c;
+  background-color: rgba(245, 108, 108, 0.1);
+}
+.snap-guide-line-h {
+  left: 0;
+  right: 0;
+  border-top: 2px dashed #409eff;
+  background-color: rgba(64, 158, 255, 0.1);
+}
+.snap-badge {
+  position: absolute;
+  background-color: #303133;
+  color: #ffffff;
+  font-size: 10px;
+  padding: 2px 6px;
+  border-radius: 3px;
+  white-space: nowrap;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+}
+.snap-guide-line-v .snap-badge {
+  top: 8px;
+  left: 4px;
+}
+.snap-guide-line-h .snap-badge {
+  left: 8px;
+  top: 4px;
 }
 .page-info {
   font-size: 13px;
