@@ -17,6 +17,18 @@ export interface ComponentNode {
   children?: ComponentNode[];
 }
 
+export type LayerType = 'canvas' | 'dialog' | 'loading' | 'custom-html';
+
+export interface LayerConfig {
+  id: string;
+  name: string;
+  type: LayerType;
+  visible: boolean;
+  zIndex: number;
+  props?: Record<string, any>;
+  children: ComponentNode[];
+}
+
 export interface PageSchema {
   id: string;
   title: string;
@@ -28,6 +40,7 @@ export interface PageSchema {
   };
   state: Record<string, any>;
   children: ComponentNode[];
+  layers?: LayerConfig[];
 }
 
 export interface OperationLog {

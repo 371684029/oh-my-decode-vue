@@ -10,11 +10,22 @@ export const useDesignerStore = defineStore('designer', {
       meta: {
         author: 'LowCode Admin',
         description: '通过低代码平台生成的页面',
-        version: '0.0.1'
+        version: '1.2.0'
       },
       state: {},
-      children: [] as ComponentNode[]
+      children: [] as ComponentNode[],
+      layers: [
+        {
+          id: 'layer_base_canvas',
+          name: '主画布图层 (Base Canvas)',
+          type: 'canvas',
+          visible: true,
+          zIndex: 1,
+          children: []
+        }
+      ]
     } as PageSchema,
+    activeLayerId: 'layer_base_canvas' as string,
     selectedNodeId: null as string | null,
     copiedNode: null as ComponentNode | null,
     isDrawerOpen: false,
@@ -152,6 +163,63 @@ export const useDesignerStore = defineStore('designer', {
         return true;
       }
       return false;
+    },
+    addLayer(type: 'dialog' | 'loading' | 'custom-html', name: string) {
+      this.recordHistory();
+      if (!this.pageSchema.layers) this.pageSchema.layers = [];
+      const layerId = 'layer_' + type + '_' + Date.now().toString(36).substring(4);
+      const defaultProps: any = {};
+
+      if (type === 'custom-html') {
+        defaultProps.htmlCode = '<div class="custom-card">\n  <h3>自定义 HTML 图层内容</h3>\n  <p id="time-text">正在加载...</p>\n</div>';
+        defaultProps.cssCode = '.custom-card { padding: 12px; background: #f0f9eb; border: 1px solid #67c23a; border-radius: 6px; color: #303133; }';
+        defaultProps.scriptMounted = 'const el = container.querySelector("#time-text"); if (el) { el.innerText = "挂载时间: " + new Date().toLocaleTimeString(); }';
+        defaultProps.scriptUnmounted = 'console.log("自定义 HTML 图层已被卸载!");';
+      } else if (type === 'dialog') {
+        defaultProps.title = name || '业务弹窗图层';
+        defaultProps.width = '50%';
+      } else if (type === 'loading') {
+        defaultProps.loadingText = '全屏数据加载中，请稍候...';
+      }
+
+      const newLayer = {
+        id: layerId,
+        name: name || (type === 'dialog' ? '业务弹窗图层' : type === 'loading' ? 'Loading 遮罩图层' : '自定义 HTML 图层'),
+        type,
+        visible: true,
+        zIndex: (this.pageSchema.layers.length + 1) * 10,
+        props: defaultProps,
+        children: []
+      };
+
+      this.pageSchema.layers.push(newLayer);
+      this.activeLayerId = layerId;
+      return layerId;
+    },
+    removeLayer(id: string) {
+      if (!this.pageSchema.layers) return;
+      const idx = this.pageSchema.layers.findIndex((l) => l.id === id);
+      if (idx !== -1 && this.pageSchema.layers[idx].type !== 'canvas') {
+        this.recordHistory();
+        this.pageSchema.layers.splice(idx, 1);
+        this.activeLayerId = 'layer_base_canvas';
+      }
+    },
+    toggleLayerVisible(id: string) {
+      if (!this.pageSchema.layers) return;
+      const layer = this.pageSchema.layers.find((l) => l.id === id);
+      if (layer) {
+        this.recordHistory();
+        layer.visible = !layer.visible;
+      }
+    },
+    updateLayerProps(id: string, newProps: Record<string, any>) {
+      if (!this.pageSchema.layers) return;
+      const layer = this.pageSchema.layers.find((l) => l.id === id);
+      if (layer) {
+        this.recordHistory();
+        layer.props = { ...(layer.props || {}), ...newProps };
+      }
     }
   }
 });

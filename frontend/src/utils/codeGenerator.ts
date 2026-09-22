@@ -123,17 +123,46 @@ export function generateVueSFC(schema: PageSchema): string {
     templateBody += renderNodeToTemplate(child, 2);
   });
 
-  if (!templateBody.trim()) {
+  let extraLayersTemplate = '';
+  let extraLifecycleScripts = '';
+
+  if (schema.layers && schema.layers.length > 0) {
+    schema.layers.forEach((layer) => {
+      if (layer.type === 'dialog') {
+        extraLayersTemplate += `    <!-- 弹窗图层: ${layer.name} -->\n` +
+          `    <el-dialog v-model="dialogVisible_${layer.id}" title="${layer.props?.title || layer.name}" width="${layer.props?.width || '50%'}">\n` +
+          `      <p>这是 ${layer.name} 嵌套弹窗内容。</p>\n` +
+          `    </el-dialog>\n\n`;
+      } else if (layer.type === 'loading') {
+        extraLayersTemplate += `    <!-- Loading 遮罩图层: ${layer.name} -->\n` +
+          `    <div v-if="loadingVisible_${layer.id}" class="loading-overlay">\n` +
+          `      <p>${layer.props?.loadingText || '数据加载中...'}</p>\n` +
+          `    </div>\n\n`;
+      } else if (layer.type === 'custom-html') {
+        extraLayersTemplate += `    <!-- 自定义 HTML 图层: ${layer.name} -->\n` +
+          `    <div class="custom-html-wrapper" ref="customHtmlRef_${layer.id}">\n` +
+          `      ${layer.props?.htmlCode || ''}\n` +
+          `    </div>\n\n`;
+
+        if (layer.props?.scriptMounted) {
+          extraLifecycleScripts += `  // 自定义 HTML 图层 (${layer.name}) onMounted 生命周期\n` +
+            `  try {\n    ${layer.props.scriptMounted}\n  } catch (err) { console.error(err); }\n\n`;
+        }
+      }
+    });
+  }
+
+  if (!templateBody.trim() && !extraLayersTemplate.trim()) {
     templateBody = '    <div class="empty-page">页面暂无内容，请在设计器中拖入物料组件</div>\n';
   }
 
   return `<template>
   <div class="lowcode-page-${schema.id}">
-${templateBody}  </div>
+${templateBody}${extraLayersTemplate}  </div>
 </template>
 
 <script setup lang="ts">
-import { ref, reactive } from 'vue';
+import { ref, reactive, onMounted, onUnmounted } from 'vue';
 import { ElMessage } from 'element-plus';
 
 // 全局/表单响应式状态
@@ -142,6 +171,10 @@ const tableData = ref([
   { id: 101, name: '张三', role: '系统管理员', status: '正常', updatedAt: '2026-09-15' },
   { id: 102, name: '李四', role: '前端开发者', status: '启用', updatedAt: '2026-09-15' }
 ]);
+
+onMounted(() => {
+${extraLifecycleScripts || '  console.log("低代码页面及多图层组件已成功挂载!");\n'}
+});
 
 const handleSubmit = () => {
   console.log('Form Submitted:', formData);

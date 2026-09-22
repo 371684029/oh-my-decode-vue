@@ -200,4 +200,5 @@ npm run build
 10. **[自制组件入参/出参规范与契约强校验指南](docs/COMPONENT_IO_SPECIFICATION.md)**：包含自制物料组件必填 Inputs/Outputs 参数定义、类型约束、属性抽屉强校验规则。
 11. **[v1.0.0 基础正式版 (Base GA) 规划与路线图](docs/1.0.0_PLAN.md)**：包含基础拖拽布局、组件 I/O 契约强校验、JSON 文件存储与 SQLite 审计日志控制台、零废码多目标出码与基础页面发布。
 12. **[v1.1.0 体验增强版规划](docs/1.1.0_PLAN.md)**：包含画布对齐参考线/吸附指示、键盘方向键微调、操作日志可视化 JSON Diff 比对。
-13. **[v3.0.0 远期企业级架构与生态规划](docs/3.0.0_PLAN.md)**：包含企业级 RBAC/SSO 单点登录、PostgreSQL/S3 高可用分布式存储、CRDT 多人实时协同、一键 CI/CD 灰度发布、VS Code 插件与 CLI 工具链。
+13. **[v1.2.0 多图层架构与生命周期规划](docs/1.2.0_PLAN.md)**：包含对话框图层、Loading 加载框图层、自定义 HTML 图层及 JavaScript 生命周期钩子 (`onMounted`/`onUnmounted`)。
+14. **[v3.0.0 远期企业级架构与生态规划](docs/3.0.0_PLAN.md)**：包含企业级 RBAC/SSO 单点登录、PostgreSQL/S3 高可用分布式存储、CRDT 多人实时协同、一键 CI/CD 灰度发布、VS Code 插件与 CLI 工具链。

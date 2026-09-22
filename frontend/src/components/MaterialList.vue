@@ -38,6 +38,9 @@
       <el-tab-pane label="图层大纲" name="layers">
         <LayerTree />
       </el-tab-pane>
+      <el-tab-pane label="多图层管理" name="multi-layers">
+        <LayerManager />
+      </el-tab-pane>
     </el-tabs>
   </div>
 </template>
@@ -48,6 +51,7 @@ import { MATERIAL_REGISTRY } from '../registry/materials';
 import type { MaterialItem } from '../types/designer';
 import { useDesignerStore } from '../stores/designerStore';
 import LayerTree from './LayerTree.vue';
+import LayerManager from './LayerManager.vue';
 
 const designerStore = useDesignerStore();
 const activeTab = ref('pro');

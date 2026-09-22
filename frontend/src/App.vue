@@ -110,6 +110,39 @@
       <PropertyDrawer v-if="!isPreviewMode" />
     </main>
 
+    <!-- 多图层系统 (Multi-Layer Overlays) -->
+    <!-- 1. 自定义 HTML 动态图层与生命周期组件 -->
+    <div v-for="layer in customHtmlLayers" :key="layer.id">
+      <div v-if="layer.visible" class="custom-html-floating-layer" :style="{ zIndex: layer.zIndex || 10 }">
+        <CustomHtmlLayerNode :layer="layer" />
+      </div>
+    </div>
+
+    <!-- 2. 弹窗/对话框图层 (Dialog Layers) -->
+    <template v-for="layer in dialogLayers" :key="layer.id">
+      <el-dialog
+        v-model="layer.visible"
+        :title="layer.props?.title || '业务弹窗图层'"
+        :width="layer.props?.width || '50%'"
+        :append-to-body="true"
+      >
+        <div class="dialog-layer-body">
+          <p style="color: #606266; font-size: 14px">这是弹窗图层组件嵌套空间。</p>
+        </div>
+      </el-dialog>
+    </template>
+
+    <!-- 3. Loading 遮罩图层 (Loading Mask Layers) -->
+    <template v-for="layer in loadingLayers" :key="layer.id">
+      <div v-if="layer.visible" class="global-loading-overlay">
+        <div class="loading-box">
+          <el-icon class="is-loading loading-icon"><Loading /></el-icon>
+          <p>{{ layer.props?.loadingText || '加载中...' }}</p>
+          <el-button size="small" type="primary" plain @click="layer.visible = false">隐藏 Loading 图层</el-button>
+        </div>
+      </div>
+    </template>
+
     <!-- Code Export Dialog -->
     <CodeExportDialog v-model="exportDialogVisible" />
 
@@ -181,6 +214,7 @@ import ProTable from './components/ProTable.vue';
 import ProForm from './components/ProForm.vue';
 import CodeExportDialog from './components/CodeExportDialog.vue';
 import ErrorBoundary from './components/ErrorBoundary.vue';
+import CustomHtmlLayerNode from './components/CustomHtmlLayerNode.vue';
 import { ElMessage } from 'element-plus';
 import { Loading } from '@element-plus/icons-vue';
 
@@ -193,6 +227,18 @@ const logsDialogVisible = ref(false);
 const exportDialogVisible = ref(false);
 const savedSchemas = ref<any[]>([]);
 const logsList = ref<any[]>([]);
+
+const customHtmlLayers = computed(() => {
+  return designerStore.pageSchema.layers?.filter((l) => l.type === 'custom-html') || [];
+});
+
+const dialogLayers = computed(() => {
+  return designerStore.pageSchema.layers?.filter((l) => l.type === 'dialog') || [];
+});
+
+const loadingLayers = computed(() => {
+  return designerStore.pageSchema.layers?.filter((l) => l.type === 'loading') || [];
+});
 const logDiffDialogVisible = ref(false);
 const selectedLog = ref<any>(null);
 const formattedLogDetails = computed(() => {
@@ -430,5 +476,37 @@ html, body, #app {
   max-height: 300px;
   overflow: auto;
   margin: 0;
+}
+.custom-html-floating-layer {
+  position: fixed;
+  bottom: 20px;
+  left: 300px;
+  max-width: 400px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+  border-radius: 6px;
+  background-color: #ffffff;
+}
+.global-loading-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(255, 255, 255, 0.85);
+  z-index: 3000;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+.loading-box {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  color: #409eff;
+  font-weight: 600;
+}
+.loading-icon {
+  font-size: 40px;
 }
 </style>
