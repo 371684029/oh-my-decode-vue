@@ -1,0 +1,15 @@
+{
+  "name": "Low-Code Platform",
+  "install": "npm ci && (npm --prefix frontend exec -- playwright install --with-deps chromium || echo 'playwright browser install skipped')",
+  "terminals": [
+    {
+      "name": "backend",
+      "command": "npm run dev:backend"
+    },
+    {
+      "name": "frontend",
+      "command": "npm run dev:frontend"
+    }
+  ],
+  "ports": [3001, 5173]
+}
