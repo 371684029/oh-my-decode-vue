@@ -1,9 +1,7 @@
 <template>
   <div class="schema-json-viewer">
     <div class="viewer-actions">
-      <el-button type="primary" size="small" icon="CopyDocument" @click="handleCopy">
-        复制 JSON
-      </el-button>
+      <el-button type="primary" size="small" icon="CopyDocument" @click="handleCopy"> 复制 JSON </el-button>
     </div>
     <pre class="json-code"><code>{{ jsonString }}</code></pre>
   </div>

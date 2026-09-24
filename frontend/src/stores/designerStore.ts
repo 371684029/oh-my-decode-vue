@@ -1,6 +1,10 @@
 import { defineStore } from 'pinia';
 import type { PageSchema, ComponentNode, MaterialItem } from '../types/designer';
 
+/** 生成全局唯一节点/图层 id（时间戳 + 随机后缀，避免同毫秒内重复） */
+const generateUniqueId = (prefix: string): string =>
+  `${prefix}_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`;
+
 export const useDesignerStore = defineStore('designer', {
   state: () => ({
     pageSchema: {
@@ -81,7 +85,7 @@ export const useDesignerStore = defineStore('designer', {
     },
     addNodeFromMaterial(material: MaterialItem, x = 0, y = 0) {
       this.recordHistory();
-      const id = material.type + '_' + Date.now().toString(36).substring(4);
+      const id = generateUniqueId(material.type);
       const newNode: ComponentNode = {
         id,
         type: material.type,
@@ -106,7 +110,10 @@ export const useDesignerStore = defineStore('designer', {
       let isChanged = false;
       layoutList.forEach((item) => {
         const node = this.pageSchema.children.find((n) => n.id === item.i);
-        if (node && (node.layout.x !== item.x || node.layout.y !== item.y || node.layout.w !== item.w || node.layout.h !== item.h)) {
+        if (
+          node &&
+          (node.layout.x !== item.x || node.layout.y !== item.y || node.layout.w !== item.w || node.layout.h !== item.h)
+        ) {
           if (!isChanged) {
             this.recordHistory();
             isChanged = true;
@@ -142,7 +149,7 @@ export const useDesignerStore = defineStore('designer', {
     pasteNode() {
       if (!this.copiedNode) return false;
       this.recordHistory();
-      const newId = this.copiedNode.type + '_' + Date.now().toString(36).substring(4);
+      const newId = generateUniqueId(this.copiedNode.type);
       const pastedNode: ComponentNode = JSON.parse(JSON.stringify(this.copiedNode));
       pastedNode.id = newId;
       pastedNode.layout.i = newId;
@@ -167,13 +174,16 @@ export const useDesignerStore = defineStore('designer', {
     addLayer(type: 'dialog' | 'loading' | 'custom-html', name: string) {
       this.recordHistory();
       if (!this.pageSchema.layers) this.pageSchema.layers = [];
-      const layerId = 'layer_' + type + '_' + Date.now().toString(36).substring(4);
+      const layerId = generateUniqueId('layer_' + type);
       const defaultProps: any = {};
 
       if (type === 'custom-html') {
-        defaultProps.htmlCode = '<div class="custom-card">\n  <h3>自定义 HTML 图层内容</h3>\n  <p id="time-text">正在加载...</p>\n</div>';
-        defaultProps.cssCode = '.custom-card { padding: 12px; background: #f0f9eb; border: 1px solid #67c23a; border-radius: 6px; color: #303133; }';
-        defaultProps.scriptMounted = 'const el = container.querySelector("#time-text"); if (el) { el.innerText = "挂载时间: " + new Date().toLocaleTimeString(); }';
+        defaultProps.htmlCode =
+          '<div class="custom-card">\n  <h3>自定义 HTML 图层内容</h3>\n  <p id="time-text">正在加载...</p>\n</div>';
+        defaultProps.cssCode =
+          '.custom-card { padding: 12px; background: #f0f9eb; border: 1px solid #67c23a; border-radius: 6px; color: #303133; }';
+        defaultProps.scriptMounted =
+          'const el = container.querySelector("#time-text"); if (el) { el.innerText = "挂载时间: " + new Date().toLocaleTimeString(); }';
         defaultProps.scriptUnmounted = 'console.log("自定义 HTML 图层已被卸载!");';
       } else if (type === 'dialog') {
         defaultProps.title = name || '业务弹窗图层';
@@ -184,7 +194,8 @@ export const useDesignerStore = defineStore('designer', {
 
       const newLayer = {
         id: layerId,
-        name: name || (type === 'dialog' ? '业务弹窗图层' : type === 'loading' ? 'Loading 遮罩图层' : '自定义 HTML 图层'),
+        name:
+          name || (type === 'dialog' ? '业务弹窗图层' : type === 'loading' ? 'Loading 遮罩图层' : '自定义 HTML 图层'),
         type,
         visible: true,
         zIndex: (this.pageSchema.layers.length + 1) * 10,

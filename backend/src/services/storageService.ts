@@ -43,7 +43,7 @@ export class StorageService {
       const filePath = this.getFilePath(id, type);
       const content = await fs.readFile(filePath, 'utf-8');
       return JSON.parse(content) as PageSchema;
-    } catch (err) {
+    } catch {
       return null;
     }
   }

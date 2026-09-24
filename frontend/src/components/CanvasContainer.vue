@@ -1,10 +1,5 @@
 <template>
-  <div
-    class="canvas-container"
-    @dragover.prevent
-    @drop="handleDrop"
-    @click="handleBackgroundClick"
-  >
+  <div class="canvas-container" @dragover.prevent @drop="handleDrop" @click="handleBackgroundClick">
     <div class="canvas-header">
       <span class="page-title">{{ designerStore.pageSchema.title }}</span>
 
@@ -63,44 +58,43 @@
         :is-resizable="true"
         :vertical-compact="true"
         :use-css-transforms="true"
-        @layout-updated="handleLayoutUpdated"
         class="grid-canvas"
+        @layout-updated="handleLayoutUpdated"
       >
-      <grid-item
-        v-for="item in layoutItems"
-        :key="item.i"
-        :x="item.x"
-        :y="item.y"
-        :w="item.w"
-        :h="item.h"
-        :i="item.i"
-        class="grid-node-wrapper"
-        :class="{ selected: designerStore.selectedNodeId === item.i }"
-        @click.stop="designerStore.selectNode(item.i)"
-        @move="handleItemMove"
-        @moved="handleItemMoved"
-        @resize="handleItemResize"
-        @resized="handleItemResized"
-      >
-        <div class="node-toolbar">
-          <span class="node-type-tag">{{ getNodeLabel(item.i) }}</span>
-          <el-icon class="delete-btn" @click.stop="designerStore.removeNode(item.i)">
-            <Delete />
-          </el-icon>
-        </div>
+        <grid-item
+          v-for="item in layoutItems"
+          :key="item.i"
+          :x="item.x"
+          :y="item.y"
+          :w="item.w"
+          :h="item.h"
+          :i="item.i"
+          class="grid-node-wrapper"
+          :class="{ selected: designerStore.selectedNodeId === item.i }"
+          @click.stop="designerStore.selectNode(item.i)"
+          @move="handleItemMove"
+          @moved="handleItemMoved"
+          @resize="handleItemResize"
+          @resized="handleItemResized"
+        >
+          <div class="node-toolbar">
+            <span class="node-type-tag">{{ getNodeLabel(item.i) }}</span>
+            <el-icon class="delete-btn" @click.stop="designerStore.removeNode(item.i)">
+              <Delete />
+            </el-icon>
+          </div>
 
-        <div class="node-content">
-          <slot :node="getNode(item.i)" />
-        </div>
-      </grid-item>
-    </grid-layout>
+          <div class="node-content">
+            <slot :node="getNode(item.i)" />
+          </div>
+        </grid-item>
+      </grid-layout>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, computed } from 'vue';
-// @ts-ignore
 import { GridLayout, GridItem } from 'vue3-grid-layout-next';
 import { useDesignerStore } from '../stores/designerStore';
 import type { MaterialItem } from '../types/designer';
@@ -111,10 +105,14 @@ const viewportMode = ref<'desktop' | 'laptop' | 'tablet' | 'mobile'>('desktop');
 
 const colNum = computed(() => {
   switch (viewportMode.value) {
-    case 'mobile': return 4;
-    case 'tablet': return 8;
-    case 'laptop': return 12;
-    default: return 12;
+    case 'mobile':
+      return 4;
+    case 'tablet':
+      return 8;
+    case 'laptop':
+      return 12;
+    default:
+      return 12;
   }
 });
 
@@ -290,7 +288,7 @@ const handleBackgroundClick = () => {
   padding: 2px 6px;
   border-radius: 3px;
   white-space: nowrap;
-  box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
 }
 .snap-guide-line-v .snap-badge {
   top: 8px;
@@ -333,7 +331,9 @@ const handleBackgroundClick = () => {
   border-radius: 4px;
   padding: 8px;
   position: relative;
-  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  transition:
+    border-color 0.2s ease,
+    box-shadow 0.2s ease;
   display: flex;
   flex-direction: column;
 }

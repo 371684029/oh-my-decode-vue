@@ -133,15 +133,9 @@
           <div v-if="node.type === 'pro-table'" class="config-section">
             <div class="section-title">
               <span>表格列配置 (Columns)</span>
-              <el-button type="primary" size="small" icon="Plus" link @click="addTableColumn">
-                添加列
-              </el-button>
+              <el-button type="primary" size="small" icon="Plus" link @click="addTableColumn"> 添加列 </el-button>
             </div>
-            <div
-              v-for="(col, index) in node.config.columns"
-              :key="index"
-              class="config-card"
-            >
+            <div v-for="(col, index) in node.config.columns" :key="index" class="config-card">
               <el-input v-model="col.label" placeholder="列名" style="margin-bottom: 6px" />
               <el-input v-model="col.prop" placeholder="字段 (prop)" style="margin-bottom: 6px" />
               <div class="card-row">
@@ -156,15 +150,9 @@
           <div v-if="node.type === 'pro-form'" class="config-section">
             <div class="section-title">
               <span>表单项配置 (Items)</span>
-              <el-button type="primary" size="small" icon="Plus" link @click="addFormItem">
-                添加项
-              </el-button>
+              <el-button type="primary" size="small" icon="Plus" link @click="addFormItem"> 添加项 </el-button>
             </div>
-            <div
-              v-for="(item, index) in node.config.items"
-              :key="index"
-              class="config-card"
-            >
+            <div v-for="(item, index) in node.config.items" :key="index" class="config-card">
               <el-input v-model="item.label" placeholder="Label" style="margin-bottom: 6px" />
               <el-input v-model="item.field" placeholder="字段名 (field)" style="margin-bottom: 6px" />
               <div class="card-row">

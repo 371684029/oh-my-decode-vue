@@ -11,9 +11,9 @@
       default-expand-all
       :expand-on-click-node="false"
       highlight-current
-      :current-node-key="selectedNodeId"
-      @node-click="handleNodeClick"
+      :current-node-key="selectedNodeId ?? undefined"
       class="custom-layer-tree"
+      @node-click="handleNodeClick"
     >
       <template #default="{ data }">
         <div class="tree-node-content" :class="{ 'is-selected': data.id === selectedNodeId }">
@@ -23,13 +23,7 @@
             <span class="node-id">({{ data.id }})</span>
           </span>
           <div class="node-actions">
-            <el-button
-              type="danger"
-              link
-              size="small"
-              title="删除组件"
-              @click.stop="handleDelete(data.id)"
-            >
+            <el-button type="danger" link size="small" title="删除组件" @click.stop="handleDelete(data.id)">
               <el-icon><Delete /></el-icon>
             </el-button>
           </div>
@@ -121,7 +115,8 @@ const handleDelete = (id: string) => {
 }
 
 .node-actions {
-  display: opacity;
+  display: flex;
+  align-items: center;
   opacity: 0.8;
 }
 

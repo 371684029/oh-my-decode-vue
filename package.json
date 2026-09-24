@@ -1,17 +1,33 @@
 {
   "name": "low-code-platform",
-  "version": "0.3.0",
+  "version": "1.2.0",
   "private": true,
   "description": "Low-Code Frontend Platform",
   "workspaces": [
     "frontend",
-    "backend"
+    "backend",
+    "shared"
   ],
   "scripts": {
     "dev:frontend": "npm --prefix frontend run dev",
     "dev:backend": "npm --prefix backend run dev",
     "build:frontend": "npm --prefix frontend run build",
     "build:backend": "npm --prefix backend run build",
-    "build": "npm run build:backend && npm run build:frontend"
+    "build": "npm run build:backend && npm run build:frontend",
+    "test": "npm --prefix frontend run test",
+    "typecheck": "npm run typecheck:backend && npm run typecheck:frontend",
+    "typecheck:frontend": "npm --prefix frontend run typecheck",
+    "typecheck:backend": "tsc -p backend/tsconfig.json --noEmit",
+    "lint": "npm run lint:frontend && npm run lint:backend",
+    "lint:frontend": "npm --prefix frontend run lint",
+    "lint:backend": "npm --prefix backend run lint",
+    "lint:fix": "npm run lint:fix:frontend && npm run lint:fix:backend",
+    "lint:fix:frontend": "npm --prefix frontend run lint:fix",
+    "lint:fix:backend": "npm --prefix backend run lint:fix",
+    "format": "prettier --write ."
+  },
+  "devDependencies": {
+    "eslint-config-prettier": "^10.1.8",
+    "prettier": "^3.9.9"
   }
 }

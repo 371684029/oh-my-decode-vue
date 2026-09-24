@@ -1,16 +1,4 @@
-export interface MaterialItem {
-  type: string;
-  label: string;
-  icon: string;
-  category: 'pro' | 'element';
-  defaultLayout: {
-    w: number;
-    h: number;
-  };
-  defaultProps: Record<string, any>;
-  defaultAttrs: Record<string, any>;
-  defaultConfig?: Record<string, any>;
-}
+import type { MaterialItem } from '@lowcode/shared';
 
 export const MATERIAL_REGISTRY: MaterialItem[] = [
   // --- 自有高端组件 ---
@@ -63,7 +51,16 @@ export const MATERIAL_REGISTRY: MaterialItem[] = [
     defaultConfig: {
       items: [
         { field: 'username', label: '用户名', component: 'input', placeholder: '请输入用户名', required: true },
-        { field: 'gender', label: '性别', component: 'select', placeholder: '请选择性别', options: [{ label: '男', value: 'male' }, { label: '女', value: 'female' }] },
+        {
+          field: 'gender',
+          label: '性别',
+          component: 'select',
+          placeholder: '请选择性别',
+          options: [
+            { label: '男', value: 'male' },
+            { label: '女', value: 'female' }
+          ]
+        },
         { field: 'birthday', label: '出生日期', component: 'date', placeholder: '请选择日期' },
         { field: 'enableNotice', label: '开启通知', component: 'switch' }
       ]

@@ -3,6 +3,10 @@ dist
 .DS_Store
 *.local
 *.log
+.env
+.env.*
+!.env.example
+.omo/
 backend/storage/pages/*.json
 backend/storage/components/*.json
 backend/data/*.db

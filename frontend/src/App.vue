@@ -5,12 +5,24 @@
       <div class="logo">
         <el-icon class="logo-icon"><Platform /></el-icon>
         <span class="logo-text">低代码前端可视化平台 (Low-Code Studio)</span>
-        <el-tag size="small" type="primary" effect="plain" style="margin-left: 10px">v0.3.0</el-tag>
+        <el-tag size="small" type="primary" effect="plain" style="margin-left: 10px">v1.2.0</el-tag>
       </div>
       <div class="header-actions">
         <el-button-group class="history-btn-group">
-          <el-button icon="RefreshLeft" :disabled="!designerStore.canUndo" @click="designerStore.undo()" title="撤销 (Ctrl+Z)">撤销</el-button>
-          <el-button icon="RefreshRight" :disabled="!designerStore.canRedo" @click="designerStore.redo()" title="重做 (Ctrl+Y)">重做</el-button>
+          <el-button
+            icon="RefreshLeft"
+            :disabled="!designerStore.canUndo"
+            title="撤销 (Ctrl+Z)"
+            @click="designerStore.undo()"
+            >撤销</el-button
+          >
+          <el-button
+            icon="RefreshRight"
+            :disabled="!designerStore.canRedo"
+            title="重做 (Ctrl+Y)"
+            @click="designerStore.redo()"
+            >重做</el-button
+          >
         </el-button-group>
         <el-button icon="FolderOpened" @click="handleOpenLoadDialog">加载配置</el-button>
         <el-button icon="View" @click="handleOpenLogsDialog">操作审计日志</el-button>
@@ -43,7 +55,12 @@
             </template>
             <div
               class="container-inner"
-              :style="{ display: 'flex', flexDirection: node.props.direction || 'row', gap: '12px', padding: node.props.padding || '12px' }"
+              :style="{
+                display: 'flex',
+                flexDirection: node.props.direction || 'row',
+                gap: '12px',
+                padding: node.props.padding || '12px'
+              }"
             >
               <p style="color: #909399; font-size: 13px; margin: 0">弹性嵌套容器 Slot 占位区域</p>
             </div>
@@ -97,10 +114,7 @@
             :inactive-text="node.props.inactiveText"
           />
 
-          <el-divider
-            v-else-if="node.type === 'el-divider'"
-            :content-position="node.props.contentPosition || 'center'"
-          >
+          <el-divider v-else-if="node.type === 'el-divider'" :content-position="node.props.contentPosition || 'center'">
             {{ node.props.text }}
           </el-divider>
         </ErrorBoundary>
@@ -161,9 +175,7 @@
         <el-table-column prop="id" label="页面ID" width="180" />
         <el-table-column label="操作" width="120" align="center">
           <template #default="scope">
-            <el-button type="primary" size="small" link @click="handleSelectSchema(scope.row)">
-              载入
-            </el-button>
+            <el-button type="primary" size="small" link @click="handleSelectSchema(scope.row)"> 载入 </el-button>
           </template>
         </el-table-column>
       </el-table>
@@ -218,7 +230,7 @@ import CustomHtmlLayerNode from './components/CustomHtmlLayerNode.vue';
 import { ElMessage } from 'element-plus';
 import { Loading } from '@element-plus/icons-vue';
 
-const API_BASE = 'http://localhost:3001/api';
+const API_BASE = import.meta.env.VITE_API_BASE ?? 'http://localhost:3001/api';
 const designerStore = useDesignerStore();
 
 const isPreviewMode = ref(false);
@@ -244,9 +256,10 @@ const selectedLog = ref<any>(null);
 const formattedLogDetails = computed(() => {
   if (!selectedLog.value || !selectedLog.value.details) return '{}';
   try {
-    const parsed = typeof selectedLog.value.details === 'string' ? JSON.parse(selectedLog.value.details) : selectedLog.value.details;
+    const parsed =
+      typeof selectedLog.value.details === 'string' ? JSON.parse(selectedLog.value.details) : selectedLog.value.details;
     return JSON.stringify(parsed, null, 2);
-  } catch (e) {
+  } catch {
     return selectedLog.value.details;
   }
 });
@@ -278,7 +291,10 @@ const performAutoSave = async () => {
 const handleKeydown = (e: KeyboardEvent) => {
   // 如果正在 input / textarea / contenteditable 中打字，则跳过快捷键
   const activeEl = document.activeElement;
-  if (activeEl && (activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA' || (activeEl as HTMLElement).isContentEditable)) {
+  if (
+    activeEl &&
+    (activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA' || (activeEl as HTMLElement).isContentEditable)
+  ) {
     return;
   }
 
@@ -397,7 +413,9 @@ const handleOpenLogsDialog = async () => {
 </script>
 
 <style>
-html, body, #app {
+html,
+body,
+#app {
   margin: 0;
   padding: 0;
   height: 100%;
@@ -419,7 +437,7 @@ html, body, #app {
   justify-content: space-between;
   align-items: center;
   padding: 0 20px;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
 }
 .logo {
   display: flex;
@@ -482,7 +500,7 @@ html, body, #app {
   bottom: 20px;
   left: 300px;
   max-width: 400px;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
   border-radius: 6px;
   background-color: #ffffff;
 }

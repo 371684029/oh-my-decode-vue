@@ -48,8 +48,8 @@
           <el-icon
             class="action-icon"
             :class="{ hidden: !layer.visible }"
-            @click.stop="designerStore.toggleLayerVisible(layer.id)"
             title="显隐切换"
+            @click.stop="designerStore.toggleLayerVisible(layer.id)"
           >
             <View v-if="layer.visible" />
             <Hide v-else />
@@ -58,8 +58,8 @@
           <el-icon
             v-if="layer.type !== 'canvas'"
             class="action-icon delete-icon"
-            @click.stop="designerStore.removeLayer(layer.id)"
             title="删除图层"
+            @click.stop="designerStore.removeLayer(layer.id)"
           >
             <Delete />
           </el-icon>
@@ -70,13 +70,19 @@
     <!-- 当前激活图层的生命周期与配置面板 (自定义 HTML / 弹窗 / Loading) -->
     <div v-if="activeLayer && activeLayer.type !== 'canvas'" class="layer-config-box">
       <el-divider content-position="left">
-        <span style="font-size: 13px; font-weight: 600; color: #409eff">
-          图层配置: {{ activeLayer.name }}
-        </span>
+        <span style="font-size: 13px; font-weight: 600; color: #409eff"> 图层配置: {{ activeLayer.name }} </span>
       </el-divider>
 
       <!-- 自定义 HTML 图层设置与生命周期脚本 -->
       <div v-if="activeLayer.type === 'custom-html'" class="html-lifecycle-editor">
+        <el-alert
+          type="warning"
+          :closable="false"
+          show-icon
+          style="margin-bottom: 12px"
+          title="安全提示"
+          description="自定义 HTML 渲染前会经 DOMPurify 消毒（剥离 script / on* 事件）；生命周期脚本将在浏览器本地执行，仅用于设计器内预览，导出代码时会原样嵌入目标代码，请由页面所有者自行评估脚本安全。"
+        />
         <el-form label-position="top" size="small">
           <el-form-item label="自定义 HTML 代码">
             <el-input
@@ -141,7 +147,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed, watch } from 'vue';
 import { useDesignerStore } from '../stores/designerStore';
 import { Files, Message, Loading, Document, ArrowDown, View, Hide, Delete } from '@element-plus/icons-vue';
 
@@ -151,21 +157,31 @@ const activeLayer = computed(() => {
   return designerStore.pageSchema.layers?.find((l) => l.id === designerStore.activeLayerId);
 });
 
-const activeLayerProps = computed(() => {
-  if (!activeLayer.value) return {};
-  if (!activeLayer.value.props) {
-    activeLayer.value.props = {};
-  }
-  return activeLayer.value.props;
-});
+// 确保激活图层存在 props 容器（watch 中初始化，避免 computed 副作用）
+watch(
+  activeLayer,
+  (layer) => {
+    if (layer && !layer.props) {
+      layer.props = {};
+    }
+  },
+  { immediate: true }
+);
+
+const activeLayerProps = computed(() => activeLayer.value?.props ?? {});
 
 const getLayerTagType = (type: string) => {
   switch (type) {
-    case 'canvas': return 'primary';
-    case 'dialog': return 'warning';
-    case 'loading': return 'info';
-    case 'custom-html': return 'success';
-    default: return 'info';
+    case 'canvas':
+      return 'primary';
+    case 'dialog':
+      return 'warning';
+    case 'loading':
+      return 'info';
+    case 'custom-html':
+      return 'success';
+    default:
+      return 'info';
   }
 };
 

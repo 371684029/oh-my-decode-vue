@@ -1,12 +1,15 @@
 <template>
-  <el-dialog
-    v-model="dialogVisible"
-    title="零废码出码引擎 - 导出代码"
-    width="800px"
-    destroy-on-close
-  >
+  <el-dialog v-model="dialogVisible" title="零废码出码引擎 - 导出代码" width="800px" destroy-on-close>
     <el-tabs v-model="activeTab" type="card">
       <el-tab-pane label="Vue 3 SFC (.vue)" name="vue">
+        <el-alert
+          type="success"
+          :closable="false"
+          show-icon
+          style="margin-bottom: 12px"
+          title="完整渲染"
+          description="生成的 Vue 3 Composition API & TypeScript 单文件组件，渲染当前 Schema 描述的全部组件、图层与生命周期逻辑。"
+        />
         <div class="code-header">
           <span class="code-desc">生成符合企级规范的 Vue 3 Composition API & TypeScript 单文件组件代码：</span>
           <div class="btn-group">
@@ -22,8 +25,16 @@
       </el-tab-pane>
 
       <el-tab-pane label="Web Component (.js)" name="wc">
+        <el-alert
+          type="info"
+          :closable="false"
+          show-icon
+          style="margin-bottom: 12px"
+          title="完整渲染"
+          description="需配套下载 PageTemplate.vue 置于同一目录，并在宿主项目（Vue 3 + Element Plus + Vite）中构建运行；React / Angular / jQuery / 原生 HTML 均可直接引用该自定义元素标签。"
+        />
         <div class="code-header">
-          <span class="code-desc">生成基于 W3C 标准的跨框架 Web Component 原生自定义元素：</span>
+          <span class="code-desc">生成 W3C 标准跨框架 Web Component 自定义元素包装脚本：</span>
           <div class="btn-group">
             <el-button type="primary" size="small" icon="DocumentCopy" @click="handleCopy(wcCode)">
               复制 JS 代码
@@ -31,14 +42,30 @@
             <el-button type="success" size="small" icon="Download" @click="handleDownload(wcCode, 'custom-element.js')">
               下载 .js 文件
             </el-button>
+            <el-button
+              type="warning"
+              size="small"
+              icon="Download"
+              @click="handleDownload(pageTemplateCode, 'PageTemplate.vue')"
+            >
+              下载配套 PageTemplate.vue
+            </el-button>
           </div>
         </div>
         <pre class="code-block"><code>{{ wcCode }}</code></pre>
       </el-tab-pane>
 
       <el-tab-pane label="独立 HTML (.html)" name="html">
+        <el-alert
+          type="info"
+          :closable="false"
+          show-icon
+          style="margin-bottom: 12px"
+          title="完整渲染"
+          description="基于 Vue 3 CDN（完整版，含模板编译器）+ Element Plus CDN，模板完整内联，下载后双击即可在浏览器运行。"
+        />
         <div class="code-header">
-          <span class="code-desc">生成可直接在浏览器双击打开运行的独立静态 HTML 包 (含 Element Plus CDN)：</span>
+          <span class="code-desc">生成完整渲染的独立静态 HTML 包 (含 Element Plus CDN)：</span>
           <div class="btn-group">
             <el-button type="primary" size="small" icon="DocumentCopy" @click="handleCopy(htmlCode)">
               复制 HTML 代码
@@ -78,7 +105,13 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue';
 import { useDesignerStore } from '../stores/designerStore';
-import { generateVueSFC, generateWebComponent, generateHTML, generatePackageJson } from '../utils/codeGenerator';
+import {
+  generateVueSFC,
+  generatePageTemplate,
+  generateWebComponent,
+  generateHTML,
+  generatePackageJson
+} from '../utils/codeGenerator';
 import { ElMessage } from 'element-plus';
 
 const props = defineProps<{
@@ -98,6 +131,7 @@ const dialogVisible = computed({
 });
 
 const vueCode = computed(() => generateVueSFC(designerStore.pageSchema));
+const pageTemplateCode = computed(() => generatePageTemplate(designerStore.pageSchema));
 const wcCode = computed(() => generateWebComponent(designerStore.pageSchema));
 const htmlCode = computed(() => generateHTML(designerStore.pageSchema));
 const pkgCode = computed(() => generatePackageJson(designerStore.pageSchema));

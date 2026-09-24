@@ -3,13 +3,16 @@
     <component :is="'style'" v-if="layer.props?.cssCode">
       {{ layer.props.cssCode }}
     </component>
-    <div v-html="layer.props?.htmlCode || '<div>无 HTML 内容</div>'"></div>
+    <!-- v-html 内容已经过 DOMPurify 消毒（见 sanitizedHtml computed），此处豁免 XSS 告警 -->
+    <!-- eslint-disable-next-line vue/no-v-html -->
+    <div v-html="sanitizedHtml"></div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted, onUpdated, watch } from 'vue';
+import { ref, computed, onMounted, onUnmounted, onUpdated, watch } from 'vue';
 import type { LayerConfig } from '../types/designer';
+import DOMPurify from 'dompurify';
 
 const props = defineProps<{
   layer: LayerConfig;
@@ -17,6 +20,16 @@ const props = defineProps<{
 
 const containerRef = ref<HTMLElement | null>(null);
 
+/** 自定义 HTML 经 DOMPurify 消毒后渲染（剥离 script / on* 事件等危险内容） */
+const sanitizedHtml = computed(() => {
+  return DOMPurify.sanitize(props.layer.props?.htmlCode || '<div>无 HTML 内容</div>');
+});
+
+/**
+ * 执行图层生命周期脚本。
+ * 注意：脚本在浏览器本地执行（等价于低代码平台的"自定义脚本节点"），
+ * 仅用于设计器内预览；导出代码时脚本将原样嵌入目标代码，由页面所有者负责安全。
+ */
 const executeScript = (scriptCode?: string, lifecycleName?: string) => {
   if (!scriptCode || !scriptCode.trim()) return;
   try {

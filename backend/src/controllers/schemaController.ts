@@ -2,29 +2,45 @@ import { Request, Response } from 'express';
 import { storageService } from '../services/storageService';
 import { logDatabase } from '../db/sqlite';
 import { PageSchema } from '../types/schema';
+import { pageSchemaValidator, formatZodErrors } from '../validation/schemaValidation';
 
 export class SchemaController {
   async saveSchema(req: Request, res: Response): Promise<void> {
     try {
-      const schema: PageSchema = req.body;
-      if (!schema || !schema.id || !schema.type) {
-        res.status(400).json({ success: false, message: 'Invalid schema format: missing id or type' });
+      const body = req.body;
+      if (!body || typeof body !== 'object') {
+        res.status(400).json({ success: false, message: 'Invalid request body' });
         return;
       }
 
+      // Schema 结构强校验：落盘前完整校验，并限制脚本/HTML 字段长度
+      const parsed = pageSchemaValidator.safeParse(body);
+      if (!parsed.success) {
+        res.status(400).json({
+          success: false,
+          message: `Schema validation failed: ${formatZodErrors(parsed.error)}`
+        });
+        return;
+      }
+
+      const schema = parsed.data as PageSchema;
       await storageService.saveSchema(schema);
 
       // 记录 SQLite 操作日志 (包含更细化的 Schema 快照概要)
       logDatabase.addLog({
         page_id: schema.id,
         action: 'SAVE_SCHEMA',
-        operator: req.headers['x-operator'] as string || 'designer_user',
-        details: JSON.stringify({
-          title: schema.title,
-          nodeCount: schema.children?.length || 0,
-          version: schema.meta?.version || '1.0.0',
-          childrenSummary: schema.children?.map((c) => ({ id: c.id, type: c.type, label: c.label, layout: c.layout }))
-        }, null, 2)
+        operator: (req.headers['x-operator'] as string) || 'designer_user',
+        details: JSON.stringify(
+          {
+            title: schema.title,
+            nodeCount: schema.children?.length || 0,
+            version: schema.meta?.version || '1.0.0',
+            childrenSummary: schema.children?.map((c) => ({ id: c.id, type: c.type, label: c.label, layout: c.layout }))
+          },
+          null,
+          2
+        )
       });
 
       res.json({ success: true, message: 'Schema saved successfully', data: { id: schema.id } });
@@ -74,7 +90,7 @@ export class SchemaController {
       logDatabase.addLog({
         page_id: id,
         action: 'DELETE_SCHEMA',
-        operator: req.headers['x-operator'] as string || 'designer_user',
+        operator: (req.headers['x-operator'] as string) || 'designer_user',
         details: JSON.stringify({ type })
       });
 

@@ -1,0 +1,9 @@
+node_modules
+dist
+docs
+package-lock.json
+frontend/src/auto-imports.d.ts
+frontend/src/components.d.ts
+frontend/src/env.d.ts
+backend/data
+backend/storage

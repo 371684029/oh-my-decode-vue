@@ -7,11 +7,7 @@
       :inline="node.props.layout === 'inline'"
     >
       <el-row :gutter="16">
-        <el-col
-          v-for="item in items"
-          :key="item.field"
-          :span="node.props.layout === 'inline' ? undefined : 12"
-        >
+        <el-col v-for="item in items" :key="item.field" :span="node.props.layout === 'inline' ? undefined : 12">
           <el-form-item :label="item.label" :required="item.required">
             <!-- Input -->
             <el-input
@@ -26,12 +22,7 @@
               :placeholder="item.placeholder"
               style="width: 100%"
             >
-              <el-option
-                v-for="opt in item.options || []"
-                :key="opt.value"
-                :label="opt.label"
-                :value="opt.value"
-              />
+              <el-option v-for="opt in item.options || []" :key="opt.value" :label="opt.label" :value="opt.value" />
             </el-select>
             <!-- Date Picker -->
             <el-date-picker
@@ -42,10 +33,7 @@
               style="width: 100%"
             />
             <!-- Switch -->
-            <el-switch
-              v-else-if="item.component === 'switch'"
-              v-model="formData[item.field]"
-            />
+            <el-switch v-else-if="item.component === 'switch'" v-model="formData[item.field]" />
           </el-form-item>
         </el-col>
       </el-row>
