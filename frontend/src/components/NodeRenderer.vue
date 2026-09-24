@@ -1,5 +1,6 @@
 <template>
   <!-- eslint-disable vue/no-mutating-props -- 设计器场景 node 为响应式 store 节点，el-switch 需双向绑定 props -->
+  <div class="node-renderer-root" @click.stop="designerStore.selectNode(node.id)">
   <ErrorBoundary>
     <!-- 自有高端组件 -->
     <ProTable v-if="node.type === 'pro-table'" :node="node" />
@@ -20,6 +21,8 @@
           gap: '12px',
           padding: np(node).padding || '12px'
         }"
+        @dragover.prevent
+        @drop.stop="onDropIntoContainer"
       >
         <template v-if="node.children && node.children.length > 0">
           <NodeRenderer v-for="child in node.children" :key="child.id" :node="child" />
@@ -51,7 +54,7 @@
       :shadow="np(node).shadow || 'always'"
       style="width: 100%"
     >
-      <p style="color: #606266; font-size: 14px">这是 Element Plus Card 内容卡片区域</p>
+      <p style="color: #606266; font-size: 14px">{{ np(node).content || '卡片内容区域' }}</p>
     </el-card>
 
     <el-tag v-else-if="node.type === 'el-tag'" :type="np(node).type || 'success'" :effect="np(node).effect || 'light'">
@@ -81,22 +84,24 @@
 
     <!-- 未知类型兜底 -->
     <div v-else :id="node.id" style="padding: 8px; border: 1px dashed #dcdfe6; border-radius: 4px">
-      {{ node.label }}
+      {{ node.label }}（未登记渲染器）
     </div>
   </ErrorBoundary>
+  </div>
 </template>
 
 <script setup lang="ts">
 import { parseExpression } from '../utils/expression';
 import { executeActions, nodeEventBus } from '../utils/dataSource';
+import { findNode } from '../utils/schemaTree';
 import { useDesignerStore } from '../stores/designerStore';
-import type { ComponentNode } from '../types/designer';
+import type { ComponentNode, MaterialItem } from '../types/designer';
 import ProTable from './ProTable.vue';
 import ProForm from './ProForm.vue';
 import ErrorBoundary from './ErrorBoundary.vue';
 import { ElMessage } from 'element-plus';
 
-defineProps<{
+const props = defineProps<{
   node: ComponentNode;
 }>();
 
@@ -119,7 +124,7 @@ const triggerNodeEvent = async (node: ComponentNode, eventName: string, event: a
   await executeActions(rule.actions, {
     scope: designerStore.pageSchema.state,
     event,
-    getNode: (id: string) => designerStore.activeChildren.find((n) => n.id === id),
+    getNode: (id: string) => findNode(designerStore.activeChildren, id) ?? undefined,
     getLayer: (id: string) => designerStore.pageSchema.layers?.find((l) => l.id === id),
     reloadNode: (id: string) => nodeEventBus.emitReload(id),
     setLayerVisible: (layerId: string, visible: boolean) => {
@@ -129,9 +134,23 @@ const triggerNodeEvent = async (node: ComponentNode, eventName: string, event: a
     notify: (type, message) => ElMessage({ type, message })
   });
 };
+
+const onDropIntoContainer = (event: DragEvent) => {
+  const data = event.dataTransfer?.getData('application/json');
+  if (!data) return;
+  try {
+    const material = JSON.parse(data) as MaterialItem;
+    designerStore.addChildToNode(props.node.id, material);
+  } catch (err) {
+    console.error('Failed to drop material into container', err);
+  }
+};
 </script>
 
 <style scoped>
+.node-renderer-root {
+  width: 100%;
+}
 .pro-container-box {
   width: 100%;
 }

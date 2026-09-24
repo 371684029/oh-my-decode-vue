@@ -14,19 +14,37 @@ export interface BackupInfo {
   mtime: string;
 }
 
+const SAFE_FILE_ID = /^[A-Za-z0-9_-]+$/;
+
+/** 把 schema id 收成安全文件名。含 `/`、`\\` 或 `..` 的 id 直接拒绝，而不是先 basename 再落盘。 */
+export function toSafeFileId(id: string): string {
+  const raw = String(id ?? '');
+  if (raw.includes('/') || raw.includes('\\') || raw.includes('..')) {
+    throw new Error(`Unsafe schema id: ${id}`);
+  }
+  const base = path.basename(raw, '.json');
+  if (!SAFE_FILE_ID.test(base)) {
+    throw new Error(`Unsafe schema id: ${id}`);
+  }
+  return base;
+}
+
 export class StorageService {
   /** 按 id 的串行写队列，防止并发保存竞态 */
   private writeQueues = new Map<string, Promise<unknown>>();
 
+  constructor(
+    private pagesDir: string = STORAGE_PAGES_DIR,
+    private componentsDir: string = STORAGE_COMPONENTS_DIR
+  ) {}
+
   private getTargetDir(type: 'page' | 'component' = 'page'): string {
-    return type === 'component' ? STORAGE_COMPONENTS_DIR : STORAGE_PAGES_DIR;
+    return type === 'component' ? this.componentsDir : this.pagesDir;
   }
 
   private getFilePath(id: string, type: 'page' | 'component' = 'page'): string {
     const dir = this.getTargetDir(type);
-    // 限制文件名防止路径穿越
-    const safeId = path.basename(id, '.json');
-    return path.join(dir, `${safeId}.json`);
+    return path.join(dir, `${toSafeFileId(id)}.json`);
   }
 
   private getBackupDir(type: 'page' | 'component' = 'page'): string {
@@ -50,12 +68,13 @@ export class StorageService {
   /** 备份轮转：保留最近 MAX_BACKUPS 代（.bak.1 最新 → .bak.N 最旧） */
   private async rotateBackups(filePath: string, id: string, type: 'page' | 'component'): Promise<void> {
     const backupDir = this.getBackupDir(type);
+    const safeId = toSafeFileId(id);
     await fs.mkdir(backupDir, { recursive: true });
 
     // 后移旧代
     for (let i = MAX_BACKUPS - 1; i >= 1; i--) {
-      const from = path.join(backupDir, `${id}.bak.${i}`);
-      const to = path.join(backupDir, `${id}.bak.${i + 1}`);
+      const from = path.join(backupDir, `${safeId}.bak.${i}`);
+      const to = path.join(backupDir, `${safeId}.bak.${i + 1}`);
       try {
         await fs.rename(from, to);
       } catch {
@@ -66,7 +85,7 @@ export class StorageService {
     try {
       const exists = await fs.stat(filePath);
       if (exists.isFile()) {
-        await fs.copyFile(filePath, path.join(backupDir, `${id}.bak.1`));
+        await fs.copyFile(filePath, path.join(backupDir, `${safeId}.bak.1`));
       }
     } catch {
       // 首次保存无既有文件
@@ -74,7 +93,7 @@ export class StorageService {
   }
 
   saveSchema(schema: PageSchema): Promise<void> {
-    return this.enqueue(schema.id, () => this.doSaveSchema(schema));
+    return this.enqueue(String(schema.id), () => this.doSaveSchema(schema));
   }
 
   private async doSaveSchema(schema: PageSchema): Promise<void> {
@@ -131,7 +150,7 @@ export class StorageService {
   /** 列出某 schema 的备份代数（P2-2） */
   async listBackups(id: string, type: 'page' | 'component' = 'page'): Promise<BackupInfo[]> {
     const backupDir = this.getBackupDir(type);
-    const safeId = path.basename(id, '.json');
+    const safeId = toSafeFileId(id);
     const infos: BackupInfo[] = [];
     try {
       const files = await fs.readdir(backupDir);
@@ -155,7 +174,7 @@ export class StorageService {
 
   /** 从指定备份代恢复（P2-2 / P1-4 回滚） */
   async restoreBackup(id: string, type: 'page' | 'component' = 'page', index: number): Promise<PageSchema | null> {
-    const safeId = path.basename(id, '.json');
+    const safeId = toSafeFileId(id);
     const backupPath = path.join(this.getBackupDir(type), `${safeId}.bak.${index}`);
     try {
       const content = await fs.readFile(backupPath, 'utf-8');

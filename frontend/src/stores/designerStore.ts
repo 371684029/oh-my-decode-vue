@@ -1,5 +1,34 @@
 import { defineStore } from 'pinia';
 import type { PageSchema, ComponentNode, MaterialItem } from '../types/designer';
+import { findNode } from '../utils/schemaTree';
+
+/**
+ * 主画布只有一份节点数组：pageSchema.children。
+ * type=canvas 的图层 children 指向同一引用，避免两套数据各写各的。
+ */
+export function shareBaseCanvas(schema: PageSchema): PageSchema {
+  if (!schema.children) schema.children = [];
+  if (!schema.layers) schema.layers = [];
+  let base = schema.layers.find((layer) => layer.type === 'canvas');
+  if (!base) {
+    base = {
+      id: 'layer_base_canvas',
+      name: '主画布图层 (Base Canvas)',
+      type: 'canvas',
+      visible: true,
+      zIndex: 1,
+      children: schema.children
+    };
+    schema.layers.unshift(base);
+    return schema;
+  }
+  if (schema.children.length === 0 && (base.children?.length ?? 0) > 0) {
+    schema.children = base.children;
+  } else {
+    base.children = schema.children;
+  }
+  return schema;
+}
 
 /** 生成全局唯一节点/图层 id（时间戳 + 随机后缀，避免同毫秒内重复） */
 const generateUniqueId = (prefix: string): string =>
@@ -7,7 +36,7 @@ const generateUniqueId = (prefix: string): string =>
 
 export const useDesignerStore = defineStore('designer', {
   state: () => ({
-    pageSchema: {
+    pageSchema: shareBaseCanvas({
       id: 'page_' + Date.now(),
       title: '未命名低代码页面',
       type: 'page' as const,
@@ -28,7 +57,7 @@ export const useDesignerStore = defineStore('designer', {
           children: []
         }
       ]
-    } as PageSchema,
+    }),
     activeLayerId: 'layer_base_canvas' as string,
     /** 当前编辑目标图层 id（null = 主画布）；进入非 canvas 图层后在其 children 中编辑 */
     editingLayerId: null as string | null,
@@ -51,9 +80,9 @@ export const useDesignerStore = defineStore('designer', {
     selectedNode(state): ComponentNode | null {
       if (!state.selectedNodeId) return null;
       const children = state.editingLayerId
-        ? (state.pageSchema.layers?.find((l) => l.id === state.editingLayerId)?.children as ComponentNode[] | undefined)
+        ? state.pageSchema.layers?.find((l) => l.id === state.editingLayerId)?.children
         : state.pageSchema.children;
-      return children?.find((node: ComponentNode) => node.id === state.selectedNodeId) || null;
+      return findNode(children, state.selectedNodeId);
     },
     canUndo(state): boolean {
       return state.historyPast.length > 0;
@@ -84,9 +113,10 @@ export const useDesignerStore = defineStore('designer', {
       this.historyFuture.push(currentSnapshot);
 
       const previousSnapshot = this.historyPast.pop()!;
-      this.pageSchema = JSON.parse(previousSnapshot);
-      this.selectedNodeId = null;
-      this.isDrawerOpen = false;
+      const keepId = this.selectedNodeId;
+      this.pageSchema = shareBaseCanvas(JSON.parse(previousSnapshot));
+      this.selectedNodeId = keepId && this.selectedNode ? keepId : null;
+      this.isDrawerOpen = !!this.selectedNodeId;
     },
     redo() {
       if (this.historyFuture.length === 0) return;
@@ -94,9 +124,10 @@ export const useDesignerStore = defineStore('designer', {
       this.historyPast.push(currentSnapshot);
 
       const nextSnapshot = this.historyFuture.pop()!;
-      this.pageSchema = JSON.parse(nextSnapshot);
-      this.selectedNodeId = null;
-      this.isDrawerOpen = false;
+      const keepId = this.selectedNodeId;
+      this.pageSchema = shareBaseCanvas(JSON.parse(nextSnapshot));
+      this.selectedNodeId = keepId && this.selectedNode ? keepId : null;
+      this.isDrawerOpen = !!this.selectedNodeId;
     },
     selectNode(id: string | null) {
       this.selectedNodeId = id;
@@ -156,9 +187,39 @@ export const useDesignerStore = defineStore('designer', {
     },
     setPageSchema(schema: PageSchema) {
       this.recordHistory();
-      this.pageSchema = schema;
+      this.pageSchema = shareBaseCanvas(schema);
+      this.editingLayerId = null;
       this.selectedNodeId = null;
       this.isDrawerOpen = false;
+    },
+    findNodeById(id: string): ComponentNode | null {
+      return findNode(this.activeChildren, id);
+    },
+    addChildToNode(parentId: string, material: MaterialItem) {
+      const parent = this.findNodeById(parentId);
+      if (!parent) return false;
+      this.recordHistory();
+      if (!parent.children) parent.children = [];
+      const id = generateUniqueId(material.type);
+      parent.children.push({
+        id,
+        type: material.type,
+        label: material.label,
+        layout: {
+          x: 0,
+          y: 0,
+          w: material.defaultLayout.w,
+          h: material.defaultLayout.h,
+          i: id
+        },
+        props: JSON.parse(JSON.stringify(material.defaultProps || {})),
+        attrs: JSON.parse(JSON.stringify(material.defaultAttrs || {})),
+        config: material.defaultConfig ? JSON.parse(JSON.stringify(material.defaultConfig)) : undefined,
+        style: {},
+        events: {}
+      });
+      this.selectNode(id);
+      return true;
     },
     copySelectedNode() {
       if (!this.selectedNode) return false;
@@ -232,6 +293,7 @@ export const useDesignerStore = defineStore('designer', {
       if (idx !== -1 && this.pageSchema.layers[idx].type !== 'canvas') {
         this.recordHistory();
         this.pageSchema.layers.splice(idx, 1);
+        if (this.editingLayerId === id) this.editingLayerId = null;
         this.activeLayerId = 'layer_base_canvas';
       }
     },

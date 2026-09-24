@@ -6,12 +6,19 @@ import { z } from 'zod';
  * 并对自定义脚本/HTML 字段做长度上限约束，防止异常/超大负载落盘。
  */
 
+/** 文件名与生成标识符：拒绝路径分隔符与 `..` */
+const safeIdSchema = z
+  .string()
+  .min(1)
+  .max(200)
+  .regex(/^[A-Za-z0-9_-]+$/, 'only letters, numbers, "_" and "-" are allowed');
+
 const layoutSchema = z.object({
   x: z.number(),
   y: z.number(),
   w: z.number(),
   h: z.number(),
-  i: z.string().max(200)
+  i: safeIdSchema
 });
 
 // 自引用节点 schema（嵌套容器 children）
@@ -38,7 +45,7 @@ const apiBindingSchema = z.object({
 
 const componentNodeSchema: z.ZodType<any> = z.lazy(() =>
   z.object({
-    id: z.string().min(1).max(200),
+    id: safeIdSchema,
     type: z.string().min(1).max(100),
     label: z.string().max(200),
     layout: layoutSchema,
@@ -64,7 +71,7 @@ const layerPropsSchema = z.object({
 });
 
 const layerConfigSchema = z.object({
-  id: z.string().min(1).max(200),
+  id: safeIdSchema,
   name: z.string().max(200),
   type: z.enum(['canvas', 'dialog', 'loading', 'custom-html']),
   visible: z.boolean(),
@@ -74,7 +81,7 @@ const layerConfigSchema = z.object({
 });
 
 export const pageSchemaValidator = z.object({
-  id: z.string().min(1).max(200),
+  id: safeIdSchema,
   title: z.string().max(200),
   type: z.enum(['page', 'component']),
   meta: z.object({

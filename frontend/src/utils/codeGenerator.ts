@@ -1,4 +1,6 @@
 import type { PageSchema, ComponentNode, LayerConfig, ApiBinding, ActionNode } from '../types/designer';
+import { isRenderedNodeType } from '../registry/nodeTypes';
+import { sanitizeCss } from './sanitizeCss';
 
 // ============================================================
 // 多目标出码引擎 (Code Generator)
@@ -49,6 +51,28 @@ function indentLines(text: string, spaces = 2): string {
 function safeIdent(value: string): string {
   const out = String(value).replace(/[^a-zA-Z0-9_$]/g, '_');
   return out && !/^[0-9]/.test(out) ? out : 'n' + out;
+}
+
+/** 嵌入 JS 字符串字面量，并把 `<` 写成 \\u003c，避免 `</script>` 打断 HTML/SFC */
+function embedJsString(value: string): string {
+  return JSON.stringify(value).replace(/</g, '\\u003c');
+}
+
+/** 主画布节点 + 非 canvas 图层节点 + 嵌套 children（canvas 图层与 children 同源，不重复收集） */
+function allEditableNodes(schema: PageSchema): ComponentNode[] {
+  const acc: ComponentNode[] = [];
+  const walk = (nodes?: ComponentNode[]) => {
+    for (const node of nodes || []) {
+      acc.push(node);
+      walk(node.children);
+    }
+  };
+  walk(schema.children);
+  for (const layer of schema.layers || []) {
+    if (layer.type === 'canvas') continue;
+    walk(layer.children);
+  }
+  return acc;
 }
 
 /** 响应提取路径 → JS 属性访问表达式（"data.list" → json.data.list） */
@@ -248,6 +272,9 @@ function renderNodeToTemplate(node: ComponentNode, indentLevel = 3): string {
     }
 
     default:
+      if (isRenderedNodeType(node.type)) {
+        return `${indent}<!-- 已登记类型缺少出码模板: ${escapeHtml(node.type)} -->\n${indent}<div id="${escapeHtml(node.id)}">${escapeHtml(node.label)}</div>\n`;
+      }
       return `${indent}<div id="${escapeHtml(node.id)}"${attrStr}>${escapeHtml(node.label)}</div>\n`;
   }
 }
@@ -272,33 +299,40 @@ function renderLayers(
 
   if (schema.layers && schema.layers.length > 0) {
     schema.layers.forEach((layer: LayerConfig) => {
+      const layerIdent = safeIdent(layer.id);
       const refExpr =
-        refStyle === 'options' ? `this.$refs.customHtmlRef_${layer.id}` : `customHtmlRef_${layer.id}?.value`;
+        refStyle === 'options' ? `this.$refs.customHtmlRef_${layerIdent}` : `customHtmlRef_${layerIdent}?.value`;
       if (layer.type === 'dialog') {
+        let dialogBody = '';
+        (layer.children || []).forEach((child) => {
+          dialogBody += renderNodeToTemplate(child, 3);
+        });
+        if (!dialogBody.trim()) {
+          dialogBody = `      <p>${escapeHtml(layer.name)} 内暂无组件</p>\n`;
+        }
         extraLayersTemplate +=
           `    <!-- 弹窗图层: ${safeComment(layer.name)} -->\n` +
-          `    <el-dialog v-model="dialogVisible_${layer.id}" title="${escapeHtml(layer.props?.title) || escapeHtml(layer.name)}" width="${escapeHtml(layer.props?.width) || '50%'}">\n` +
-          `      <p>这是 ${escapeHtml(layer.name)} 嵌套弹窗内容。</p>\n` +
+          `    <el-dialog v-model="dialogVisible_${layerIdent}" title="${escapeHtml(layer.props?.title) || escapeHtml(layer.name)}" width="${escapeHtml(layer.props?.width) || '50%'}">\n` +
+          dialogBody +
           `    </el-dialog>\n\n`;
       } else if (layer.type === 'loading') {
         extraLayersTemplate +=
           `    <!-- Loading 遮罩图层: ${safeComment(layer.name)} -->\n` +
-          `    <div v-if="loadingVisible_${layer.id}" class="loading-overlay">\n` +
+          `    <div v-if="loadingVisible_${layerIdent}" class="loading-overlay">\n` +
           `      <p>${escapeHtml(layer.props?.loadingText) || '数据加载中...'}</p>\n` +
           `    </div>\n\n`;
       } else if (layer.type === 'custom-html') {
         extraLayersTemplate +=
           `    <!-- 自定义 HTML 图层: ${safeComment(layer.name)} -->\n` +
-          `    <div class="custom-html-wrapper" ref="customHtmlRef_${layer.id}">\n` +
-          `      ${layer.props?.htmlCode || ''}\n` +
-          `    </div>\n\n`;
+          `    <div class="custom-html-wrapper" ref="customHtmlRef_${layerIdent}" v-html="customHtml_${layerIdent}"></div>\n\n`;
 
         if (layer.props?.scriptMounted) {
           extraLifecycleScripts +=
             `  // 自定义 HTML 图层 (${safeComment(layer.name)}) onMounted 生命周期\n` +
             `  try {\n` +
             `    const container = ${refExpr};\n` +
-            `    ${layer.props.scriptMounted}\n` +
+            `    const __runMounted = new Function('container', 'state', ${embedJsString(layer.props.scriptMounted)});\n` +
+            `    __runMounted(container, {});\n` +
             `  } catch (err) { console.error(err); }\n\n`;
         }
         if (layer.props?.scriptUnmounted) {
@@ -306,7 +340,8 @@ function renderLayers(
             `  // 自定义 HTML 图层 (${safeComment(layer.name)}) onUnmounted 生命周期\n` +
             `  try {\n` +
             `    const container = ${refExpr};\n` +
-            `    ${layer.props.scriptUnmounted}\n` +
+            `    const __runUnmounted = new Function('container', 'state', ${embedJsString(layer.props.scriptUnmounted)});\n` +
+            `    __runUnmounted(container, {});\n` +
             `  } catch (err) { console.error(err); }\n\n`;
         }
       }
@@ -321,8 +356,8 @@ function collectLayerStateDecls(schema: PageSchema): { dialogVisible: string[]; 
   const dialogVisible: string[] = [];
   const loadingVisible: string[] = [];
   schema.layers?.forEach((l) => {
-    if (l.type === 'dialog') dialogVisible.push(`const dialogVisible_${l.id} = ref(false);`);
-    else if (l.type === 'loading') loadingVisible.push(`const loadingVisible_${l.id} = ref(true);`);
+    if (l.type === 'dialog') dialogVisible.push(`const dialogVisible_${safeIdent(l.id)} = ref(false);`);
+    else if (l.type === 'loading') loadingVisible.push(`const loadingVisible_${safeIdent(l.id)} = ref(true);`);
   });
   return { dialogVisible, loadingVisible };
 }
@@ -368,7 +403,11 @@ function renderPageStyle(schema: PageSchema): string {
 }
 .custom-html-wrapper {
   margin: 12px 0;
-}`;
+}
+${(schema.layers || [])
+  .filter((layer) => layer.type === 'custom-html' && layer.props?.cssCode)
+  .map((layer) => `/* ${safeComment(layer.name)} */\n${sanitizeCss(layer.props?.cssCode || '')}`)
+  .join('\n')}`;
 }
 
 // ---------------------------------------------------------------------------
@@ -493,12 +532,12 @@ function renderActionStatement(action: ActionNode, optionsApi: boolean): string 
     case 'reload_data':
       return action.target ? `await ${optionsApi ? 'this.' : ''}loadData_${safeIdent(action.target)}();` : '';
     case 'open_dialog':
-      return action.target ? `${refAccess(`dialogVisible_${action.target}`)} = true;` : '';
+      return action.target ? `${refAccess(`dialogVisible_${safeIdent(action.target)}`)} = true;` : '';
     case 'close_dialog':
-      return action.target ? `${refAccess(`dialogVisible_${action.target}`)} = false;` : '';
+      return action.target ? `${refAccess(`dialogVisible_${safeIdent(action.target)}`)} = false;` : '';
     case 'toggle_loading':
       return action.target
-        ? `${refAccess(`loadingVisible_${action.target}`)} = ${action.payload?.visible ?? true};`
+        ? `${refAccess(`loadingVisible_${safeIdent(action.target)}`)} = ${action.payload?.visible ?? true};`
         : '';
     case 'show_message':
       return `ElMessage({ type: ${JSON.stringify(action.payload?.messageType ?? 'success')}, message: ${renderPayloadExpr(action.payload?.messageText ?? '操作完成')} });`;
@@ -509,13 +548,16 @@ function renderActionStatement(action: ActionNode, optionsApi: boolean): string 
 
 /** 生成 Vue SFC script setup 主体（v1.3.0：数据源 + 事件动作链 + 参数化） */
 function renderScriptSetup(schema: PageSchema): string {
-  const children = schema.children || [];
+  const children = allEditableNodes(schema);
   const tableNodes = children.filter((n) => n.type === 'pro-table');
   const formNodes = children.filter((n) => n.type === 'pro-form');
   const eventNodes = children.filter((n) => n.events?.click?.enabled && (n.events.click.actions?.length ?? 0) > 0);
 
   const { dialogVisible, loadingVisible } = collectLayerStateDecls(schema);
-  const layerStateDecls = [...dialogVisible, ...loadingVisible].join('\n');
+  const customHtmlDecls = (schema.layers || [])
+    .filter((layer) => layer.type === 'custom-html')
+    .map((layer) => `const customHtml_${safeIdent(layer.id)} = ${embedJsString(layer.props?.htmlCode || '')};`);
+  const layerStateDecls = [...dialogVisible, ...loadingVisible, ...customHtmlDecls].join('\n');
 
   const lines: string[] = [];
 
@@ -761,7 +803,7 @@ ${requestBlock}
 
 /** options API: data() 返回内容（节点化数据名 + 图层状态） */
 function renderOptionsData(schema: PageSchema): string {
-  const children = schema.children || [];
+  const children = allEditableNodes(schema);
   const tableNodes = children.filter((n) => n.type === 'pro-table');
   const formNodes = children.filter((n) => n.type === 'pro-form');
   const { dialogVisible, loadingVisible } = collectLayerStateDecls(schema);
@@ -797,13 +839,18 @@ function renderOptionsData(schema: PageSchema): string {
 
   dialogVisible.forEach((d) => fields.push(`${d.replace('const ', '').replace(' = ref(false);', '')}: false,`));
   loadingVisible.forEach((l) => fields.push(`${l.replace('const ', '').replace(' = ref(true);', '')}: true,`));
+  (schema.layers || [])
+    .filter((layer) => layer.type === 'custom-html')
+    .forEach((layer) => {
+      fields.push(`customHtml_${safeIdent(layer.id)}: ${embedJsString(layer.props?.htmlCode || '')},`);
+    });
 
   return fields.join('\n          ');
 }
 
 /** options API: methods 内容（加载 + 事件动作链 + 表单/行动作） */
 function renderOptionsMethods(schema: PageSchema): string {
-  const children = schema.children || [];
+  const children = allEditableNodes(schema);
   const tableNodes = children.filter((n) => n.type === 'pro-table');
   const formNodes = children.filter((n) => n.type === 'pro-form');
   const eventNodes = children.filter((n) => n.events?.click?.enabled && (n.events.click.actions?.length ?? 0) > 0);
@@ -868,7 +915,7 @@ ${rowCall}
  * 模板直接内联，双击即可在浏览器运行。
  */
 export function generateHTML(schema: PageSchema): string {
-  const children = schema.children || [];
+  const children = allEditableNodes(schema);
   const tableNodes = children.filter((n) => n.type === 'pro-table');
   const formNodes = children.filter((n) => n.type === 'pro-form');
   // HTML 使用 options API（CDN 渲染），模板 ref 需通过 this.$refs 访问

@@ -1,6 +1,8 @@
 import { describe, expect, test } from 'vitest';
 import { generateVueSFC, generateWebComponent, generateHTML, generatePackageJson } from './codeGenerator';
-import type { PageSchema } from '../types/designer';
+import type { PageSchema, ComponentNode } from '../types/designer';
+import { MATERIAL_REGISTRY } from '../registry/materials';
+import { RENDERED_NODE_TYPES } from '../registry/nodeTypes';
 
 /** 构造覆盖全部节点类型 + 三种图层的测试 Schema */
 function buildTestSchema(): PageSchema {
@@ -119,8 +121,10 @@ describe('generateVueSFC', () => {
     expect(code).toContain('dialogVisible_layer_dlg');
     expect(code).toContain('loadingVisible_layer_loading');
     expect(code).toContain('customHtmlRef_layer_html');
-    expect(code).toContain('console.log("mounted");');
-    expect(code).toContain('console.log("unmounted");');
+    expect(code).toContain('v-html="customHtml_layer_html"');
+    expect(code).toContain('console.log(\\"mounted\\")');
+    expect(code).toContain('console.log(\\"unmounted\\")');
+    expect(code).not.toContain('<div class="custom-card">卡片</div>');
     expect(code).toContain('onMounted');
     expect(code).toContain('onUnmounted');
   });
@@ -165,7 +169,7 @@ describe('generateHTML', () => {
     expect(code).toContain('<el-button');
     expect(code).toContain('tableData');
     expect(code).toContain('formData');
-    expect(code).toContain('console.log("mounted");');
+    expect(code).toContain('console.log(\\"mounted\\")');
   });
 
   test('不再输出占位节点列表', () => {
@@ -265,5 +269,65 @@ describe('出码引擎输入转义（防止用户配置破坏生成代码）', (
     const code = generateVueSFC(maliciousSchema());
     expect(code).toContain('title="弹窗&quot;标题"');
     expect(code).toContain('<!-- 弹窗图层: 弹窗 换行名 -->');
+  });
+
+  test('自定义 HTML 与脚本以字符串嵌入，不能打断 script 标签', () => {
+    const schema = buildTestSchema();
+    const layer = schema.layers?.find((item) => item.type === 'custom-html');
+    if (!layer?.props) throw new Error('missing html layer');
+    layer.props.htmlCode = '</div><script>alert(1)</script>';
+    layer.props.scriptMounted = '</script><script>alert(2)</script>';
+    const code = generateVueSFC(schema);
+    expect(code).not.toContain('<script>alert(1)</script>');
+    expect(code).not.toContain('<script>alert(2)</script>');
+    expect(code).toContain('\\u003c/script>');
+  });
+
+  test('弹窗图层导出其中的子节点', () => {
+    const schema = buildTestSchema();
+    const dialog = schema.layers?.find((item) => item.type === 'dialog');
+    if (!dialog) throw new Error('missing dialog');
+    dialog.children = [
+      {
+        id: 'dlg_btn',
+        type: 'el-button',
+        label: '弹窗按钮',
+        layout: { x: 0, y: 0, w: 2, h: 2, i: 'dlg_btn' },
+        props: { text: '弹窗内按钮', type: 'success' },
+        attrs: {},
+        style: {},
+        events: {}
+      }
+    ];
+    const code = generateVueSFC(schema);
+    expect(code).toContain('弹窗内按钮');
+    expect(code).not.toContain('内暂无组件');
+  });
+});
+
+describe('物料与出码登记一致', () => {
+  test('每个物料类型都有出码模板', () => {
+    const registered = new Set<string>(RENDERED_NODE_TYPES);
+    for (const material of MATERIAL_REGISTRY) {
+      expect(registered.has(material.type)).toBe(true);
+      const node: ComponentNode = {
+        id: 'node_1',
+        type: material.type,
+        label: material.label,
+        layout: { x: 0, y: 0, w: 2, h: 2, i: 'node_1' },
+        props: { ...material.defaultProps },
+        attrs: {},
+        style: {},
+        events: {},
+        config: material.defaultConfig
+      };
+      const code = generateVueSFC({
+        ...buildTestSchema(),
+        children: [node],
+        layers: []
+      });
+      expect(code).not.toContain('缺少出码模板');
+      expect(code).not.toContain(`>${material.label}</div>`);
+    }
   });
 });

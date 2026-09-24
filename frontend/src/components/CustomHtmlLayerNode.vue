@@ -1,68 +1,72 @@
 <template>
-  <div ref="containerRef" class="custom-html-layer-container">
-    <component :is="'style'" v-if="layer.props?.cssCode">
-      {{ layer.props.cssCode }}
-    </component>
-    <!-- v-html 内容已经过 DOMPurify 消毒（见 sanitizedHtml computed），此处豁免 XSS 告警 -->
-    <!-- eslint-disable-next-line vue/no-v-html -->
-    <div v-html="sanitizedHtml"></div>
-  </div>
+  <iframe
+    class="custom-html-frame"
+    sandbox="allow-scripts"
+    referrerpolicy="no-referrer"
+    :title="layer.name || '自定义 HTML 图层'"
+    :srcdoc="srcdoc"
+  />
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted, onUpdated, watch } from 'vue';
+import { computed } from 'vue';
 import type { LayerConfig } from '../types/designer';
 import DOMPurify from 'dompurify';
+import { sanitizeCss } from '../utils/sanitizeCss';
 
 const props = defineProps<{
   layer: LayerConfig;
 }>();
 
-const containerRef = ref<HTMLElement | null>(null);
+const SCRIPT_OPEN = '<' + 'script>';
+const SCRIPT_CLOSE = '<' + '/script>';
 
-/** 自定义 HTML 经 DOMPurify 消毒后渲染（剥离 script / on* 事件等危险内容） */
-const sanitizedHtml = computed(() => {
-  return DOMPurify.sanitize(props.layer.props?.htmlCode || '<div>无 HTML 内容</div>');
-});
+/** 把用户脚本放进 iframe 文档时，避免提前结束 script 标签 */
+function embedScript(code: string): string {
+  return code.split(SCRIPT_CLOSE).join('\\u003c/script>');
+}
 
 /**
- * 执行图层生命周期脚本。
- * 注意：脚本在浏览器本地执行（等价于低代码平台的"自定义脚本节点"），
- * 仅用于设计器内预览；导出代码时脚本将原样嵌入目标代码，由页面所有者负责安全。
+ * 自定义 HTML 在 sandbox iframe 中预览（无 allow-same-origin）。
+ * 样式与脚本留在独立文档里，不进入设计器页面，也不在父窗口使用 new Function。
  */
-const executeScript = (scriptCode?: string, lifecycleName?: string) => {
-  if (!scriptCode || !scriptCode.trim()) return;
-  try {
-    const fn = new Function('container', 'state', scriptCode);
-    fn(containerRef.value, {});
-  } catch (err) {
-    console.error(`[Custom HTML Layer ${props.layer.name}] ${lifecycleName} Error:`, err);
-  }
-};
+const srcdoc = computed(() => {
+  const html = DOMPurify.sanitize(props.layer.props?.htmlCode || '<div>无 HTML 内容</div>');
+  const css = sanitizeCss(props.layer.props?.cssCode || '');
+  const mounted = embedScript(props.layer.props?.scriptMounted || '');
+  const updated = embedScript(props.layer.props?.scriptUpdated || '');
+  const unmounted = embedScript(props.layer.props?.scriptUnmounted || '');
 
-onMounted(() => {
-  executeScript(props.layer.props?.scriptMounted, 'onMounted');
+  return `<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8" />
+<style>${css}</style>
+</head>
+<body>
+${html}
+${SCRIPT_OPEN}
+(function () {
+  var container = document.body;
+  var state = {};
+  window.addEventListener('pagehide', function () {
+    try { ${unmounted} } catch (err) { console.error(err); }
+  });
+  try { ${mounted} } catch (err) { console.error(err); }
+  try { ${updated} } catch (err) { console.error(err); }
+})();
+${SCRIPT_CLOSE}
+</body>
+</html>`;
 });
-
-onUpdated(() => {
-  executeScript(props.layer.props?.scriptUpdated, 'onUpdated');
-});
-
-onUnmounted(() => {
-  executeScript(props.layer.props?.scriptUnmounted, 'onUnmounted');
-});
-
-watch(
-  () => props.layer.props?.scriptMounted,
-  () => {
-    executeScript(props.layer.props?.scriptMounted, 'onMounted (watch)');
-  }
-);
 </script>
 
 <style scoped>
-.custom-html-layer-container {
+.custom-html-frame {
   width: 100%;
-  position: relative;
+  min-height: 160px;
+  border: 1px solid #e4e7ed;
+  border-radius: 6px;
+  background: #fff;
 }
 </style>

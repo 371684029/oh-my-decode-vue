@@ -29,6 +29,22 @@ describe('designerStore 节点操作', () => {
     expect(store.selectedNodeId).toBe(node.id);
     expect(store.isDrawerOpen).toBe(true);
     expect(store.canUndo).toBe(true);
+    const canvas = store.pageSchema.layers?.find((layer) => layer.type === 'canvas');
+    expect(canvas?.children).toBe(store.pageSchema.children);
+  });
+
+  test('addChildToNode 把物料放进容器并可选中', () => {
+    const store = useDesignerStore();
+    store.addNodeFromMaterial({
+      ...material,
+      type: 'pro-container',
+      label: '容器',
+      defaultLayout: { w: 12, h: 4 }
+    });
+    const parentId = store.pageSchema.children[0].id;
+    expect(store.addChildToNode(parentId, material)).toBe(true);
+    expect(store.pageSchema.children[0].children?.[0].type).toBe('el-button');
+    expect(store.selectedNode?.type).toBe('el-button');
   });
 
   test('undo/redo 撤销与重做', () => {

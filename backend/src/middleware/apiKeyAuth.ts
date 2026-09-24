@@ -20,11 +20,12 @@ export function apiKeyAuth(req: Request, res: Response, next: NextFunction): voi
   next();
 }
 
-/** 解析操作人（服务端判定，客户端 header 仅作展示） */
+/** 解析操作人。未启用 API_KEY 时仍清洗 header，避免把换行或路径写进审计日志。 */
 export function resolveOperator(req: Request): string {
-  if (!API_KEY) {
-    return (req.headers['x-operator'] as string) || 'designer_user';
+  if (API_KEY) {
+    return 'api_user';
   }
-  // 启用认证后，operator 与认证 key 绑定（客户端不可伪造）
-  return 'api_user';
+  const raw = typeof req.headers['x-operator'] === 'string' ? req.headers['x-operator'] : 'designer_user';
+  const cleaned = raw.replace(/[^A-Za-z0-9_.-]/g, '').slice(0, 64);
+  return cleaned || 'designer_user';
 }
