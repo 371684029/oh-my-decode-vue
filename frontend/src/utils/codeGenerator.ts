@@ -1,6 +1,7 @@
 import type { PageSchema, ComponentNode, LayerConfig, ApiBinding, ActionNode } from '../types/designer';
 import { isRenderedNodeType } from '../registry/nodeTypes';
 import { sanitizeCss } from './sanitizeCss';
+import { canInlineExpression } from './expression';
 
 // ============================================================
 // 多目标出码引擎 (Code Generator)
@@ -58,6 +59,20 @@ function embedJsString(value: string): string {
   return JSON.stringify(value).replace(/</g, '\\u003c');
 }
 
+function escapeScriptClose(code: string): string {
+  return code.replace(/<\/script/gi, '<\\/script');
+}
+
+/** 自定义 HTML 出码为 sandbox iframe 文档，脚本留在独立文档里 */
+function buildCustomHtmlSrcdoc(layer: LayerConfig): string {
+  const html = layer.props?.htmlCode || '<div>无 HTML 内容</div>';
+  const css = sanitizeCss(layer.props?.cssCode || '');
+  const mounted = escapeScriptClose(layer.props?.scriptMounted || '');
+  const updated = escapeScriptClose(layer.props?.scriptUpdated || '');
+  const unmounted = escapeScriptClose(layer.props?.scriptUnmounted || '');
+  return `<!DOCTYPE html><html><head><meta charset="utf-8"><style>${css}</style></head><body>${html}<script>(function(){var container=document.body;var state={};window.addEventListener('pagehide',function(){try{${unmounted}}catch(err){console.error(err)}});try{${mounted}}catch(err){console.error(err)}try{${updated}}catch(err){console.error(err)}})();</script></body></html>`;
+}
+
 /** 主画布节点 + 非 canvas 图层节点 + 嵌套 children（canvas 图层与 children 同源，不重复收集） */
 function allEditableNodes(schema: PageSchema): ComponentNode[] {
   const acc: ComponentNode[] = [];
@@ -75,17 +90,29 @@ function allEditableNodes(schema: PageSchema): ComponentNode[] {
   return acc;
 }
 
-/** 响应提取路径 → JS 属性访问表达式（"data.list" → json.data.list） */
+/** 只内联受限解释器能完整解析的表达式，其余退回字符串字面量 */
+function inlineExpr(source: string): string {
+  const raw = source.trim();
+  return canInlineExpression(raw) ? `(${raw})` : JSON.stringify(source);
+}
+
+/** 响应提取路径 → JS 属性访问。非法片段（含分号、调用）退回根变量，不拼进产物 */
 function renderPathExpr(path: string | undefined, rootVar: string): string {
   if (!path || !path.trim()) return rootVar;
-  const segs = path
-    .split('.')
-    .map((seg) => {
-      const m = seg.match(/^([^\[]*)\[(\d+)\]$/);
-      return m ? `${m[1]}[${m[2]}]` : seg;
-    })
-    .filter(Boolean);
-  return `${rootVar}.${segs.join('.')}`;
+  let expr = rootVar;
+  for (const raw of path.split('.')) {
+    if (!raw) return rootVar;
+    const indexed = raw.match(/^([A-Za-z_$][A-Za-z0-9_$]*)(\[\d+\])?$/);
+    const indexOnly = raw.match(/^\[(\d+)\]$/);
+    if (indexed) {
+      expr += indexed[2] ? `.${indexed[1]}${indexed[2]}` : `.${indexed[1]}`;
+    } else if (indexOnly) {
+      expr += `[${indexOnly[1]}]`;
+    } else {
+      return rootVar;
+    }
+  }
+  return expr;
 }
 
 /** 请求参数对象字面量（{{ expr }} → 内联 JS 表达式） */
@@ -94,7 +121,7 @@ function renderParamsLiteral(params: Record<string, any> | undefined): string {
   const entries = Object.entries(params).map(([k, v]) => {
     if (typeof v === 'string') {
       const m = v.match(/^\s*\{\{\s*(.*?)\s*\}\}\s*$/);
-      return `${JSON.stringify(k)}: ${m ? `(${m[1]})` : JSON.stringify(v)}`;
+      return `${JSON.stringify(k)}: ${m ? inlineExpr(m[1]) : JSON.stringify(v)}`;
     }
     return `${JSON.stringify(k)}: ${JSON.stringify(v)}`;
   });
@@ -287,21 +314,19 @@ function renderNodeToTemplate(node: ComponentNode, indentLevel = 3): string {
  */
 function renderLayers(
   schema: PageSchema,
-  refStyle: 'composition' | 'options' = 'composition'
+  _refStyle: 'composition' | 'options' = 'composition'
 ): {
   extraLayersTemplate: string;
   extraLifecycleScripts: string;
   extraUnmountScripts: string;
 } {
   let extraLayersTemplate = '';
-  let extraLifecycleScripts = '';
-  let extraUnmountScripts = '';
+  const extraLifecycleScripts = '';
+  const extraUnmountScripts = '';
 
   if (schema.layers && schema.layers.length > 0) {
     schema.layers.forEach((layer: LayerConfig) => {
       const layerIdent = safeIdent(layer.id);
-      const refExpr =
-        refStyle === 'options' ? `this.$refs.customHtmlRef_${layerIdent}` : `customHtmlRef_${layerIdent}?.value`;
       if (layer.type === 'dialog') {
         let dialogBody = '';
         (layer.children || []).forEach((child) => {
@@ -324,26 +349,7 @@ function renderLayers(
       } else if (layer.type === 'custom-html') {
         extraLayersTemplate +=
           `    <!-- 自定义 HTML 图层: ${safeComment(layer.name)} -->\n` +
-          `    <div class="custom-html-wrapper" ref="customHtmlRef_${layerIdent}" v-html="customHtml_${layerIdent}"></div>\n\n`;
-
-        if (layer.props?.scriptMounted) {
-          extraLifecycleScripts +=
-            `  // 自定义 HTML 图层 (${safeComment(layer.name)}) onMounted 生命周期\n` +
-            `  try {\n` +
-            `    const container = ${refExpr};\n` +
-            `    const __runMounted = new Function('container', 'state', ${embedJsString(layer.props.scriptMounted)});\n` +
-            `    __runMounted(container, {});\n` +
-            `  } catch (err) { console.error(err); }\n\n`;
-        }
-        if (layer.props?.scriptUnmounted) {
-          extraUnmountScripts +=
-            `  // 自定义 HTML 图层 (${safeComment(layer.name)}) onUnmounted 生命周期\n` +
-            `  try {\n` +
-            `    const container = ${refExpr};\n` +
-            `    const __runUnmounted = new Function('container', 'state', ${embedJsString(layer.props.scriptUnmounted)});\n` +
-            `    __runUnmounted(container, {});\n` +
-            `  } catch (err) { console.error(err); }\n\n`;
-        }
+          `    <iframe class="custom-html-frame" sandbox="allow-scripts" title="${escapeHtml(layer.name)}" :srcdoc="customHtmlSrcdoc_${layerIdent}"></iframe>\n\n`;
       }
     });
   }
@@ -417,10 +423,10 @@ ${(schema.layers || [])
 /** URL 表达式：全串 {{ expr }} → 内联表达式；部分内嵌 → 字符串拼接 */
 function renderUrlExpr(url: string): string {
   const full = url.match(/^\s*\{\{\s*(.*?)\s*\}\}\s*$/);
-  if (full) return `(${full[1]})`;
+  if (full) return inlineExpr(full[1]);
   if (url.includes('{{')) {
     const parts = url.split(/\{\{\s*(.*?)\s*\}\}/);
-    return parts.map((p, i) => (i % 2 === 1 ? `(${p})` : JSON.stringify(p))).join(' + ') || JSON.stringify(url);
+    return parts.map((p, i) => (i % 2 === 1 ? inlineExpr(p) : JSON.stringify(p))).join(' + ') || JSON.stringify(url);
   }
   return JSON.stringify(url);
 }
@@ -429,7 +435,7 @@ function renderUrlExpr(url: string): string {
 function renderPayloadExpr(value: unknown): string {
   if (typeof value === 'string') {
     const m = value.match(/^\s*\{\{\s*(.*?)\s*\}\}\s*$/);
-    return m ? `(${m[1]})` : JSON.stringify(value);
+    return m ? inlineExpr(m[1]) : JSON.stringify(value);
   }
   if (Array.isArray(value)) {
     return `[${value.map((v) => renderPayloadExpr(v)).join(', ')}]`;
@@ -446,7 +452,7 @@ function renderPayloadExpr(value: unknown): string {
 /** 生成 GET 请求块文本（options API 需 this. 前缀，composition 不需要） */
 function renderFetchRequestBlock(urlExpr: string, paramsLit: string, method: 'GET' | 'POST'): string {
   if (method === 'POST') {
-    return `    const res = await fetch(${urlExpr}, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(${paramsLit}) });`;
+    return `    const res = await fetch(${urlExpr}, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(${paramsLit}), signal: AbortSignal.timeout(10000) });`;
   }
   return `    const params = ${paramsLit};
     const qs = new URLSearchParams();
@@ -454,7 +460,7 @@ function renderFetchRequestBlock(urlExpr: string, paramsLit: string, method: 'GE
     const q = qs.toString();
     const base = ${urlExpr};
     const url = q ? (base.includes('?') ? base + '&' + q : base + '?' + q) : base;
-    const res = await fetch(url, { method: 'GET', headers: { 'Content-Type': 'application/json' } });`;
+    const res = await fetch(url, { method: 'GET', headers: { 'Content-Type': 'application/json' }, signal: AbortSignal.timeout(10000) });`;
 }
 
 /** 生成表格节点加载函数（composition API） */
@@ -556,7 +562,7 @@ function renderScriptSetup(schema: PageSchema): string {
   const { dialogVisible, loadingVisible } = collectLayerStateDecls(schema);
   const customHtmlDecls = (schema.layers || [])
     .filter((layer) => layer.type === 'custom-html')
-    .map((layer) => `const customHtml_${safeIdent(layer.id)} = ${embedJsString(layer.props?.htmlCode || '')};`);
+    .map((layer) => `const customHtmlSrcdoc_${safeIdent(layer.id)} = ${embedJsString(buildCustomHtmlSrcdoc(layer))};`);
   const layerStateDecls = [...dialogVisible, ...loadingVisible, ...customHtmlDecls].join('\n');
 
   const lines: string[] = [];
@@ -842,7 +848,7 @@ function renderOptionsData(schema: PageSchema): string {
   (schema.layers || [])
     .filter((layer) => layer.type === 'custom-html')
     .forEach((layer) => {
-      fields.push(`customHtml_${safeIdent(layer.id)}: ${embedJsString(layer.props?.htmlCode || '')},`);
+      fields.push(`customHtmlSrcdoc_${safeIdent(layer.id)}: ${embedJsString(buildCustomHtmlSrcdoc(layer))},`);
     });
 
   return fields.join('\n          ');

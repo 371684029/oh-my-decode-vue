@@ -1,7 +1,7 @@
 <template>
   <div class="layer-tree-container">
     <div class="layer-tree-header">
-      <span class="title">页面大纲图层树 ({{ nodes.length }})</span>
+      <span class="title">{{ treeTitle }} ({{ nodes.length }})</span>
     </div>
 
     <el-tree
@@ -44,7 +44,12 @@ import { Menu, Delete } from '@element-plus/icons-vue';
 
 const designerStore = useDesignerStore();
 
-const nodes = computed(() => designerStore.pageSchema.children || []);
+const nodes = computed(() => designerStore.activeChildren || []);
+const treeTitle = computed(() => {
+  if (!designerStore.editingLayerId) return '主画布大纲';
+  const layer = designerStore.pageSchema.layers?.find((item) => item.id === designerStore.editingLayerId);
+  return layer ? `图层「${layer.name}」` : '当前图层';
+});
 const selectedNodeId = computed(() => designerStore.selectedNodeId);
 
 const handleNodeClick = (data: any) => {

@@ -43,7 +43,7 @@ export const useDesignerStore = defineStore('designer', {
       meta: {
         author: 'LowCode Admin',
         description: '通过低代码平台生成的页面',
-        version: '1.3.0'
+        version: '1.5.0'
       },
       state: {},
       children: [] as ComponentNode[],
@@ -66,7 +66,11 @@ export const useDesignerStore = defineStore('designer', {
     isDrawerOpen: false,
     drawerTab: 'props' as 'props' | 'config' | 'attrs' | 'json',
     historyPast: [] as string[],
-    historyFuture: [] as string[]
+    historyFuture: [] as string[],
+    /** 撤销/重做回放时不再把恢复动作记成新历史 */
+    suppressHistory: false,
+    historyPending: null as string | null,
+    historyTimer: null as ReturnType<typeof setTimeout> | null
   }),
   getters: {
     /** 当前编辑目标（图层 children 或主画布 children）的响应式数组引用 */
@@ -92,40 +96,72 @@ export const useDesignerStore = defineStore('designer', {
     }
   },
   actions: {
-    recordHistory() {
-      const snapshot = JSON.stringify(this.pageSchema);
-      // 去重：与最近一次快照相同则跳过（避免无效历史）
+    flushPendingHistory() {
+      if (this.historyTimer) {
+        clearTimeout(this.historyTimer);
+        this.historyTimer = null;
+      }
+      const snap = this.historyPending;
+      this.historyPending = null;
+      if (!snap || snap === JSON.stringify(this.pageSchema)) return;
+      this.pushSnapshot(snap);
+    },
+    /** 属性等直接改字段的操作：记下变更前快照，短时间多次输入合并成一步 */
+    noteSchemaChange(previous: string) {
+      if (this.suppressHistory) return;
+      if (this.historyPending === null) this.historyPending = previous;
+      if (this.historyTimer) clearTimeout(this.historyTimer);
+      this.historyTimer = setTimeout(() => {
+        this.historyTimer = null;
+        this.flushPendingHistory();
+      }, 400);
+    },
+    pushSnapshot(snapshot: string) {
       if (this.historyPast.length > 0 && this.historyPast[this.historyPast.length - 1] === snapshot) {
         return;
       }
-      // 自适应历史深度：schema 越大保留步数越少，控制内存占用
+      this.historyPast.push(snapshot);
       const size = snapshot.length;
       const maxSteps = size > 200000 ? 8 : size > 50000 ? 15 : 30;
-      while (this.historyPast.length >= maxSteps) {
+      while (this.historyPast.length > maxSteps) {
         this.historyPast.shift();
       }
-      this.historyPast.push(snapshot);
+      const byteBudget = 1_500_000;
+      let total = this.historyPast.reduce((sum, item) => sum + item.length, 0);
+      while (this.historyPast.length > 1 && total > byteBudget) {
+        total -= this.historyPast.shift()!.length;
+      }
       this.historyFuture = [];
     },
+    recordHistory() {
+      this.flushPendingHistory();
+      this.pushSnapshot(JSON.stringify(this.pageSchema));
+    },
     undo() {
+      this.flushPendingHistory();
       if (this.historyPast.length === 0) return;
       const currentSnapshot = JSON.stringify(this.pageSchema);
       this.historyFuture.push(currentSnapshot);
 
       const previousSnapshot = this.historyPast.pop()!;
       const keepId = this.selectedNodeId;
+      this.suppressHistory = true;
       this.pageSchema = shareBaseCanvas(JSON.parse(previousSnapshot));
+      this.suppressHistory = false;
       this.selectedNodeId = keepId && this.selectedNode ? keepId : null;
       this.isDrawerOpen = !!this.selectedNodeId;
     },
     redo() {
+      this.flushPendingHistory();
       if (this.historyFuture.length === 0) return;
       const currentSnapshot = JSON.stringify(this.pageSchema);
       this.historyPast.push(currentSnapshot);
 
       const nextSnapshot = this.historyFuture.pop()!;
       const keepId = this.selectedNodeId;
+      this.suppressHistory = true;
       this.pageSchema = shareBaseCanvas(JSON.parse(nextSnapshot));
+      this.suppressHistory = false;
       this.selectedNodeId = keepId && this.selectedNode ? keepId : null;
       this.isDrawerOpen = !!this.selectedNodeId;
     },
@@ -176,14 +212,36 @@ export const useDesignerStore = defineStore('designer', {
       });
     },
     removeNode(id: string) {
-      const idx = this.activeChildren.findIndex((n) => n.id === id);
-      if (idx !== -1) {
-        this.recordHistory();
-        this.activeChildren.splice(idx, 1);
-        if (this.selectedNodeId === id) {
-          this.selectNode(null);
+      const locate = (nodes: ComponentNode[]): ComponentNode[] | null => {
+        if (nodes.some((node) => node.id === id)) return nodes;
+        for (const node of nodes) {
+          if (node.children) {
+            const found = locate(node.children);
+            if (found) return found;
+          }
         }
+        return null;
+      };
+      const list = locate(this.activeChildren);
+      if (!list) return;
+      this.recordHistory();
+      const idx = list.findIndex((node) => node.id === id);
+      list.splice(idx, 1);
+      if (this.selectedNodeId === id) {
+        this.selectNode(null);
       }
+    },
+    /** 容器内子节点按数组顺序前后移动（弹性容器的排布顺序） */
+    moveChild(parentId: string, childId: string, delta: number) {
+      const parent = this.findNodeById(parentId);
+      if (!parent?.children) return false;
+      const index = parent.children.findIndex((node) => node.id === childId);
+      const next = index + delta;
+      if (index < 0 || next < 0 || next >= parent.children.length) return false;
+      this.recordHistory();
+      const [item] = parent.children.splice(index, 1);
+      parent.children.splice(next, 0, item);
+      return true;
     },
     setPageSchema(schema: PageSchema) {
       this.recordHistory();

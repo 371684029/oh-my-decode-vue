@@ -247,11 +247,30 @@
               </el-select>
               <el-button type="danger" icon="Delete" circle size="small" @click="removeAction(index)" />
             </div>
-            <el-input
+            <el-select
               v-model="action.target"
-              placeholder="目标节点/图层 id（如 tbl_users / layer_dlg）"
-              style="margin-top: 6px"
-            />
+              filterable
+              clearable
+              placeholder="选择目标组件或图层"
+              style="width: 100%; margin-top: 6px"
+            >
+              <el-option-group label="组件">
+                <el-option
+                  v-for="item in targetNodes"
+                  :key="item.id"
+                  :label="`${item.label} (${item.id})`"
+                  :value="item.id"
+                />
+              </el-option-group>
+              <el-option-group label="图层">
+                <el-option
+                  v-for="layer in designerStore.pageSchema.layers || []"
+                  :key="layer.id"
+                  :label="`${layer.name} (${layer.id})`"
+                  :value="layer.id"
+                />
+              </el-option-group>
+            </el-select>
             <el-input
               v-model="action.payloadText"
               type="textarea"
@@ -280,11 +299,21 @@ import { ref, computed, watch } from 'vue';
 import { useDesignerStore } from '../stores/designerStore';
 import { parseExpression } from '../utils/expression';
 import { ApiExecutor, nodeEventBus } from '../utils/dataSource';
-import type { ActionType } from '../types/designer';
+import type { ActionType, ComponentNode } from '../types/designer';
 import SchemaJsonViewer from './SchemaJsonViewer.vue';
 import { ElMessage } from 'element-plus';
 
 const designerStore = useDesignerStore();
+
+const flattenNodes = (nodes: ComponentNode[] | undefined, acc: Array<{ id: string; label: string }> = []) => {
+  for (const item of nodes || []) {
+    acc.push({ id: item.id, label: item.label || item.type });
+    flattenNodes(item.children, acc);
+  }
+  return acc;
+};
+
+const targetNodes = computed(() => flattenNodes(designerStore.activeChildren));
 
 const getExpressionPreview = (exprStr: string) => {
   try {

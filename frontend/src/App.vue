@@ -5,7 +5,7 @@
       <div class="logo">
         <el-icon class="logo-icon"><Platform /></el-icon>
         <span class="logo-text">低代码前端可视化平台 (Low-Code Studio)</span>
-        <el-tag size="small" type="primary" effect="plain" style="margin-left: 10px">v1.3.0</el-tag>
+        <el-tag size="small" type="primary" effect="plain" style="margin-left: 10px">v1.5.0</el-tag>
       </div>
       <div class="header-actions">
         <el-button-group class="history-btn-group">
@@ -145,7 +145,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted } from 'vue';
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue';
 import { http } from './utils/http';
 import { useDesignerStore } from './stores/designerStore';
 import MaterialList from './components/MaterialList.vue';
@@ -158,6 +158,14 @@ import { ElMessage } from 'element-plus';
 import { Loading } from '@element-plus/icons-vue';
 
 const designerStore = useDesignerStore();
+
+watch(
+  () => JSON.stringify(designerStore.pageSchema),
+  (next, prev) => {
+    if (prev && prev !== next) designerStore.noteSchemaChange(prev);
+  },
+  { flush: 'sync' }
+);
 
 const isPreviewMode = ref(false);
 const loadDialogVisible = ref(false);

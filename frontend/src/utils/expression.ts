@@ -429,3 +429,21 @@ export function isExpression(val: any): boolean {
   if (typeof val !== 'string') return false;
   return /^\s*\{\{\s*.*?\s*\}\}\s*$/.test(val);
 }
+
+/**
+ * 表达式能否原样内联进生成的 JavaScript。
+ * 必须被受限解释器完整解析，且源码不含 `<`，避免打断 HTML 里的 script。
+ */
+export function canInlineExpression(source: string): boolean {
+  if (typeof source !== 'string') return false;
+  const raw = source.trim();
+  if (!raw || /<\/|<\s*script/i.test(raw)) return false;
+  try {
+    const tokens = tokenize(raw);
+    const evaluator = new ExpressionEvaluator(tokens, {});
+    evaluator.parse();
+    return evaluator['peek']().type === 'eof';
+  } catch {
+    return false;
+  }
+}

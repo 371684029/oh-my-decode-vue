@@ -52,6 +52,35 @@ export interface FetchResult {
   total?: number;
 }
 
+const FETCH_TIMEOUT_MS = 10000;
+const BLOCKED_HOSTS = new Set(['169.254.169.254', 'metadata.google.internal']);
+
+/** 只允许相对路径与 http(s)，拒绝 javascript: 和云元数据地址 */
+export function assertFetchableUrl(url: string): void {
+  if (url.startsWith('/') && !url.startsWith('//')) return;
+  let parsed: URL;
+  try {
+    parsed = new URL(url);
+  } catch {
+    throw new Error('无效的数据源 URL');
+  }
+  if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+    throw new Error('数据源仅允许 http 或 https');
+  }
+  if (BLOCKED_HOSTS.has(parsed.hostname.toLowerCase())) {
+    throw new Error('不允许访问该地址');
+  }
+}
+
+function fetchTimeoutSignal(): AbortSignal {
+  if (typeof AbortSignal !== 'undefined' && typeof AbortSignal.timeout === 'function') {
+    return AbortSignal.timeout(FETCH_TIMEOUT_MS);
+  }
+  const controller = new AbortController();
+  setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
+  return controller.signal;
+}
+
 /** 统一请求执行器 */
 export class ApiExecutor {
   private scope: Record<string, any>;
@@ -73,6 +102,7 @@ export class ApiExecutor {
       throw new Error('数据源 URL 未配置');
     }
     const url = /^https?:\/\//.test(rawUrl) ? rawUrl : this.baseUrl + rawUrl;
+    assertFetchableUrl(url);
     const params = resolveTemplatedValue(api.params ?? {}, this.scope) as Record<string, any>;
     const method = api.method ?? 'GET';
 
@@ -89,7 +119,7 @@ export class ApiExecutor {
       init.body = JSON.stringify(params);
     }
 
-    const res = await fetch(finalUrl, init);
+    const res = await fetch(finalUrl, { ...init, signal: fetchTimeoutSignal() });
     if (!res.ok) {
       throw new Error(`HTTP ${res.status}: ${finalUrl}`);
     }
@@ -122,7 +152,13 @@ export interface ActionContext {
 /** 按序执行动作链 */
 export async function executeActions(actions: ActionNode[], ctx: ActionContext): Promise<void> {
   for (const action of actions) {
-    await executeAction(action, ctx);
+    try {
+      await executeAction(action, ctx);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : '动作执行失败';
+      ctx.notify('error', message);
+      break;
+    }
   }
 }
 
@@ -139,16 +175,20 @@ async function executeAction(action: ActionNode, ctx: ActionContext): Promise<vo
       break;
     }
     case 'reload_data':
-      if (action.target) await ctx.reloadNode(action.target);
+      if (!action.target) throw new Error('刷新数据缺少目标组件');
+      await ctx.reloadNode(action.target);
       break;
     case 'open_dialog':
-      if (action.target) ctx.setLayerVisible(action.target, true);
+      if (!action.target) throw new Error('打开弹窗缺少目标图层');
+      ctx.setLayerVisible(action.target, true);
       break;
     case 'close_dialog':
-      if (action.target) ctx.setLayerVisible(action.target, false);
+      if (!action.target) throw new Error('关闭弹窗缺少目标图层');
+      ctx.setLayerVisible(action.target, false);
       break;
     case 'toggle_loading':
-      if (action.target) ctx.setLayerVisible(action.target, action.payload?.visible ?? true);
+      if (!action.target) throw new Error('Loading 动作缺少目标图层');
+      ctx.setLayerVisible(action.target, action.payload?.visible ?? true);
       break;
     case 'show_message':
       ctx.notify(action.payload?.messageType ?? 'info', action.payload?.messageText ?? '操作完成');

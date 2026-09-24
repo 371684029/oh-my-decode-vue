@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest';
-import { parseExpression, isExpression } from './expression';
+import { parseExpression, isExpression, canInlineExpression } from './expression';
 
 const scope = {
   state: { user: { name: '张三' }, count: 3 },
@@ -93,6 +93,17 @@ describe('parseExpression 安全防护', () => {
   test('拒绝恶意函数构造链', () => {
     const evil = '{{ constructor.constructor("return globalThis")() }}';
     expect(parseExpression(evil, scope)).toBe(evil);
+  });
+});
+
+describe('canInlineExpression', () => {
+  test('合法表达式可以内联，注入片段不可以', () => {
+    expect(canInlineExpression('state.user.name')).toBe(true);
+    expect(canInlineExpression('1 + 2')).toBe(true);
+    expect(canInlineExpression('count < 5')).toBe(true);
+    expect(canInlineExpression('1) || alert(1) || (1')).toBe(false);
+    expect(canInlineExpression('alert(1)')).toBe(false);
+    expect(canInlineExpression('"</script>"')).toBe(false);
   });
 });
 

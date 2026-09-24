@@ -120,8 +120,10 @@ describe('generateVueSFC', () => {
     expect(code).toContain('el-dialog');
     expect(code).toContain('dialogVisible_layer_dlg');
     expect(code).toContain('loadingVisible_layer_loading');
-    expect(code).toContain('customHtmlRef_layer_html');
-    expect(code).toContain('v-html="customHtml_layer_html"');
+    expect(code).toContain('customHtmlSrcdoc_layer_html');
+    expect(code).toContain('sandbox="allow-scripts"');
+    expect(code).not.toContain('v-html="customHtml_layer_html"');
+    expect(code).not.toContain('new Function');
     expect(code).toContain('console.log(\\"mounted\\")');
     expect(code).toContain('console.log(\\"unmounted\\")');
     expect(code).not.toContain('<div class="custom-card">卡片</div>');
@@ -281,6 +283,22 @@ describe('出码引擎输入转义（防止用户配置破坏生成代码）', (
     expect(code).not.toContain('<script>alert(1)</script>');
     expect(code).not.toContain('<script>alert(2)</script>');
     expect(code).toContain('\\u003c/script>');
+  });
+
+  test('不安全表达式和响应路径不会变成可执行代码', () => {
+    const schema = buildTestSchema();
+    const table = schema.children.find((node) => node.type === 'pro-table');
+    if (!table) throw new Error('missing table');
+    table.apiBinding = {
+      url: '{{ 1) || alert(1) || (1 }}',
+      responsePath: 'data.list;alert(1)',
+      method: 'GET'
+    };
+    const code = generateVueSFC(schema);
+    expect(code).toContain(JSON.stringify('1) || alert(1) || (1'));
+    expect(code).not.toContain('(1) || alert(1)');
+    expect(code).not.toContain('list;alert');
+    expect(code).toContain('AbortSignal.timeout(10000)');
   });
 
   test('弹窗图层导出其中的子节点', () => {

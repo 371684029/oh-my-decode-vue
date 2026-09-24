@@ -45,6 +45,24 @@ describe('designerStore 节点操作', () => {
     expect(store.addChildToNode(parentId, material)).toBe(true);
     expect(store.pageSchema.children[0].children?.[0].type).toBe('el-button');
     expect(store.selectedNode?.type).toBe('el-button');
+    const childId = store.pageSchema.children[0].children?.[0].id;
+    if (!childId) throw new Error('missing child');
+    store.addChildToNode(parentId, { ...material, label: '第二个' });
+    expect(store.moveChild(parentId, childId, 1)).toBe(true);
+    expect(store.pageSchema.children[0].children?.[1].id).toBe(childId);
+    store.removeNode(childId);
+    expect(store.pageSchema.children[0].children?.some((node) => node.id === childId)).toBe(false);
+  });
+
+  test('noteSchemaChange 把属性修改前的快照写入撤销栈', () => {
+    const store = useDesignerStore();
+    store.addNodeFromMaterial(material);
+    const before = JSON.stringify(store.pageSchema);
+    store.pageSchema.children[0].label = '改名';
+    store.noteSchemaChange(before);
+    store.flushPendingHistory();
+    store.undo();
+    expect(store.pageSchema.children[0].label).toBe('按钮 (Button)');
   });
 
   test('undo/redo 撤销与重做', () => {

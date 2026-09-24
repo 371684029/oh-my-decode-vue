@@ -25,7 +25,13 @@
         @drop.stop="onDropIntoContainer"
       >
         <template v-if="node.children && node.children.length > 0">
-          <NodeRenderer v-for="child in node.children" :key="child.id" :node="child" />
+          <div v-for="child in node.children" :key="child.id" class="container-child">
+            <div class="container-child-tools" @click.stop>
+              <el-button link size="small" @click="designerStore.moveChild(node.id, child.id, -1)">前移</el-button>
+              <el-button link size="small" @click="designerStore.moveChild(node.id, child.id, 1)">后移</el-button>
+            </div>
+            <NodeRenderer :node="child" />
+          </div>
         </template>
         <p v-else style="color: #909399; font-size: 13px; margin: 0">弹性嵌套容器：可拖入子组件</p>
       </div>
@@ -157,5 +163,16 @@ const onDropIntoContainer = (event: DragEvent) => {
 .container-inner {
   min-height: 40px;
   flex-wrap: wrap;
+}
+.container-child {
+  flex: 1 1 160px;
+  min-width: 120px;
+  border: 1px dashed #dcdfe6;
+  border-radius: 4px;
+  padding: 4px;
+}
+.container-child-tools {
+  display: flex;
+  justify-content: flex-end;
 }
 </style>

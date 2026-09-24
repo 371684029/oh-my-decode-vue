@@ -35,7 +35,7 @@
 - **✅ 数据驱动能力 (v1.3.0)**：接口数据源绑定（`apiBinding`）、表达式绑定真实渲染（`{{ }}`）、事件动作链（click → 刷新/弹窗/状态联动），出码产物生成真实前端 `fetch` 调用。
 - **✅ 操作历史与自动保存**：30 步撤销/重做、复制/粘贴/删除快捷键、3 分钟无感自动保存。
 - **✅ 安全加固**：后端 Schema 落盘前 Zod 强校验（结构、脚本/HTML 长度、id 禁止路径字符）；表达式求值器为受限解释器（拒绝函数调用/赋值/原型链访问，不使用 `eval`）；自定义 HTML 在设计器里放进 sandbox iframe，出码时 HTML/脚本以转义字符串嵌入；API 默认只监听 `127.0.0.1`，CORS 默认只放行本地设计器。
-- **✅ 工程化与质量**：Vitest 单元测试（前端 64、后端 5）、ESLint + Prettier（0 error / 0 warning）、GitHub Actions CI（双 Node 版本）、`shared` 共享类型包、Element Plus 按需引入。
+- **✅ 工程化与质量**：Vitest 单元测试（前端 69、后端 5）、ESLint + Prettier（0 error / 0 warning）、GitHub Actions CI（双 Node 版本）、`shared` 共享类型包、Element Plus 按需引入。
 
 ### 🔜 规划中的核心能力（详见 `docs/`）
 
@@ -109,7 +109,7 @@
 | **JSON 文件存储** | Node File System      | `fs/promises`    | 持久化存储 Schema JSON 配置文件                    |
 | **日志数据库**    | SQLite                | `better-sqlite3` | 本地轻量级审计日志数据库                           |
 | **共享类型**      | `@lowcode/shared`     | —                | Monorepo 共享类型包，消除前后端类型漂移            |
-| **单元测试**      | Vitest                | `4.x`            | 前端 64 + 后端 5：Store / 出码 / 表达式 / 存储校验 |
+| **单元测试**      | Vitest                | `4.x`            | 前端与后端：Store / 出码 / 表达式 / 数据源 / 存储 |
 | **代码规范**      | ESLint + Prettier     | `9.x` / `3.x`    | 0 error / 0 warning，统一代码风格                  |
 | **CI/CD**         | GitHub Actions        | —                | 双 Node 版本：typecheck → lint → test → build      |
 | **工程化 & 规范** | TypeScript            | `5.x` / `6.x`    | 强类型标注与语法检查                               |
@@ -191,7 +191,7 @@ npm run build
 ```bash
 npm run typecheck   # 前后端 + shared 类型检查
 npm run lint        # ESLint（0 error / 0 warning 门槛）
-npm run test        # Vitest：前端 64 用例 + 后端 5 用例
+npm run test        # Vitest：前端 69 用例 + 后端 5 用例
 npm run format      # Prettier 全仓格式化
 ```
 
@@ -215,7 +215,18 @@ npm run format      # Prettier 全仓格式化
 
 ## 📝 版本变更历史 (Changelog)
 
-### 📌 v1.3.0 (当前版本 - 2026-09)
+### 📌 v1.5.0 (当前版本 - 2026-09)
+
+- **出码表达式白名单**：只有受限解释器能完整解析的 `{{ }}` 才会内联进生成代码；响应路径只接受标识符和下标，非法片段不会拼进 JavaScript。
+- **属性修改可撤销**：直接改属性、数据源和事件时记下变更前快照，连续输入合并成一步；历史栈按体积丢弃最早的快照。
+- **大纲跟随当前图层**：进入弹窗或其它图层编辑时，大纲显示该图层的节点树，嵌套子节点可删除。
+- **事件目标改为选择**：动作链从组件和图层列表里选目标；某一步失败后停止后续动作。
+- **容器内排序**：弹性容器里的子节点可以前移、后移。
+- **自定义 HTML 导出隔离**：出码改为 sandbox iframe 的 srcdoc，不再把脚本用 `new Function` 放进页面。
+- **数据源请求约束**：仅允许 http(s) 和站内相对路径，拦截云元数据地址，请求 10 秒超时。
+- **工具链对齐**：后端与 shared 的 TypeScript 升到 6.x，与前端一致。
+
+### 📌 v1.3.0
 
 - **数据驱动能力**：组件支持 `apiBinding` 接口数据源绑定（URL/方法/参数/响应路径/分页路径/自动请求），设计器"试请求"实时预览，出码产物生成真实前端 `fetch` 调用（不生成后端代码）。
 - **表达式绑定真实渲染**：`{{ state.xxx }}` 表达式从属性面板预览升级为画布组件实时求值。

@@ -1,5 +1,12 @@
 import { describe, expect, test, beforeEach, vi } from 'vitest';
-import { extractByPath, resolveTemplatedValue, ApiExecutor, executeActions, nodeEventBus } from './dataSource';
+import {
+  extractByPath,
+  resolveTemplatedValue,
+  ApiExecutor,
+  executeActions,
+  nodeEventBus,
+  assertFetchableUrl
+} from './dataSource';
 import type { ActionNode, ApiBinding } from '../types/designer';
 
 beforeEach(() => {
@@ -85,6 +92,13 @@ describe('ApiExecutor 统一请求层', () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false, status: 500 }));
     const executor = new ApiExecutor();
     await expect(executor.fetchData({ url: '/x' })).rejects.toThrow('HTTP 500');
+  });
+
+  test('拒绝非 http(s) 地址', async () => {
+    const executor = new ApiExecutor();
+    await expect(executor.fetchData({ url: 'javascript:alert(1)' })).rejects.toThrow(/http/);
+    expect(() => assertFetchableUrl('https://169.254.169.254/latest')).toThrow(/不允许/);
+    expect(() => assertFetchableUrl('/api/users')).not.toThrow();
   });
 
   test('未配置 URL 抛出错误', async () => {
@@ -176,5 +190,26 @@ describe('executeActions 事件动作链', () => {
       notify: () => {}
     });
     expect(setLayerVisible).toHaveBeenCalledWith('layer_loading', false);
+  });
+
+  test('前面的动作失败后不再执行后续动作', async () => {
+    const notify = vi.fn();
+    const reload = vi.fn();
+    await executeActions(
+      [
+        { id: 'a1', type: 'reload_data' },
+        { id: 'a2', type: 'reload_data', target: 'tbl_users' }
+      ],
+      {
+        scope: {},
+        getNode: () => undefined,
+        getLayer: () => undefined,
+        reloadNode: reload,
+        setLayerVisible: () => {},
+        notify
+      }
+    );
+    expect(notify).toHaveBeenCalledWith('error', '刷新数据缺少目标组件');
+    expect(reload).not.toHaveBeenCalled();
   });
 });
