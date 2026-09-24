@@ -8,7 +8,7 @@
 
 ## 📖 项目简介
 
-本项目旨在打造一款可通过**可视化拖拉拽**快速生成 Vue 3 页面的低代码平台。平台以 **JSON Schema 为唯一映射桥梁**连接 UI 组件层。v1.3.0 已落地数据源绑定、`{{ }}` 表达式渲染和最小事件动作链；完整管道编排与远程物料仍在规划中（详见 `docs/`）。
+本项目旨在打造一款可通过**可视化拖拉拽**快速生成 Vue 3 页面的低代码平台。平台以 **JSON Schema 为唯一映射桥梁**连接 UI 组件层。当前版本 **v1.5.0**：数据源绑定、`{{ }}` 表达式渲染、事件动作链、出码白名单和自定义 HTML 沙箱导出已经落地；完整管道编排与远程物料仍在规划中（详见 `docs/`）。
 
 项目采用了 **Node.js + Express + SQLite** 架构，其中页面/组件的 Schema 配置文件**直接存储为本地 `.json` 文件**，而 SQLite 数据库专用于记录高可靠的**操作审计日志 (Operation Audit Logs)**。
 
@@ -32,9 +32,9 @@
   - **SQLite 审计留痕**：所有的修改、保存与删除操作均自动落盘至 SQLite 操作日志表（`logs.db`）。
 - **✅ 多图层系统**：弹窗 (Dialog) / Loading 遮罩 / 自定义 HTML 三种图层，支持显隐切换、zIndex 管理与生命周期脚本钩子。
 - **✅ 多目标出码引擎**：Vue 3 SFC (`.vue`) / W3C Web Component (`.js`，配套 PageTemplate.vue) / 独立 HTML (`.html`，CDN 完整渲染) 三目标均为**完整渲染**，并对用户配置内容做 HTML 转义与标签名安全化。
-- **✅ 数据驱动能力 (v1.3.0)**：接口数据源绑定（`apiBinding`）、表达式绑定真实渲染（`{{ }}`）、事件动作链（click → 刷新/弹窗/状态联动），出码产物生成真实前端 `fetch` 调用。
-- **✅ 操作历史与自动保存**：30 步撤销/重做、复制/粘贴/删除快捷键、3 分钟无感自动保存。
-- **✅ 安全加固**：后端 Schema 落盘前 Zod 强校验（结构、脚本/HTML 长度、id 禁止路径字符）；表达式求值器为受限解释器（拒绝函数调用/赋值/原型链访问，不使用 `eval`）；自定义 HTML 在设计器里放进 sandbox iframe，出码时 HTML/脚本以转义字符串嵌入；API 默认只监听 `127.0.0.1`，CORS 默认只放行本地设计器。
+- **✅ 数据驱动能力**：接口数据源绑定（`apiBinding`）、表达式绑定真实渲染（`{{ }}`）、事件动作链（从列表选择目标；失败即停止），出码产物生成带 10 秒超时的前端 `fetch`。
+- **✅ 操作历史与自动保存**：撤销/重做覆盖布局和属性修改（连续输入合并成一步，并按体积丢弃最早快照）、复制/粘贴/删除快捷键、3 分钟无感自动保存。
+- **✅ 安全加固**：后端 Schema 落盘前 Zod 强校验（结构、脚本/HTML 长度、id 禁止路径字符）；表达式求值器为受限解释器（拒绝函数调用/赋值/原型链访问，不使用 `eval`），出码只内联通过该解释器的表达式；自定义 HTML 在设计器和导出页面都放进 sandbox iframe；API 默认只监听 `127.0.0.1`，CORS 默认只放行本地设计器。
 - **✅ 工程化与质量**：Vitest 单元测试（前端 69、后端 5）、ESLint + Prettier（0 error / 0 warning）、GitHub Actions CI（双 Node 版本）、`shared` 共享类型包、Element Plus 按需引入。
 
 ### 🔜 规划中的核心能力（详见 `docs/`）
@@ -102,17 +102,17 @@
 | **状态管理**      | Pinia                 | `4.x`            | 响应式 Store，管理设计器全局 Schema 状态           |
 | **前端构建**      | Vite                  | `8.x`            | 极速冷启动与 HMR 构建工具（rolldown 内核）         |
 | **表达式求值**    | 自研受限解释器        | —                | `{{ }}` 表达式安全求值（拒绝 eval / new Function） |
-| **HTML 消毒**     | DOMPurify             | `3.x`            | 自定义 HTML 图层 v-html 渲染前消毒                 |
-| **后端运行环境**  | Node.js               | `18+` / `22+`    | JavaScript 运行环境                                |
+| **HTML 消毒**     | DOMPurify             | `3.x`            | 自定义 HTML 写入 iframe 文档前消毒                 |
+| **后端运行环境**  | Node.js               | `20+` / `22+`    | JavaScript 运行环境（CI 覆盖 20 与 22）            |
 | **后端 Web 框架** | Express               | `4.x`            | RESTful API 服务框架                               |
-| **Schema 校验**   | Zod                   | `3.x`            | 页面 Schema 落盘前结构强校验与字段长度限制         |
+| **Schema 校验**   | Zod                   | `4.x`            | 页面 Schema 落盘前结构强校验与字段长度限制         |
 | **JSON 文件存储** | Node File System      | `fs/promises`    | 持久化存储 Schema JSON 配置文件                    |
 | **日志数据库**    | SQLite                | `better-sqlite3` | 本地轻量级审计日志数据库                           |
 | **共享类型**      | `@lowcode/shared`     | —                | Monorepo 共享类型包，消除前后端类型漂移            |
 | **单元测试**      | Vitest                | `4.x`            | 前端与后端：Store / 出码 / 表达式 / 数据源 / 存储 |
-| **代码规范**      | ESLint + Prettier     | `9.x` / `3.x`    | 0 error / 0 warning，统一代码风格                  |
+| **代码规范**      | ESLint + Prettier     | `10.x` / `3.x`   | 0 error / 0 warning，统一代码风格                  |
 | **CI/CD**         | GitHub Actions        | —                | 双 Node 版本：typecheck → lint → test → build      |
-| **工程化 & 规范** | TypeScript            | `5.x` / `6.x`    | 强类型标注与语法检查                               |
+| **工程化 & 规范** | TypeScript            | `6.x`            | 前后端与 shared 使用同一主版本                     |
 
 ---
 
@@ -129,9 +129,9 @@ low-code-platform/
 ├── frontend/               # Vue 3 前端低代码设计器工程
 │   ├── src/
 │   │   ├── components/     # 设计器 UI 组件 (CanvasContainer, MaterialList, PropertyDrawer ...)
-│   │   ├── registry/       # 物料注册中心 (materials.ts)
+│   │   ├── registry/       # 物料注册 (materials.ts) 与已登记节点类型 (nodeTypes.ts)
 │   │   ├── stores/         # Pinia 全局设计器 Store (designerStore.ts)
-│   │   ├── utils/          # 出码引擎 (codeGenerator.ts) / 受限表达式求值器 (expression.ts)
+│   │   ├── utils/          # 出码 (codeGenerator.ts) / 表达式 (expression.ts) / 数据源 (dataSource.ts)
 │   │   ├── types/          # 类型 re-export（统一来自 @lowcode/shared）
 │   │   ├── *.test.ts       # Vitest 单元测试（Store / 出码引擎 / 表达式求值器）
 │   │   └── App.vue         # 主应用与 API 联调界面
@@ -143,6 +143,7 @@ low-code-platform/
 ├── backend/                # Node.js + Express 后端服务工程
 │   ├── src/
 │   │   ├── controllers/    # JSON Schema CRUD 与日志控制器
+│   │   ├── middleware/     # X-Api-Key 认证
 │   │   ├── db/             # SQLite logs.db 初始化脚本
 │   │   ├── services/       # 文件读写存储服务 (storageService.ts)
 │   │   ├── validation/     # Zod 落盘强校验 (schemaValidation.ts)
@@ -189,7 +190,7 @@ npm run build
 ### 4. 质量检查（CI 同款命令）
 
 ```bash
-npm run typecheck   # 前后端 + shared 类型检查
+npm run typecheck   # 前后端类型检查
 npm run lint        # ESLint（0 error / 0 warning 门槛）
 npm run test        # Vitest：前端 69 用例 + 后端 5 用例
 npm run format      # Prettier 全仓格式化
@@ -291,15 +292,15 @@ npm run format      # Prettier 全仓格式化
 
 ### 🗺️ 路线图与规划 (docs/roadmap/)
 
-4. **[0.0.1 里程碑规划](docs/roadmap/0.0.1_PLAN.md)**：包含基础拖拽、属性面板与双存储方案。
-5. **[0.1.0 接口与事件联动规划](docs/roadmap/0.1.0_PLAN.md)**：包含 API 数据源绑定、参数映射与事件动作链条。
-6. **[架构演进与体验优化深度建议](docs/roadmap/ARCH_RECOMMENDATIONS.md)**：包含零废码源码生成器、沙箱预览、时间旅行撤销历史栈、远程物料插件与规则引擎的落地方案。
-7. **[平台演进与优化方向指南](docs/roadmap/FUTURE_DIRECTIONS.md)**：包含画布标尺/快捷键/嵌套容器、动态 JS 表达式、纯 Vue 3 SFC 出码等 10 大演进方向。
-8. **[v0.4.0 功能规划与路线图](docs/roadmap/0.4.0_PLAN.md)**：包含节点式可视化逻辑流编排、在线 API 数据源建模与 Mock 仿真、可视化 CSS 与样式微调编辑器、Schema 版本对比与 Diff 工具、第三方物料 SDK。
-9. **[v0.5.0 功能规划与路线图](docs/roadmap/0.5.0_PLAN.md)**：包含多工作区多项目物理隔离、自制组件入参/出参强校验规范、简易操作日志可视化控制台。
-10. **[自制组件入参/出参规范与契约强校验指南](docs/roadmap/COMPONENT_IO_SPECIFICATION.md)**：包含自制物料组件必填 Inputs/Outputs 参数定义、类型约束、属性抽屉强校验规则。
-11. **[v1.0.0 基础正式版 (Base GA) 规划与路线图](docs/roadmap/1.0.0_PLAN.md)**：包含基础拖拽布局、组件 I/O 契约强校验、JSON 文件存储与 SQLite 审计日志控制台、多目标出码与基础页面发布。
-12. **[v1.1.0 体验增强版规划](docs/roadmap/1.1.0_PLAN.md)**：包含画布对齐参考线/吸附指示、键盘方向键微调、操作日志可视化 JSON Diff 比对。
-13. **[v1.2.0 多图层架构与生命周期规划](docs/roadmap/1.2.0_PLAN.md)**：包含对话框图层、Loading 加载框图层、自定义 HTML 图层及 JavaScript 生命周期钩子。
-14. **[数据与事件管道编排技术规范](docs/roadmap/PIPELINE_ORCHESTRATION.md)**：包含组件、图层（弹窗/遮罩）、页面路由跳转、生命周期钩子与异步 API 数据流的可视化管道编排架构规范。
-15. **[v3.0.0 远期企业级架构与生态规划](docs/roadmap/3.0.0_PLAN.md)**：包含企业级 RBAC/SSO 单点登录、PostgreSQL/S3 高可用分布式存储、CRDT 多人实时协同、一键 CI/CD 灰度发布、VS Code 插件与 CLI 工具链。
+5. **[0.0.1 里程碑规划](docs/roadmap/0.0.1_PLAN.md)**：包含基础拖拽、属性面板与双存储方案。
+6. **[0.1.0 接口与事件联动规划](docs/roadmap/0.1.0_PLAN.md)**：包含 API 数据源绑定、参数映射与事件动作链条。
+7. **[架构演进与体验优化深度建议](docs/roadmap/ARCH_RECOMMENDATIONS.md)**：包含零废码源码生成器、沙箱预览、时间旅行撤销历史栈、远程物料插件与规则引擎的落地方案。
+8. **[平台演进与优化方向指南](docs/roadmap/FUTURE_DIRECTIONS.md)**：包含画布标尺、可视化联动、微前端发布、协同锁、远程物料等尚未落地的方向。文首标明了 v1.3.0 之前已经完成的条目。
+9. **[v0.4.0 功能规划与路线图](docs/roadmap/0.4.0_PLAN.md)**：包含节点式可视化逻辑流编排、在线 API 数据源建模与 Mock 仿真、可视化 CSS 与样式微调编辑器、Schema 版本对比与 Diff 工具、第三方物料 SDK。
+10. **[v0.5.0 功能规划与路线图](docs/roadmap/0.5.0_PLAN.md)**：包含多工作区多项目物理隔离、自制组件入参/出参强校验规范、简易操作日志可视化控制台。
+11. **[自制组件入参/出参规范与契约强校验指南](docs/roadmap/COMPONENT_IO_SPECIFICATION.md)**：包含自制物料组件必填 Inputs/Outputs 参数定义、类型约束、属性抽屉强校验规则。
+12. **[v1.0.0 基础正式版 (Base GA) 规划与路线图](docs/roadmap/1.0.0_PLAN.md)**：包含基础拖拽布局、组件 I/O 契约强校验、JSON 文件存储与 SQLite 审计日志控制台、多目标出码与基础页面发布。
+13. **[v1.1.0 体验增强版规划](docs/roadmap/1.1.0_PLAN.md)**：包含画布对齐参考线/吸附指示、键盘方向键微调、操作日志可视化 JSON Diff 比对。
+14. **[v1.2.0 多图层架构与生命周期规划](docs/roadmap/1.2.0_PLAN.md)**：包含对话框图层、Loading 加载框图层、自定义 HTML 图层及 JavaScript 生命周期钩子。
+15. **[数据与事件管道编排技术规范](docs/roadmap/PIPELINE_ORCHESTRATION.md)**：包含组件、图层（弹窗/遮罩）、页面路由跳转、生命周期钩子与异步 API 数据流的可视化管道编排架构规范。
+16. **[v3.0.0 远期企业级架构与生态规划](docs/roadmap/3.0.0_PLAN.md)**：包含企业级 RBAC/SSO 单点登录、PostgreSQL/S3 高可用分布式存储、CRDT 多人实时协同、一键 CI/CD 灰度发布、VS Code 插件与 CLI 工具链。
