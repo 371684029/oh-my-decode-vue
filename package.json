@@ -1,6 +1,6 @@
 {
   "name": "low-code-platform",
-  "version": "1.2.0",
+  "version": "1.3.0",
   "private": true,
   "description": "Low-Code Frontend Platform",
   "workspaces": [
@@ -15,6 +15,7 @@
     "build:backend": "npm --prefix backend run build",
     "build": "npm run build:backend && npm run build:frontend",
     "test": "npm --prefix frontend run test",
+    "test:e2e": "npm --prefix frontend run test:e2e",
     "typecheck": "npm run typecheck:backend && npm run typecheck:frontend",
     "typecheck:frontend": "npm --prefix frontend run typecheck",
     "typecheck:backend": "tsc -p backend/tsconfig.json --noEmit",

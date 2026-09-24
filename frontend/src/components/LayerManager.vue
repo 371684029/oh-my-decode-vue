@@ -57,6 +57,17 @@
 
           <el-icon
             v-if="layer.type !== 'canvas'"
+            class="action-icon"
+            :class="{ 'editing-icon': designerStore.editingLayerId === layer.id }"
+            :title="designerStore.editingLayerId === layer.id ? '退出图层编辑' : '进入图层编辑（向图层内拖入组件）'"
+            @click.stop="handleLayerEdit(layer.id)"
+          >
+            <EditPen v-if="designerStore.editingLayerId !== layer.id" />
+            <Close v-else />
+          </el-icon>
+
+          <el-icon
+            v-if="layer.type !== 'canvas'"
             class="action-icon delete-icon"
             title="删除图层"
             @click.stop="designerStore.removeLayer(layer.id)"
@@ -149,7 +160,18 @@
 <script setup lang="ts">
 import { computed, watch } from 'vue';
 import { useDesignerStore } from '../stores/designerStore';
-import { Files, Message, Loading, Document, ArrowDown, View, Hide, Delete } from '@element-plus/icons-vue';
+import {
+  Files,
+  Message,
+  Loading,
+  Document,
+  ArrowDown,
+  View,
+  Hide,
+  Delete,
+  EditPen,
+  Close
+} from '@element-plus/icons-vue';
 
 const designerStore = useDesignerStore();
 
@@ -187,6 +209,15 @@ const getLayerTagType = (type: string) => {
 
 const handleCreateLayer = (type: 'dialog' | 'loading' | 'custom-html') => {
   designerStore.addLayer(type, '');
+};
+
+/** 进入 / 退出图层内编辑 */
+const handleLayerEdit = (layerId: string) => {
+  if (designerStore.editingLayerId === layerId) {
+    designerStore.exitLayerEdit();
+  } else {
+    designerStore.enterLayerEdit(layerId);
+  }
 };
 </script>
 

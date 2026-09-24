@@ -53,6 +53,16 @@ describe('designerStore 节点操作', () => {
     expect(store.historyPast.length).toBe(30);
   });
 
+  test('recordHistory 去重：连续无变化不重复记录', () => {
+    const store = useDesignerStore();
+    store.addNodeFromMaterial(material);
+    store.recordHistory(); // 记录当前状态
+    const len = store.historyPast.length;
+    store.recordHistory(); // 页面无变化 → 去重跳过
+    store.recordHistory();
+    expect(store.historyPast.length).toBe(len);
+  });
+
   test('copySelectedNode / pasteNode 复制粘贴生成新 id', () => {
     const store = useDesignerStore();
     store.addNodeFromMaterial(material);

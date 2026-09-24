@@ -14,7 +14,7 @@ export const useDesignerStore = defineStore('designer', {
       meta: {
         author: 'LowCode Admin',
         description: '通过低代码平台生成的页面',
-        version: '1.2.0'
+        version: '1.3.0'
       },
       state: {},
       children: [] as ComponentNode[],
@@ -30,6 +30,8 @@ export const useDesignerStore = defineStore('designer', {
       ]
     } as PageSchema,
     activeLayerId: 'layer_base_canvas' as string,
+    /** 当前编辑目标图层 id（null = 主画布）；进入非 canvas 图层后在其 children 中编辑 */
+    editingLayerId: null as string | null,
     selectedNodeId: null as string | null,
     copiedNode: null as ComponentNode | null,
     isDrawerOpen: false,
@@ -38,9 +40,20 @@ export const useDesignerStore = defineStore('designer', {
     historyFuture: [] as string[]
   }),
   getters: {
+    /** 当前编辑目标（图层 children 或主画布 children）的响应式数组引用 */
+    activeChildren(state): ComponentNode[] {
+      if (state.editingLayerId) {
+        const layer = state.pageSchema.layers?.find((l) => l.id === state.editingLayerId);
+        if (layer) return layer.children;
+      }
+      return state.pageSchema.children;
+    },
     selectedNode(state): ComponentNode | null {
       if (!state.selectedNodeId) return null;
-      return state.pageSchema.children.find((node: ComponentNode) => node.id === state.selectedNodeId) || null;
+      const children = state.editingLayerId
+        ? (state.pageSchema.layers?.find((l) => l.id === state.editingLayerId)?.children as ComponentNode[] | undefined)
+        : state.pageSchema.children;
+      return children?.find((node: ComponentNode) => node.id === state.selectedNodeId) || null;
     },
     canUndo(state): boolean {
       return state.historyPast.length > 0;
@@ -52,8 +65,14 @@ export const useDesignerStore = defineStore('designer', {
   actions: {
     recordHistory() {
       const snapshot = JSON.stringify(this.pageSchema);
-      // 限制最大撤销步数为 30
-      if (this.historyPast.length >= 30) {
+      // 去重：与最近一次快照相同则跳过（避免无效历史）
+      if (this.historyPast.length > 0 && this.historyPast[this.historyPast.length - 1] === snapshot) {
+        return;
+      }
+      // 自适应历史深度：schema 越大保留步数越少，控制内存占用
+      const size = snapshot.length;
+      const maxSteps = size > 200000 ? 8 : size > 50000 ? 15 : 30;
+      while (this.historyPast.length >= maxSteps) {
         this.historyPast.shift();
       }
       this.historyPast.push(snapshot);
@@ -103,13 +122,13 @@ export const useDesignerStore = defineStore('designer', {
         style: {},
         events: {}
       };
-      this.pageSchema.children.push(newNode);
+      this.activeChildren.push(newNode);
       this.selectNode(id);
     },
     updateNodeLayout(layoutList: any[]) {
       let isChanged = false;
       layoutList.forEach((item) => {
-        const node = this.pageSchema.children.find((n) => n.id === item.i);
+        const node = this.activeChildren.find((n) => n.id === item.i);
         if (
           node &&
           (node.layout.x !== item.x || node.layout.y !== item.y || node.layout.w !== item.w || node.layout.h !== item.h)
@@ -126,10 +145,10 @@ export const useDesignerStore = defineStore('designer', {
       });
     },
     removeNode(id: string) {
-      const idx = this.pageSchema.children.findIndex((n) => n.id === id);
+      const idx = this.activeChildren.findIndex((n) => n.id === id);
       if (idx !== -1) {
         this.recordHistory();
-        this.pageSchema.children.splice(idx, 1);
+        this.activeChildren.splice(idx, 1);
         if (this.selectedNodeId === id) {
           this.selectNode(null);
         }
@@ -154,7 +173,7 @@ export const useDesignerStore = defineStore('designer', {
       pastedNode.id = newId;
       pastedNode.layout.i = newId;
       pastedNode.layout.y += pastedNode.layout.h; // 下移一行排列
-      this.pageSchema.children.push(pastedNode);
+      this.activeChildren.push(pastedNode);
       this.selectNode(newId);
       return true;
     },
@@ -231,6 +250,21 @@ export const useDesignerStore = defineStore('designer', {
         this.recordHistory();
         layer.props = { ...(layer.props || {}), ...newProps };
       }
+    },
+    /** 进入图层内编辑（非 canvas 图层）：画布切换为该图层 children */
+    enterLayerEdit(layerId: string) {
+      const layer = this.pageSchema.layers?.find((l) => l.id === layerId);
+      if (layer && layer.type !== 'canvas') {
+        this.editingLayerId = layerId;
+        this.activeLayerId = layerId;
+        this.selectNode(null);
+      }
+    },
+    /** 退出图层内编辑，返回主画布 */
+    exitLayerEdit() {
+      this.editingLayerId = null;
+      this.activeLayerId = 'layer_base_canvas';
+      this.selectNode(null);
     }
   }
 });

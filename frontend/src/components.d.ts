@@ -51,9 +51,13 @@ declare module 'vue' {
     LayerManager: typeof import('./components/LayerManager.vue')['default']
     LayerTree: typeof import('./components/LayerTree.vue')['default']
     MaterialList: typeof import('./components/MaterialList.vue')['default']
+    NodeRenderer: typeof import('./components/NodeRenderer.vue')['default']
     ProForm: typeof import('./components/ProForm.vue')['default']
     PropertyDrawer: typeof import('./components/PropertyDrawer.vue')['default']
     ProTable: typeof import('./components/ProTable.vue')['default']
     SchemaJsonViewer: typeof import('./components/SchemaJsonViewer.vue')['default']
+  }
+  export interface GlobalDirectives {
+    vLoading: typeof import('element-plus/es')['ElLoadingDirective']
   }
 }

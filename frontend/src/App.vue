@@ -5,7 +5,7 @@
       <div class="logo">
         <el-icon class="logo-icon"><Platform /></el-icon>
         <span class="logo-text">低代码前端可视化平台 (Low-Code Studio)</span>
-        <el-tag size="small" type="primary" effect="plain" style="margin-left: 10px">v1.2.0</el-tag>
+        <el-tag size="small" type="primary" effect="plain" style="margin-left: 10px">v1.3.0</el-tag>
       </div>
       <div class="header-actions">
         <el-button-group class="history-btn-group">
@@ -41,83 +41,7 @@
 
       <!-- Center Main Canvas -->
       <CanvasContainer v-slot="{ node }">
-        <ErrorBoundary v-if="node">
-          <!-- 自有高端组件 -->
-          <ProTable v-if="node.type === 'pro-table'" :node="node" />
-          <ProForm v-else-if="node.type === 'pro-form'" :node="node" />
-
-          <el-card v-else-if="node.type === 'pro-container'" class="pro-container-box">
-            <template #header>
-              <div class="card-header">
-                <span style="font-weight: 600">{{ node.props.title || '嵌套弹性容器' }}</span>
-                <el-tag size="small" type="info">Flex {{ node.props.direction || 'row' }}</el-tag>
-              </div>
-            </template>
-            <div
-              class="container-inner"
-              :style="{
-                display: 'flex',
-                flexDirection: node.props.direction || 'row',
-                gap: '12px',
-                padding: node.props.padding || '12px'
-              }"
-            >
-              <p style="color: #909399; font-size: 13px; margin: 0">弹性嵌套容器 Slot 占位区域</p>
-            </div>
-          </el-card>
-
-          <!-- Element Plus 原生组件 -->
-          <el-button
-            v-else-if="node.type === 'el-button'"
-            :type="node.props.type || 'primary'"
-            :size="node.props.size || 'default'"
-          >
-            {{ node.props.text || '按钮' }}
-          </el-button>
-
-          <el-input
-            v-else-if="node.type === 'el-input'"
-            :placeholder="node.props.placeholder"
-            :clearable="node.props.clearable"
-          />
-
-          <el-card
-            v-else-if="node.type === 'el-card'"
-            :header="node.props.header"
-            :shadow="node.props.shadow || 'always'"
-            style="width: 100%"
-          >
-            <p style="color: #606266; font-size: 14px">这是 Element Plus Card 内容卡片区域</p>
-          </el-card>
-
-          <el-tag
-            v-else-if="node.type === 'el-tag'"
-            :type="node.props.type || 'success'"
-            :effect="node.props.effect || 'light'"
-          >
-            {{ node.props.text || '标签' }}
-          </el-tag>
-
-          <el-alert
-            v-else-if="node.type === 'el-alert'"
-            :title="node.props.title"
-            :type="node.props.type || 'info'"
-            :show-icon="node.props.showIcon"
-            :closable="node.props.closable"
-            style="width: 100%"
-          />
-
-          <el-switch
-            v-else-if="node.type === 'el-switch'"
-            v-model="node.props.value"
-            :active-text="node.props.activeText"
-            :inactive-text="node.props.inactiveText"
-          />
-
-          <el-divider v-else-if="node.type === 'el-divider'" :content-position="node.props.contentPosition || 'center'">
-            {{ node.props.text }}
-          </el-divider>
-        </ErrorBoundary>
+        <NodeRenderer v-if="node" :node="node" />
       </CanvasContainer>
 
       <!-- Right Property Drawer -->
@@ -141,7 +65,12 @@
         :append-to-body="true"
       >
         <div class="dialog-layer-body">
-          <p style="color: #606266; font-size: 14px">这是弹窗图层组件嵌套空间。</p>
+          <template v-if="layer.children && layer.children.length > 0">
+            <NodeRenderer v-for="child in layer.children" :key="child.id" :node="child" />
+          </template>
+          <p v-else style="color: #606266; font-size: 14px">
+            弹窗图层为空，可在「多图层管理」点击编辑图标后向弹窗内拖入组件。
+          </p>
         </div>
       </el-dialog>
     </template>
@@ -217,20 +146,17 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted } from 'vue';
-import axios from 'axios';
+import { http } from './utils/http';
 import { useDesignerStore } from './stores/designerStore';
 import MaterialList from './components/MaterialList.vue';
 import CanvasContainer from './components/CanvasContainer.vue';
 import PropertyDrawer from './components/PropertyDrawer.vue';
-import ProTable from './components/ProTable.vue';
-import ProForm from './components/ProForm.vue';
+import NodeRenderer from './components/NodeRenderer.vue';
 import CodeExportDialog from './components/CodeExportDialog.vue';
-import ErrorBoundary from './components/ErrorBoundary.vue';
 import CustomHtmlLayerNode from './components/CustomHtmlLayerNode.vue';
 import { ElMessage } from 'element-plus';
 import { Loading } from '@element-plus/icons-vue';
 
-const API_BASE = import.meta.env.VITE_API_BASE ?? 'http://localhost:3001/api';
 const designerStore = useDesignerStore();
 
 const isPreviewMode = ref(false);
@@ -277,7 +203,7 @@ const performAutoSave = async () => {
   if (isAutoSaving.value) return;
   isAutoSaving.value = true;
   try {
-    await axios.post(`${API_BASE}/schemas`, designerStore.pageSchema);
+    await http.post('/schemas', designerStore.pageSchema);
   } catch (err: any) {
     console.error('Auto save failed:', err);
   } finally {
@@ -372,7 +298,7 @@ onUnmounted(() => {
 
 const handleSaveSchema = async () => {
   try {
-    const res = await axios.post(`${API_BASE}/schemas`, designerStore.pageSchema);
+    const res = await http.post('/schemas', designerStore.pageSchema);
     if (res.data.success) {
       ElMessage.success('Schema 已成功写入后端 .json 文件并持久化留痕 SQLite！');
     }
@@ -383,7 +309,7 @@ const handleSaveSchema = async () => {
 
 const handleOpenLoadDialog = async () => {
   try {
-    const res = await axios.get(`${API_BASE}/schemas?type=page`);
+    const res = await http.get('/schemas', { params: { type: 'page' } });
     if (res.data.success) {
       savedSchemas.value = res.data.data;
       loadDialogVisible.value = true;
@@ -401,7 +327,7 @@ const handleSelectSchema = (schema: any) => {
 
 const handleOpenLogsDialog = async () => {
   try {
-    const res = await axios.get(`${API_BASE}/logs`);
+    const res = await http.get('/logs');
     if (res.data.success) {
       logsList.value = res.data.data;
       logsDialogVisible.value = true;

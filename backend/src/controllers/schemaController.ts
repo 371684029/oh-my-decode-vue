@@ -1,8 +1,9 @@
 import { Request, Response } from 'express';
-import { storageService } from '../services/storageService';
+import { storageService, bumpVersion } from '../services/storageService';
 import { logDatabase } from '../db/sqlite';
 import { PageSchema } from '../types/schema';
 import { pageSchemaValidator, formatZodErrors } from '../validation/schemaValidation';
+import { resolveOperator } from '../middleware/apiKeyAuth';
 
 export class SchemaController {
   async saveSchema(req: Request, res: Response): Promise<void> {
@@ -24,18 +25,33 @@ export class SchemaController {
       }
 
       const schema = parsed.data as PageSchema;
+
+      // P1-4 版本化：读取既有版本，递增并记录上一版本
+      const existing = await storageService.getSchema(schema.id, schema.type);
+      let prevVersion: string | undefined;
+      if (existing?.meta?.version) {
+        prevVersion = existing.meta.version;
+        schema.meta = schema.meta ?? { author: '', description: '', version: '1.0.0' };
+        schema.meta.prevVersion = prevVersion;
+        schema.meta.version = bumpVersion(prevVersion);
+      } else {
+        schema.meta = schema.meta ?? { author: '', description: '', version: '1.0.0' };
+        schema.meta.version = schema.meta.version || '1.0.0';
+      }
+
       await storageService.saveSchema(schema);
 
       // 记录 SQLite 操作日志 (包含更细化的 Schema 快照概要)
       logDatabase.addLog({
         page_id: schema.id,
         action: 'SAVE_SCHEMA',
-        operator: (req.headers['x-operator'] as string) || 'designer_user',
+        operator: resolveOperator(req),
         details: JSON.stringify(
           {
             title: schema.title,
             nodeCount: schema.children?.length || 0,
             version: schema.meta?.version || '1.0.0',
+            prevVersion: prevVersion ?? null,
             childrenSummary: schema.children?.map((c) => ({ id: c.id, type: c.type, label: c.label, layout: c.layout }))
           },
           null,
@@ -43,7 +59,11 @@ export class SchemaController {
         )
       });
 
-      res.json({ success: true, message: 'Schema saved successfully', data: { id: schema.id } });
+      res.json({
+        success: true,
+        message: 'Schema saved successfully',
+        data: { id: schema.id, version: schema.meta.version }
+      });
     } catch (err: any) {
       res.status(500).json({ success: false, message: err.message });
     }
@@ -90,7 +110,7 @@ export class SchemaController {
       logDatabase.addLog({
         page_id: id,
         action: 'DELETE_SCHEMA',
-        operator: (req.headers['x-operator'] as string) || 'designer_user',
+        operator: resolveOperator(req),
         details: JSON.stringify({ type })
       });
 
@@ -110,6 +130,48 @@ export class SchemaController {
         const logs = logDatabase.getAllLogs();
         res.json({ success: true, data: logs });
       }
+    } catch (err: any) {
+      res.status(500).json({ success: false, message: err.message });
+    }
+  }
+
+  /** P2-2: 列出 schema 备份代数 */
+  async listBackups(req: Request, res: Response): Promise<void> {
+    try {
+      const { id } = req.params;
+      const type = (req.query.type as 'page' | 'component') || 'page';
+      const backups = await storageService.listBackups(id, type);
+      res.json({ success: true, data: backups });
+    } catch (err: any) {
+      res.status(500).json({ success: false, message: err.message });
+    }
+  }
+
+  /** P2-2 / P1-4: 从指定备份代恢复 */
+  async restoreBackup(req: Request, res: Response): Promise<void> {
+    try {
+      const { id } = req.params;
+      const type = (req.query.type as 'page' | 'component') || 'page';
+      const index = Number(req.query.backup ?? req.body?.backup ?? 1);
+
+      const restored = await storageService.restoreBackup(id, type, index);
+      if (!restored) {
+        res.status(404).json({ success: false, message: `Backup #${index} not found` });
+        return;
+      }
+
+      logDatabase.addLog({
+        page_id: id,
+        action: 'RESTORE_BACKUP',
+        operator: resolveOperator(req),
+        details: JSON.stringify({ type, backupIndex: index, version: restored.meta?.version })
+      });
+
+      res.json({
+        success: true,
+        message: 'Schema restored from backup',
+        data: { id, version: restored.meta?.version }
+      });
     } catch (err: any) {
       res.status(500).json({ success: false, message: err.message });
     }

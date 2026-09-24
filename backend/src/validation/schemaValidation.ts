@@ -15,6 +15,27 @@ const layoutSchema = z.object({
 });
 
 // 自引用节点 schema（嵌套容器 children）
+const actionNodeSchema = z.object({
+  id: z.string().min(1).max(100),
+  type: z.enum(['reload_data', 'open_dialog', 'close_dialog', 'toggle_loading', 'show_message', 'set_state']),
+  target: z.string().max(200).optional(),
+  payload: z.record(z.string(), z.unknown()).optional()
+});
+
+const eventRuleSchema = z.object({
+  enabled: z.boolean(),
+  actions: z.array(actionNodeSchema).default([])
+});
+
+const apiBindingSchema = z.object({
+  url: z.string().min(1).max(2000),
+  method: z.enum(['GET', 'POST']).optional(),
+  params: z.record(z.string(), z.unknown()).optional(),
+  autoFetch: z.boolean().optional(),
+  responsePath: z.string().max(500).optional(),
+  totalProp: z.string().max(500).optional()
+});
+
 const componentNodeSchema: z.ZodType<any> = z.lazy(() =>
   z.object({
     id: z.string().min(1).max(200),
@@ -25,7 +46,8 @@ const componentNodeSchema: z.ZodType<any> = z.lazy(() =>
     attrs: z.record(z.string(), z.unknown()).default({}),
     config: z.record(z.string(), z.unknown()).optional(),
     style: z.record(z.string(), z.unknown()).default({}),
-    events: z.record(z.string(), z.unknown()).default({}),
+    events: z.record(z.string(), eventRuleSchema).default({}),
+    apiBinding: apiBindingSchema.optional(),
     children: z.array(componentNodeSchema).optional()
   })
 );
@@ -58,7 +80,8 @@ export const pageSchemaValidator = z.object({
   meta: z.object({
     author: z.string().max(200),
     description: z.string().max(2000),
-    version: z.string().max(50)
+    version: z.string().max(50),
+    prevVersion: z.string().max(50).optional()
   }),
   state: z.record(z.string(), z.unknown()).default({}),
   children: z.array(componentNodeSchema).default([]),

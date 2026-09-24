@@ -110,8 +110,8 @@ describe('generateVueSFC', () => {
     expect(code).toContain('<el-table');
     expect(code).toContain('<el-table-column prop="id" label="ID" width="80" sortable');
     expect(code).toContain('<el-form');
-    expect(code).toContain('v-model=\'formData["username"]\'');
-    expect(code).toContain('v-model=\'formData["birthday"]\'');
+    expect(code).toContain('v-model=\'formData_form_1["username"]\'');
+    expect(code).toContain('v-model=\'formData_form_1["birthday"]\'');
   });
 
   test('渲染图层模板与生命周期', () => {
@@ -240,7 +240,7 @@ describe('出码引擎输入转义（防止用户配置破坏生成代码）', (
 
   test('SFC 中表单项字段名以安全方括号形式绑定', () => {
     const code = generateVueSFC(maliciousSchema());
-    expect(code).toContain('formData["user.name\\"x"]');
+    expect(code).toContain('formData_form_x["user.name\\"x"]');
     expect(code).toContain('label="含引号字段"');
   });
 

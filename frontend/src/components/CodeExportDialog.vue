@@ -21,7 +21,8 @@
             </el-button>
           </div>
         </div>
-        <pre class="code-block"><code>{{ vueCode }}</code></pre>
+        <!-- eslint-disable-next-line vue/no-v-html -->
+        <pre class="code-block"><code v-html="highlight(vueCode, 'xml')"></code></pre>
       </el-tab-pane>
 
       <el-tab-pane label="Web Component (.js)" name="wc">
@@ -52,7 +53,8 @@
             </el-button>
           </div>
         </div>
-        <pre class="code-block"><code>{{ wcCode }}</code></pre>
+        <!-- eslint-disable-next-line vue/no-v-html -->
+        <pre class="code-block"><code v-html="highlight(wcCode, 'javascript')"></code></pre>
       </el-tab-pane>
 
       <el-tab-pane label="独立 HTML (.html)" name="html">
@@ -75,7 +77,8 @@
             </el-button>
           </div>
         </div>
-        <pre class="code-block"><code>{{ htmlCode }}</code></pre>
+        <!-- eslint-disable-next-line vue/no-v-html -->
+        <pre class="code-block"><code v-html="highlight(htmlCode, 'xml')"></code></pre>
       </el-tab-pane>
 
       <el-tab-pane label="package.json 清单" name="pkg">
@@ -90,7 +93,8 @@
             </el-button>
           </div>
         </div>
-        <pre class="code-block"><code>{{ pkgCode }}</code></pre>
+        <!-- eslint-disable-next-line vue/no-v-html -->
+        <pre class="code-block"><code v-html="highlight(pkgCode, 'json')"></code></pre>
       </el-tab-pane>
     </el-tabs>
 
@@ -113,6 +117,17 @@ import {
   generatePackageJson
 } from '../utils/codeGenerator';
 import { ElMessage } from 'element-plus';
+import hljs from 'highlight.js';
+import 'highlight.js/styles/github-dark.css';
+
+/** 代码语法高亮（hljs 会转义 HTML，返回内容安全，可 v-html） */
+const highlight = (code: string, lang: string): string => {
+  try {
+    return hljs.highlight(code, { language: lang }).value;
+  } catch {
+    return code;
+  }
+};
 
 const props = defineProps<{
   modelValue: boolean;

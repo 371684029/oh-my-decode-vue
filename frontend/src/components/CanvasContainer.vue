@@ -2,6 +2,10 @@
   <div class="canvas-container" @dragover.prevent @drop="handleDrop" @click="handleBackgroundClick">
     <div class="canvas-header">
       <span class="page-title">{{ designerStore.pageSchema.title }}</span>
+      <el-tag v-if="editingLayer" type="warning" size="small" class="editing-layer-tag">
+        正在编辑图层: {{ editingLayer.name }}
+        <el-button link size="small" type="warning" @click="designerStore.exitLayerEdit()">退出</el-button>
+      </el-tag>
 
       <!-- 多端响应式视口切换器 -->
       <div class="viewport-selector">
@@ -131,7 +135,7 @@ const viewportStyle = computed(() => {
 
 const layoutItems = computed({
   get() {
-    return designerStore.pageSchema.children.map((node) => node.layout);
+    return designerStore.activeChildren.map((node) => node.layout);
   },
   set(val) {
     designerStore.updateNodeLayout(val);
@@ -139,8 +143,13 @@ const layoutItems = computed({
 });
 
 const getNode = (id: string) => {
-  return designerStore.pageSchema.children.find((n) => n.id === id);
+  return designerStore.activeChildren.find((n) => n.id === id);
 };
+
+/** 当前编辑的图层（null = 主画布） */
+const editingLayer = computed(() => {
+  return designerStore.pageSchema.layers?.find((l) => l.id === designerStore.editingLayerId) ?? null;
+});
 
 const getNodeLabel = (id: string) => {
   const node = getNode(id);

@@ -32,6 +32,7 @@
   - **SQLite 审计留痕**：所有的修改、保存与删除操作均自动落盘至 SQLite 操作日志表（`logs.db`）。
 - **✅ 多图层系统**：弹窗 (Dialog) / Loading 遮罩 / 自定义 HTML 三种图层，支持显隐切换、zIndex 管理与生命周期脚本钩子。
 - **✅ 多目标出码引擎**：Vue 3 SFC (`.vue`) / W3C Web Component (`.js`，配套 PageTemplate.vue) / 独立 HTML (`.html`，CDN 完整渲染) 三目标均为**完整渲染**，并对用户配置内容做 HTML 转义与标签名安全化。
+- **✅ 数据驱动能力 (v1.3.0)**：接口数据源绑定（`apiBinding`）、表达式绑定真实渲染（`{{ }}`）、事件动作链（click → 刷新/弹窗/状态联动），出码产物生成真实前端 `fetch` 调用。
 - **✅ 操作历史与自动保存**：30 步撤销/重做、复制/粘贴/删除快捷键、3 分钟无感自动保存。
 - **✅ 安全加固**：后端 Schema 落盘前 Zod 强校验（结构 + 脚本/HTML 字段长度上限）；前端表达式求值器为受限解释器（拒绝函数调用/赋值/原型链访问，不使用 `eval`）；自定义 HTML 渲染经 DOMPurify 消毒。
 - **✅ 工程化与质量**：Vitest 单元测试（45 用例，覆盖 Store / 出码引擎 / 表达式求值器）、ESLint + Prettier 代码规范（0 error / 0 warning）、GitHub Actions CI（双 Node 版本）、`shared` 共享类型包消除前后端类型漂移、Element Plus 按需引入（业务代码体积 -95%）。
@@ -120,11 +121,9 @@
 ```text
 low-code-platform/
 ├── .github/workflows/      # GitHub Actions CI（typecheck → lint → test → build）
-├── docs/                   # 项目规划与架构技术规范文档集
-│   ├── 0.0.1_PLAN.md       # 0.0.1 基础里程碑规划文档
-│   ├── 0.1.0_PLAN.md       # 0.1.0 接口数据源、传参映射与事件动作规划
-│   ├── COMPONENT_API_EVENT_MAPPING.md # 组件、接口、事件三角解耦技术规范
-│   └── ARCH_RECOMMENDATIONS.md # v2.0.0 干净源码生成器/沙箱/撤销历史栈演进建议
+├── docs/                   # 文档集
+│   ├── implemented/        # 已实现技术规范与优化报告 (CAE 契约/物料规范/优化报告)
+│   └── roadmap/            # 各版本规划与路线图 (0.x ~ 3.0.0 PLAN 等)
 ├── shared/                 # 共享类型包 @lowcode/shared（纯类型，前后端共用）
 │   └── src/index.ts        # ComponentNode / PageSchema / LayerConfig / MaterialItem ...
 ├── frontend/               # Vue 3 前端低代码设计器工程
@@ -212,12 +211,19 @@ npm run format      # Prettier 全仓格式化
 
 ## 📝 版本变更历史 (Changelog)
 
-### 📌 v1.2.0 (当前版本 - 2026-09)
+### 📌 v1.3.0 (当前版本 - 2026-09)
+
+- **数据驱动能力**：组件支持 `apiBinding` 接口数据源绑定（URL/方法/参数/响应路径/分页路径/自动请求），设计器"试请求"实时预览，出码产物生成真实前端 `fetch` 调用（不生成后端代码）。
+- **表达式绑定真实渲染**：`{{ state.xxx }}` 表达式从属性面板预览升级为画布组件实时求值。
+- **事件动作链 (Action Chain)**：组件 `click` 事件可编排动作链（刷新数据 / 打开/关闭弹窗 / Loading 控制 / 消息提示 / 状态更新），页面从展示变为可交互。
+- **配套加固**：后端 `X-Api-Key` 认证（可配置开关）、Schema 版本化保存与回滚、备份轮转与恢复接口、并发写保护、嵌套容器递归渲染、导出代码语法高亮、docs 分区、axios 统一错误降级。
+
+### 📌 v1.2.0
 
 - **多图层堆叠架构**：新增弹窗 (Dialog)、Loading 遮罩、自定义 HTML 三种业务图层，支持图层显隐切换与 zIndex 层级管理。
 - **图层生命周期钩子**：自定义 HTML 图层支持 `onMounted` / `onUpdated` / `onUnmounted` 生命周期脚本注入，实现数据加载、DOM 操作与清理逻辑。
 - **出码引擎完整渲染**：Web Component（配套 PageTemplate.vue）与独立 HTML（CDN 渲染）由演示级升级为**完整渲染**。
-- **工程化与安全加固**：Vitest 单元测试（45 用例）、ESLint + Prettier（0 error / 0 warning）、GitHub Actions CI、Zod 落盘强校验、受限表达式求值器（移除 `new Function`）、DOMPurify HTML 消毒、`@lowcode/shared` 共享类型包、Element Plus 按需引入（业务代码体积 -95%）、出码输入转义（防注入破坏生成代码）。
+- **工程化与安全加固**：Vitest 单元测试（59 用例）、ESLint + Prettier（0 error / 0 warning）、GitHub Actions CI、Zod 落盘强校验、受限表达式求值器（移除 `new Function`）、DOMPurify HTML 消毒、`@lowcode/shared` 共享类型包、Element Plus 按需引入（业务代码体积 -95%）、出码输入转义（防注入破坏生成代码）。
 
 ### 📌 v1.1.0
 
@@ -255,20 +261,29 @@ npm run format      # Prettier 全仓格式化
 
 ## 📄 文档索引 (Documentation Index)
 
-所有的详细规划、技术架构标准与演进建议均存放于 `docs/` 目录：
+文档按状态分为两个分区：
 
-1. **[0.0.1 里程碑规划](docs/0.0.1_PLAN.md)**：包含基础拖拽、属性面板与双存储方案。
-2. **[0.1.0 接口与事件联动规划](docs/0.1.0_PLAN.md)**：包含 API 数据源绑定、参数映射与事件动作链条。
-3. **[Component - API - Event 三角解耦规范](docs/COMPONENT_API_EVENT_MAPPING.md)**：包含完整的 Schema 契约与 JSON 桥梁模型。
-4. **[架构演进与体验优化深度建议](docs/ARCH_RECOMMENDATIONS.md)**：包含零废码源码生成器、沙箱预览、时间旅行撤销历史栈、远程物料插件与规则引擎的落地方案。
-5. **[平台演进与优化方向指南](docs/FUTURE_DIRECTIONS.md)**：包含画布标尺/快捷键/嵌套容器、动态 JS 表达式、纯 Vue 3 SFC 出码、SQLite 版本对比回滚与 Module Federation 远程物料插件等 10 大演进方向。
-6. **[v0.2.0 已实现功能问题排查与优化报告](docs/0.2.0_OPTIMIZATIONS.md)**：包含 Web Component Shadow DOM 样式穿透、RFC 6902 JSON Patch 增量保存、历史栈 GC 优化、快捷键上下文隔离与 Prettier 代码美化解析器落地方案。
-7. **[v0.4.0 功能规划与路线图](docs/0.4.0_PLAN.md)**：包含节点式可视化逻辑流编排、在线 API 数据源建模与 Mock 仿真、可视化 CSS 与样式微调编辑器、Schema 版本对比与 Diff 工具、第三方物料 SDK。
-8. **[低代码物料解析规范与技术对比指南](docs/MATERIAL_SPECIFICATION.md)**：包含 Vue 源码 (.vue) 与编译 JS (.js) 的解析机制、兼容性、扩展性对比及混合架构最佳落地建议。
-9. **[v0.5.0 功能规划与路线图](docs/0.5.0_PLAN.md)**：包含多工作区多项目物理隔离、自制组件入参/出参强校验规范、简易操作日志可视化控制台。
-10. **[自制组件入参/出参规范与契约强校验指南](docs/COMPONENT_IO_SPECIFICATION.md)**：包含自制物料组件必填 Inputs/Outputs 参数定义、类型约束、属性抽屉强校验规则。
-11. **[v1.0.0 基础正式版 (Base GA) 规划与路线图](docs/1.0.0_PLAN.md)**：包含基础拖拽布局、组件 I/O 契约强校验、JSON 文件存储与 SQLite 审计日志控制台、零废码多目标出码与基础页面发布。
-12. **[v1.1.0 体验增强版规划](docs/1.1.0_PLAN.md)**：包含画布对齐参考线/吸附指示、键盘方向键微调、操作日志可视化 JSON Diff 比对。
-13. **[v1.2.0 多图层架构与生命周期规划](docs/1.2.0_PLAN.md)**：包含对话框图层、Loading 加载框图层、自定义 HTML 图层及 JavaScript 生命周期钩子 (`onMounted`/`onUnmounted`)。
-14. **[数据与事件管道编排技术规范](docs/PIPELINE_ORCHESTRATION.md)**：包含组件、图层（弹窗/遮罩）、页面路由跳转、生命周期钩子与异步 API 数据流的可视化管道编排架构规范。
-15. **[v3.0.0 远期企业级架构与生态规划](docs/3.0.0_PLAN.md)**：包含企业级 RBAC/SSO 单点登录、PostgreSQL/S3 高可用分布式存储、CRDT 多人实时协同、一键 CI/CD 灰度发布、VS Code 插件与 CLI 工具链。
+- **`docs/implemented/`**：已实现的技术规范与优化报告
+- **`docs/roadmap/`**：各版本规划与路线图（含规划中 / 未实现项）
+
+### 📘 已实现规范 (docs/implemented/)
+
+1. **[Component - API - Event 三角解耦规范](docs/implemented/COMPONENT_API_EVENT_MAPPING.md)**：包含完整的 Schema 契约与 JSON 桥梁模型（部分能力见 v1.3.0 数据驱动实现）。
+2. **[低代码物料解析规范与技术对比指南](docs/implemented/MATERIAL_SPECIFICATION.md)**：包含 Vue 源码 (.vue) 与编译 JS (.js) 的解析机制、兼容性、扩展性对比及混合架构最佳落地建议。
+3. **[v0.2.0 已实现功能排查与优化报告](docs/implemented/0.2.0_OPTIMIZATIONS.md)**：包含 Web Component Shadow DOM 样式穿透、增量保存、历史栈优化、快捷键上下文隔离与代码美化解析器落地方案。
+
+### 🗺️ 路线图与规划 (docs/roadmap/)
+
+4. **[0.0.1 里程碑规划](docs/roadmap/0.0.1_PLAN.md)**：包含基础拖拽、属性面板与双存储方案。
+5. **[0.1.0 接口与事件联动规划](docs/roadmap/0.1.0_PLAN.md)**：包含 API 数据源绑定、参数映射与事件动作链条。
+6. **[架构演进与体验优化深度建议](docs/roadmap/ARCH_RECOMMENDATIONS.md)**：包含零废码源码生成器、沙箱预览、时间旅行撤销历史栈、远程物料插件与规则引擎的落地方案。
+7. **[平台演进与优化方向指南](docs/roadmap/FUTURE_DIRECTIONS.md)**：包含画布标尺/快捷键/嵌套容器、动态 JS 表达式、纯 Vue 3 SFC 出码等 10 大演进方向。
+8. **[v0.4.0 功能规划与路线图](docs/roadmap/0.4.0_PLAN.md)**：包含节点式可视化逻辑流编排、在线 API 数据源建模与 Mock 仿真、可视化 CSS 与样式微调编辑器、Schema 版本对比与 Diff 工具、第三方物料 SDK。
+9. **[v0.5.0 功能规划与路线图](docs/roadmap/0.5.0_PLAN.md)**：包含多工作区多项目物理隔离、自制组件入参/出参强校验规范、简易操作日志可视化控制台。
+10. **[自制组件入参/出参规范与契约强校验指南](docs/roadmap/COMPONENT_IO_SPECIFICATION.md)**：包含自制物料组件必填 Inputs/Outputs 参数定义、类型约束、属性抽屉强校验规则。
+11. **[v1.0.0 基础正式版 (Base GA) 规划与路线图](docs/roadmap/1.0.0_PLAN.md)**：包含基础拖拽布局、组件 I/O 契约强校验、JSON 文件存储与 SQLite 审计日志控制台、多目标出码与基础页面发布。
+12. **[v1.1.0 体验增强版规划](docs/roadmap/1.1.0_PLAN.md)**：包含画布对齐参考线/吸附指示、键盘方向键微调、操作日志可视化 JSON Diff 比对。
+13. **[v1.2.0 多图层架构与生命周期规划](docs/roadmap/1.2.0_PLAN.md)**：包含对话框图层、Loading 加载框图层、自定义 HTML 图层及 JavaScript 生命周期钩子。
+14. **[v1.3.0 数据驱动能力与体验加固规划](docs/roadmap/1.3.0_PLAN.md)**：包含数据源绑定 (apiBinding)、表达式绑定渲染、事件动作链、Playwright E2E、后端认证/版本化/备份轮转等 P0-P2 配套优化。
+15. **[数据与事件管道编排技术规范](docs/roadmap/PIPELINE_ORCHESTRATION.md)**：包含组件、图层（弹窗/遮罩）、页面路由跳转、生命周期钩子与异步 API 数据流的可视化管道编排架构规范。
+16. **[v3.0.0 远期企业级架构与生态规划](docs/roadmap/3.0.0_PLAN.md)**：包含企业级 RBAC/SSO 单点登录、PostgreSQL/S3 高可用分布式存储、CRDT 多人实时协同、一键 CI/CD 灰度发布、VS Code 插件与 CLI 工具链。

@@ -42,16 +42,55 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue';
+import { ref, computed, onMounted, onUnmounted } from 'vue';
 import type { ComponentNode } from '../types/designer';
+import { ElMessage } from 'element-plus';
+import { ApiExecutor, nodeEventBus } from '../utils/dataSource';
+import { useDesignerStore } from '../stores/designerStore';
 
 const props = defineProps<{
   node: ComponentNode;
 }>();
 
 const formData = ref<Record<string, any>>({});
+const loading = ref(false);
+
+const executor = new ApiExecutor();
 
 const items = computed(() => props.node.config?.items || []);
+
+/** 加载数据：接口返回对象按 field 回填表单；缺省为空表单 */
+const loadData = async () => {
+  const binding = props.node.apiBinding;
+  if (!binding?.url) return;
+  try {
+    loading.value = true;
+    const designerStore = useDesignerStore();
+    executor.setScope(designerStore.pageSchema.state);
+    const { data } = await executor.fetchData(binding);
+    if (data && typeof data === 'object') {
+      formData.value = { ...data };
+    }
+  } catch (err: any) {
+    ElMessage.error('表单数据加载失败: ' + (err.message || err));
+  } finally {
+    loading.value = false;
+  }
+};
+
+let unsubscribe: (() => void) | undefined;
+
+onMounted(() => {
+  const binding = props.node.apiBinding;
+  if (binding?.url && binding.autoFetch !== false) {
+    loadData();
+  }
+  unsubscribe = nodeEventBus.onReload(props.node.id, () => loadData());
+});
+
+onUnmounted(() => {
+  unsubscribe?.();
+});
 </script>
 
 <style scoped>
