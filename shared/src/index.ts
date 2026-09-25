@@ -11,6 +11,8 @@ export interface ApiBinding {
   autoFetch?: boolean; // 挂载时自动请求，默认 true
   responsePath?: string; // 数据列表提取路径（如 "data.list"）
   totalProp?: string; // 分页总数提取路径（如 "data.total"）
+  /** 设计器本地 Mock 的完整响应。出码不嵌入该字段。 */
+  example?: unknown;
 }
 
 /** 动作类型（v1.3.0 L3 最小可行动作集） */

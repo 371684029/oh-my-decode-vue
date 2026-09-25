@@ -81,6 +81,22 @@
         <pre class="code-block"><code v-html="highlight(htmlCode, 'xml')"></code></pre>
       </el-tab-pane>
 
+      <el-tab-pane label="接口文档 (api.md)" name="api">
+        <div class="code-header">
+          <span class="code-desc">当前页面前端会请求的接口，含 Mock 响应示例：</span>
+          <div class="btn-group">
+            <el-button type="primary" size="small" icon="DocumentCopy" @click="handleCopy(apiDoc)">
+              复制 Markdown
+            </el-button>
+            <el-button type="success" size="small" icon="Download" @click="handleDownload(apiDoc, 'api.md')">
+              下载 api.md
+            </el-button>
+          </div>
+        </div>
+        <!-- eslint-disable-next-line vue/no-v-html -->
+        <pre class="code-block"><code v-html="highlight(apiDoc, 'markdown')"></code></pre>
+      </el-tab-pane>
+
       <el-tab-pane label="package.json 清单" name="pkg">
         <div class="code-header">
           <span class="code-desc">自动提取当前低代码页面所依赖的项目构建 package.json：</span>
@@ -116,6 +132,7 @@ import {
   generateHTML,
   generatePackageJson
 } from '../utils/codeGenerator';
+import { renderApiMarkdown } from '../utils/frontendApi';
 import { ElMessage } from 'element-plus';
 import hljs from 'highlight.js';
 import 'highlight.js/styles/github-dark.css';
@@ -150,6 +167,7 @@ const pageTemplateCode = computed(() => generatePageTemplate(designerStore.pageS
 const wcCode = computed(() => generateWebComponent(designerStore.pageSchema));
 const htmlCode = computed(() => generateHTML(designerStore.pageSchema));
 const pkgCode = computed(() => generatePackageJson(designerStore.pageSchema));
+const apiDoc = computed(() => renderApiMarkdown(designerStore.pageSchema));
 
 const handleCopy = (text: string) => {
   navigator.clipboard.writeText(text);

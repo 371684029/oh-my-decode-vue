@@ -5,7 +5,7 @@
       <div class="logo">
         <el-icon class="logo-icon"><Platform /></el-icon>
         <span class="logo-text">低代码前端可视化平台 (Low-Code Studio)</span>
-        <el-tag size="small" type="primary" effect="plain" style="margin-left: 10px">v1.8.0</el-tag>
+        <el-tag size="small" type="primary" effect="plain" style="margin-left: 10px">v1.9.0</el-tag>
       </div>
       <div class="header-actions">
         <el-button-group class="history-btn-group">
@@ -29,6 +29,7 @@
         <el-button :type="isPreviewMode ? 'info' : 'primary'" icon="VideoPlay" @click="isPreviewMode = !isPreviewMode">
           {{ isPreviewMode ? '退出预览' : '纯预览模式' }}
         </el-button>
+        <el-button icon="Connection" @click="handleGenerateMockDocs">生成 Mock 与接口文档</el-button>
         <el-button type="warning" icon="Download" @click="exportDialogVisible = true">导出代码</el-button>
         <el-button type="success" icon="Select" @click="handleSaveSchema">保存并写入 JSON</el-button>
       </div>
@@ -88,6 +89,15 @@
 
     <!-- Code Export Dialog -->
     <CodeExportDialog v-model="exportDialogVisible" />
+
+    <el-dialog v-model="apiDocVisible" title="前端接口文档" width="720px">
+      <pre class="api-doc">{{ apiDocMarkdown }}</pre>
+      <template #footer>
+        <el-button @click="apiDocVisible = false">关闭</el-button>
+        <el-button type="primary" @click="copyApiDoc">复制</el-button>
+        <el-button type="success" @click="downloadApiDoc">下载 api.md</el-button>
+      </template>
+    </el-dialog>
 
     <!-- Bottom Right Auto-Save Loading Indicator -->
     <div v-if="isAutoSaving" class="auto-save-indicator">
@@ -158,6 +168,8 @@ import CodeExportDialog from './components/CodeExportDialog.vue';
 import CustomHtmlLayerNode from './components/CustomHtmlLayerNode.vue';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import { Loading } from '@element-plus/icons-vue';
+import { applyMockBindings, renderApiMarkdown } from './utils/frontendApi';
+import { nodeEventBus } from './utils/dataSource';
 
 const designerStore = useDesignerStore();
 
@@ -174,6 +186,8 @@ const isPreviewMode = ref(false);
 const loadDialogVisible = ref(false);
 const logsDialogVisible = ref(false);
 const exportDialogVisible = ref(false);
+const apiDocVisible = ref(false);
+const apiDocMarkdown = ref('');
 const savedSchemas = ref<any[]>([]);
 const logsList = ref<any[]>([]);
 
@@ -212,6 +226,40 @@ const formattedLogDetails = computed(() => {
     return selectedLog.value.details;
   }
 });
+
+const handleGenerateMockDocs = () => {
+  const draft = JSON.parse(JSON.stringify(designerStore.pageSchema));
+  const added = applyMockBindings(draft);
+  const markdown = renderApiMarkdown(draft);
+  if (added.length === 0 && !markdown.includes('方法：')) {
+    ElMessage.info('当前页面没有表格、表单或已绑定的接口');
+    return;
+  }
+  if (added.length > 0) {
+    designerStore.recordHistory();
+    applyMockBindings(designerStore.pageSchema);
+    for (const id of added) nodeEventBus.emitReload(id);
+  }
+  apiDocMarkdown.value = markdown;
+  apiDocVisible.value = true;
+};
+
+const copyApiDoc = () => {
+  navigator.clipboard.writeText(apiDocMarkdown.value);
+  ElMessage.success('接口文档已复制');
+};
+
+const downloadApiDoc = () => {
+  const blob = new Blob([apiDocMarkdown.value], { type: 'text/markdown;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = 'api.md';
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
+};
 
 const handleViewLogDiff = (log: any) => {
   selectedLog.value = log;
@@ -426,13 +474,16 @@ body,
   overflow: hidden;
 }
 .designer-header {
-  height: 56px;
+  min-height: 56px;
+  height: auto;
   background-color: #1f2d3d;
   color: #ffffff;
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 0 20px;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 8px 20px;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
 }
 .logo {
@@ -452,7 +503,18 @@ body,
 .header-actions {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
+  justify-content: flex-end;
   gap: 10px;
+}
+.api-doc {
+  margin: 0;
+  max-height: 420px;
+  overflow: auto;
+  white-space: pre-wrap;
+  font-family: Consolas, Monaco, 'Courier New', monospace;
+  font-size: 13px;
+  line-height: 1.5;
 }
 .history-btn-group {
   margin-right: 4px;
