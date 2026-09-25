@@ -140,6 +140,17 @@ test.describe('低代码设计器核心闭环', () => {
     await expect(page.locator('.pro-form-wrapper .el-form-item__label').first()).toContainText('性别');
   });
 
+  test('改过的占位提示出现在 Vue 和 HTML 导出', async ({ page }) => {
+    await addMaterial(page, '高端表单');
+    await page.getByRole('tab', { name: '高级 Config' }).click();
+    await page.locator('.el-drawer').getByPlaceholder('占位提示').first().fill('请填写账号');
+    await page.getByRole('button', { name: '导出代码' }).click();
+    const dialog = page.getByRole('dialog', { name: '零废码出码引擎 - 导出代码' });
+    await expect(dialog).toContainText('请填写账号');
+    await dialog.getByRole('tab', { name: '独立 HTML (.html)' }).click();
+    await expect(dialog).toContainText('请填写账号');
+  });
+
   test('一键生成 Mock 与接口文档', async ({ page }) => {
     await addMaterial(page, '高端表格');
     await closeDrawer(page);

@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest';
-import { generateVueSFC, generateWebComponent, generateHTML, generatePackageJson } from './codeGenerator';
+import { generateVueSFC, generatePageTemplate, generateWebComponent, generateHTML, generatePackageJson } from './codeGenerator';
 import type { PageSchema, ComponentNode } from '../types/designer';
 import { MATERIAL_REGISTRY } from '../registry/materials';
 import { RENDERED_NODE_TYPES } from '../registry/nodeTypes';
@@ -477,6 +477,48 @@ describe('v1.6.0 出码正确性', () => {
     const code = generateVueSFC(schema);
     expect(code).toContain('const dialogVisible_layer_dlg = ref(true);');
     expect(code).toContain('const loadingVisible_layer_loading = ref(true);');
+  });
+});
+
+describe('v1.11.0 出码与画布对齐', () => {
+  test('表单占位、必填和标签宽度进入 Vue、配套组件与 HTML', () => {
+    const schema = buildTestSchema();
+    const form = schema.children.find((node) => node.type === 'pro-form');
+    if (!form?.config?.items) throw new Error('missing form');
+    form.props.labelWidth = '140px';
+    form.props.layout = 'inline';
+    const username = form.config.items.find((item: { field?: string }) => item.field === 'username');
+    if (!username) throw new Error('missing username');
+    username.placeholder = '请填写账号';
+
+    const outputs = [generateVueSFC(schema), generatePageTemplate(schema), generateHTML(schema)];
+    for (const code of outputs) {
+      expect(code).toContain('placeholder="请填写账号"');
+      expect(code).toContain('label-width="140px"');
+      expect(code).toContain(' inline');
+      expect(code).not.toContain('labelWidth=');
+    }
+    expect(outputs[0]).toContain('prop="username" required');
+  });
+
+  test('表格分页和空操作不另写一套', () => {
+    const schema = buildTestSchema();
+    const table = schema.children.find((node) => node.type === 'pro-table');
+    if (!table?.config?.columns) throw new Error('missing table');
+    table.config.pagination = { enabled: true, pageSize: 20 };
+    table.config.columns[0].align = 'center';
+    table.config.actions = [];
+    table.apiBinding = { url: '/api/rows', method: 'GET', responsePath: 'data.list' };
+
+    for (const code of [generateVueSFC(schema), generateHTML(schema)]) {
+      expect(code).toContain(':page-size="20"');
+      expect(code).toContain('size: 20');
+      expect(code).toContain('align="center"');
+      expect(code).not.toContain('>查看</el-button>');
+    }
+
+    table.config.actions = [{ label: '详情', type: 'primary', eventKey: 'view' }];
+    expect(generateVueSFC(schema)).toContain('>详情</el-button>');
   });
 });
 
