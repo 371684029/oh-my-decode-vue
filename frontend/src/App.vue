@@ -1,11 +1,12 @@
 <template>
+  <el-config-provider :locale="elementLocale">
   <div class="designer-app">
     <!-- Header -->
     <header class="designer-header">
       <div class="logo">
         <el-icon class="logo-icon"><Platform /></el-icon>
         <span class="logo-text">低代码前端可视化平台 (Low-Code Studio)</span>
-        <el-tag size="small" type="primary" effect="plain" style="margin-left: 10px">v1.9.0</el-tag>
+        <el-tag size="small" type="primary" effect="plain" style="margin-left: 10px">v1.10.0</el-tag>
       </div>
       <div class="header-actions">
         <el-button-group class="history-btn-group">
@@ -154,6 +155,7 @@
       </div>
     </el-dialog>
   </div>
+  </el-config-provider>
 </template>
 
 <script setup lang="ts">
@@ -166,12 +168,14 @@ import PropertyDrawer from './components/PropertyDrawer.vue';
 import NodeRenderer from './components/NodeRenderer.vue';
 import CodeExportDialog from './components/CodeExportDialog.vue';
 import CustomHtmlLayerNode from './components/CustomHtmlLayerNode.vue';
-import { ElMessage, ElMessageBox } from 'element-plus';
+import { ElConfigProvider, ElMessage, ElMessageBox } from 'element-plus';
+import zhCn from 'element-plus/es/locale/lang/zh-cn';
 import { Loading } from '@element-plus/icons-vue';
 import { applyMockBindings, renderApiMarkdown } from './utils/frontendApi';
 import { nodeEventBus } from './utils/dataSource';
 
 const designerStore = useDesignerStore();
+const elementLocale = zhCn;
 
 watch(
   () => JSON.stringify(designerStore.pageSchema),
@@ -474,6 +478,8 @@ body,
   overflow: hidden;
 }
 .designer-header {
+  position: relative;
+  z-index: 4000;
   min-height: 56px;
   height: auto;
   background-color: #1f2d3d;
