@@ -8,7 +8,7 @@
 
 ## 📖 项目简介
 
-本项目旨在打造一款可通过**可视化拖拉拽**快速生成 Vue 3 页面的低代码平台。平台以 **JSON Schema 为唯一映射桥梁**连接 UI 组件层。当前版本 **v1.5.0**：数据源绑定、`{{ }}` 表达式渲染、事件动作链、出码白名单和自定义 HTML 沙箱导出已经落地；完整管道编排与远程物料仍在规划中（详见 `docs/`）。
+本项目旨在打造一款可通过**可视化拖拉拽**快速生成 Vue 3 页面的低代码平台。平台以 **JSON Schema 为唯一映射桥梁**连接 UI 组件层。当前版本 **v1.6.0**：在 v1.5.0 的数据源、表达式、动作链和出码白名单之上，补齐出码正确性、设计器与导出一致性、存储竞态和审计差异。完整管道编排与远程物料仍在规划中（详见 `docs/`）。
 
 项目采用了 **Node.js + Express + SQLite** 架构，其中页面/组件的 Schema 配置文件**直接存储为本地 `.json` 文件**，而 SQLite 数据库专用于记录高可靠的**操作审计日志 (Operation Audit Logs)**。
 
@@ -109,7 +109,7 @@
 | **JSON 文件存储** | Node File System      | `fs/promises`    | 持久化存储 Schema JSON 配置文件                    |
 | **日志数据库**    | SQLite                | `better-sqlite3` | 本地轻量级审计日志数据库                           |
 | **共享类型**      | `@lowcode/shared`     | —                | Monorepo 共享类型包，消除前后端类型漂移            |
-| **单元测试**      | Vitest                | `4.x`            | 前端与后端：Store / 出码 / 表达式 / 数据源 / 存储 |
+| **单元测试**      | Vitest                | `4.x`            | 前端与后端：Store / 出码 / 表达式 / 数据源 / 存储  |
 | **代码规范**      | ESLint + Prettier     | `10.x` / `3.x`   | 0 error / 0 warning，统一代码风格                  |
 | **CI/CD**         | GitHub Actions        | —                | 双 Node 版本：typecheck → lint → test → build      |
 | **工程化 & 规范** | TypeScript            | `6.x`            | 前后端与 shared 使用同一主版本                     |
@@ -123,7 +123,7 @@ low-code-platform/
 ├── .github/workflows/      # GitHub Actions CI（typecheck → lint → test → build）
 ├── docs/                   # 文档集
 │   ├── implemented/        # 技术规范 (CAE/物料/组件 I/O/管道编排) 与优化报告
-│   └── roadmap/            # 各版本规划与路线图 (0.x ~ 3.0.0，含 v1.3.0 记录与 v1.6.0 规划)
+│   └── roadmap/            # 各版本规划与路线图 (0.x ~ 3.0.0，含 v1.3.0 记录与 v1.6.0 实现说明)
 ├── shared/                 # 共享类型包 @lowcode/shared（纯类型，前后端共用）
 │   └── src/index.ts        # ComponentNode / PageSchema / LayerConfig / MaterialItem ...
 ├── frontend/               # Vue 3 前端低代码设计器工程
@@ -200,23 +200,38 @@ npm run format      # Prettier 全仓格式化
 
 ## 🔌 后端 RESTful API 接口定义
 
-| 请求方式   | 路径               | 描述                                                                                          | 参数 / Body                       |
-| :--------- | :----------------- | :-------------------------------------------------------------------------------------------- | :-------------------------------- |
-| **GET**    | `/api/schemas`     | 获取页面/组件 JSON 列表                                                                       | `?type=page` 或 `?type=component` |
-| **GET**    | `/api/schemas/:id` | 读取指定 ID 的 Schema 内容                                                                    | `?type=page`                      |
-| **POST**   | `/api/schemas`     | 保存 Schema 至本地 `.json` 文件并记录 SQLite 日志（落盘前 Zod 结构强校验 + 脚本字段长度上限） | Body: `PageSchema` JSON 对象      |
-| **DELETE** | `/api/schemas/:id` | 删除 Schema 配置文件并记录 SQLite 日志                                                        | `?type=page`                      |
-| **GET**    | `/api/logs`        | 查询 SQLite 操作审计日志                                                                      | `?pageId=xxx` (可选)              |
-| **GET**    | `/api/schemas/:id/backups` | 列出该 Schema 的备份代数                                                                | `?type=page`                      |
-| **POST**   | `/api/schemas/:id/restore` | 从指定备份代恢复                                                                          | Body: `{ "index": 1 }`            |
+| 请求方式   | 路径                       | 描述                                                                                          | 参数 / Body                       |
+| :--------- | :------------------------- | :-------------------------------------------------------------------------------------------- | :-------------------------------- |
+| **GET**    | `/api/schemas`             | 获取页面/组件 JSON 列表                                                                       | `?type=page` 或 `?type=component` |
+| **GET**    | `/api/schemas/:id`         | 读取指定 ID 的 Schema 内容                                                                    | `?type=page`                      |
+| **POST**   | `/api/schemas`             | 保存 Schema 至本地 `.json` 文件并记录 SQLite 日志（落盘前 Zod 结构强校验 + 脚本字段长度上限） | Body: `PageSchema` JSON 对象      |
+| **DELETE** | `/api/schemas/:id`         | 删除 Schema 配置文件并记录 SQLite 日志                                                        | `?type=page`                      |
+| **GET**    | `/api/logs`                | 查询 SQLite 操作审计日志                                                                      | `?pageId=xxx` (可选)              |
+| **GET**    | `/api/schemas/:id/backups` | 列出该 Schema 的备份代数                                                                      | `?type=page`                      |
+| **POST**   | `/api/schemas/:id/restore` | 从指定备份代恢复                                                                              | Body: `{ "index": 1 }`            |
 
 配置了环境变量 `API_KEY` 后，以上接口要求请求头 `X-Api-Key`。`CORS_ORIGIN` 默认 `http://localhost:5173`，`HOST` 默认 `127.0.0.1`。
+
+`VITE_API_KEY` 会打进前端包，只适合挡住对本机端口的随意扫描，不能当作用户口令或服务端机密。未配置 `API_KEY` 时接口保持开放，方便本地开发。
 
 ---
 
 ## 📝 版本变更历史 (Changelog)
 
-### 📌 v1.5.0 (当前版本 - 2026-09)
+### 📌 v1.6.0 (当前版本 - 2026-09)
+
+- **出码不再被用户字符串打断**：URL 换行留在注释里，非法属性名丢弃，样式值去掉会闭合声明的字符。
+- **多表单按 id 分支**：提交和重置按 `formId` 取对应表单数据；输入框和开关各自声明数据。
+- **表格占位与分页**：未绑定数据源时设计器和出码使用同一组占位行；导出页面翻页会再次请求。
+- **行操作与弹窗载荷**：表格行按钮执行对应事件动作链；打开弹窗时把载荷写入页面状态。
+- **表达式与图层初始可见性**：能通过白名单的 `{{ }}` 内联进模板，其余保持转义字符串；新建弹窗和 Loading 默认隐藏，导出初始值跟 `layer.visible`。
+- **粘贴、变量名与存储**：粘贴重写子孙 id；页面级标识符冲突时加短哈希；页面和组件备份分目录，版本递增和删除走同一写队列。
+- **请求与状态写入**：跟随重定向时重新检查每一跳；`__proto__` 等键不会写进页面状态。
+- **自定义 HTML 与密钥比较**：设计器和出码共用同一份 srcdoc 清洗；启用 `API_KEY` 时用哈希后的定长时间比较。`VITE_API_KEY` 会打进前端包，不是用户口令。
+- **审计差异与撤销**：第二次保存记下 JSON Patch；拖拽松手记一步，历史栈以快照加补丁存储。
+- **组件入参提示**：表格列、表单项、容器标题缺失时抽屉给出警告，不拦截保存。
+
+### 📌 v1.5.0 (2026-09)
 
 - **出码表达式白名单**：只有受限解释器能完整解析的 `{{ }}` 才会内联进生成代码；响应路径只接受标识符和下标，非法片段不会拼进 JavaScript。
 - **属性修改可撤销**：直接改属性、数据源和事件时记下变更前快照，连续输入合并成一步；历史栈按体积丢弃最早的快照。
@@ -303,5 +318,5 @@ npm run format      # Prettier 全仓格式化
 13. **[v1.1.0 体验增强版规划](docs/roadmap/1.1.0_PLAN.md)**：包含画布对齐参考线/吸附指示、键盘方向键微调、操作日志可视化 JSON Diff 比对。
 14. **[v1.2.0 多图层架构与生命周期规划](docs/roadmap/1.2.0_PLAN.md)**：包含对话框图层、Loading 加载框图层、自定义 HTML 图层及 JavaScript 生命周期钩子。
 15. **[v1.3.0 数据驱动能力与体验加固记录](docs/roadmap/1.3.0_PLAN.md)**：数据源绑定、表达式渲染、事件动作链、E2E、后端认证/版本化/备份轮转。该版本已合入 `main`。
-16. **[v1.6.0 正确性与一致性加固规划](docs/roadmap/1.6.0_PLAN.md)**：出码换行注入、多表单分支、输入框状态、表格占位、行操作与分页、表达式出码、图层可见性、备份隔离、重定向校验、审计差异与撤销补丁。规划中，尚未改代码。
+16. **[v1.6.0 正确性与一致性加固](docs/roadmap/1.6.0_PLAN.md)**：出码换行注入、多表单分支、输入框状态、表格占位、行操作与分页、表达式出码、图层可见性、备份隔离、重定向校验、审计差异与撤销补丁。已实现。
 17. **[v3.0.0 远期企业级架构与生态规划](docs/roadmap/3.0.0_PLAN.md)**：包含企业级 RBAC/SSO 单点登录、PostgreSQL/S3 高可用分布式存储、CRDT 多人实时协同、一键 CI/CD 灰度发布、VS Code 插件与 CLI 工具链。

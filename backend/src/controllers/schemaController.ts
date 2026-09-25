@@ -1,9 +1,10 @@
 import { Request, Response } from 'express';
-import { storageService, bumpVersion } from '../services/storageService';
+import { storageService } from '../services/storageService';
 import { logDatabase } from '../db/sqlite';
 import { PageSchema } from '../types/schema';
 import { pageSchemaValidator, formatZodErrors } from '../validation/schemaValidation';
 import { resolveOperator } from '../middleware/apiKeyAuth';
+import { buildSaveLogDetails } from '../utils/jsonPatch';
 
 export class SchemaController {
   async saveSchema(req: Request, res: Response): Promise<void> {
@@ -25,44 +26,28 @@ export class SchemaController {
       }
 
       const schema = parsed.data as PageSchema;
+      const { saved, previous } = await storageService.saveVersioned(schema);
 
-      // P1-4 版本化：读取既有版本，递增并记录上一版本
-      const existing = await storageService.getSchema(schema.id, schema.type);
-      let prevVersion: string | undefined;
-      if (existing?.meta?.version) {
-        prevVersion = existing.meta.version;
-        schema.meta = schema.meta ?? { author: '', description: '', version: '1.0.0' };
-        schema.meta.prevVersion = prevVersion;
-        schema.meta.version = bumpVersion(prevVersion);
-      } else {
-        schema.meta = schema.meta ?? { author: '', description: '', version: '1.0.0' };
-        schema.meta.version = schema.meta.version || '1.0.0';
-      }
-
-      await storageService.saveSchema(schema);
-
-      // 记录 SQLite 操作日志 (包含更细化的 Schema 快照概要)
       logDatabase.addLog({
-        page_id: schema.id,
+        page_id: saved.id,
         action: 'SAVE_SCHEMA',
         operator: resolveOperator(req),
         details: JSON.stringify(
-          {
-            title: schema.title,
-            nodeCount: schema.children?.length || 0,
-            version: schema.meta?.version || '1.0.0',
-            prevVersion: prevVersion ?? null,
-            childrenSummary: schema.children?.map((c) => ({ id: c.id, type: c.type, label: c.label, layout: c.layout }))
-          },
-          null,
-          2
+          buildSaveLogDetails({
+            title: saved.title,
+            nodeCount: saved.children?.length || 0,
+            version: saved.meta?.version || '1.0.0',
+            prevVersion: saved.meta?.prevVersion,
+            previous,
+            saved
+          })
         )
       });
 
       res.json({
         success: true,
         message: 'Schema saved successfully',
-        data: { id: schema.id, version: schema.meta.version }
+        data: { id: saved.id, version: saved.meta.version }
       });
     } catch (err: any) {
       res.status(500).json({ success: false, message: err.message });

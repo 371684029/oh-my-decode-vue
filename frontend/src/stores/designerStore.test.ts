@@ -110,6 +110,42 @@ describe('designerStore 节点操作', () => {
     expect(store.pageSchema.children[1].id).not.toBe(originalId);
   });
 
+  test('pasteNode 重写容器子孙 id', () => {
+    const store = useDesignerStore();
+    store.addNodeFromMaterial({
+      ...material,
+      type: 'pro-container',
+      label: '容器',
+      defaultLayout: { w: 12, h: 4 }
+    });
+    const parentId = store.pageSchema.children[0].id;
+    store.addChildToNode(parentId, material);
+    store.addChildToNode(parentId, { ...material, label: '第二个' });
+    store.selectNode(parentId);
+    const before = store.pageSchema.children[0].children?.map((node) => node.id) ?? [];
+    expect(store.copySelectedNode()).toBe(true);
+    expect(store.pasteNode()).toBe(true);
+    const pasted = store.pageSchema.children[1];
+    const after = pasted.children?.map((node) => node.id) ?? [];
+    expect(after).toHaveLength(2);
+    expect(new Set([pasted.id, ...after, parentId, ...before]).size).toBe(6);
+    expect(after.every((id) => !before.includes(id))).toBe(true);
+  });
+
+  test('拖拽手势只在结束时记一步', () => {
+    const store = useDesignerStore();
+    store.addNodeFromMaterial(material);
+    const before = store.historyPast.length;
+    store.beginLayoutGesture();
+    store.updateNodeLayout([{ i: store.pageSchema.children[0].id, x: 3, y: 1, w: 2, h: 2 }], { history: false });
+    store.updateNodeLayout([{ i: store.pageSchema.children[0].id, x: 4, y: 1, w: 2, h: 2 }], { history: false });
+    expect(store.historyPast.length).toBe(before);
+    store.endLayoutGesture();
+    expect(store.historyPast.length).toBe(before + 1);
+    store.undo();
+    expect(store.pageSchema.children[0].layout.x).toBe(0);
+  });
+
   test('removeNode 删除并清空选中', () => {
     const store = useDesignerStore();
     store.addNodeFromMaterial(material);
@@ -184,8 +220,9 @@ describe('designerStore 图层管理', () => {
     const layerId = store.addLayer('dialog', '弹窗');
     const historyBefore = store.historyPast.length;
 
-    store.toggleLayerVisible(layerId);
     expect(store.pageSchema.layers?.find((l) => l.id === layerId)?.visible).toBe(false);
+    store.toggleLayerVisible(layerId);
+    expect(store.pageSchema.layers?.find((l) => l.id === layerId)?.visible).toBe(true);
     expect(store.historyPast.length).toBe(historyBefore + 1);
   });
 

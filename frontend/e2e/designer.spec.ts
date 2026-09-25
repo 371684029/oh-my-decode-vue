@@ -1,4 +1,18 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, type Page } from '@playwright/test';
+
+async function addMaterial(page: Page, label: string) {
+  const tab = label === '高端表格' || label === '高端表单' ? '自有高端组件' : 'Element 组件';
+  await page.getByRole('tab', { name: tab }).click();
+  await page.locator('.material-item', { hasText: label }).click();
+}
+
+async function closeDrawer(page: Page) {
+  const drawer = page.locator('.el-drawer');
+  if (await drawer.isVisible()) {
+    await drawer.locator('.el-drawer__close-btn').click();
+    await expect(drawer).toBeHidden();
+  }
+}
 
 test.describe('低代码设计器核心闭环', () => {
   test.beforeEach(async ({ page }) => {
@@ -13,14 +27,13 @@ test.describe('低代码设计器核心闭环', () => {
   });
 
   test('添加物料节点并渲染到画布', async ({ page }) => {
-    await page.click('.material-item:has-text("高端表格")');
+    await addMaterial(page, '高端表格');
     await expect(page.locator('.grid-node-wrapper')).toHaveCount(1);
     await expect(page.locator('.node-type-tag').first()).toContainText('高端表格');
   });
 
   test('选中节点打开属性抽屉并可切换数据源/事件 Tab', async ({ page }) => {
-    await page.click('.material-item:has-text("按钮")');
-    await page.click('.grid-node-wrapper');
+    await addMaterial(page, '按钮');
     const drawer = page.locator('.el-drawer');
     await expect(drawer).toBeVisible();
 
@@ -32,8 +45,9 @@ test.describe('低代码设计器核心闭环', () => {
   });
 
   test('撤销与重做闭环', async ({ page }) => {
-    await page.click('.material-item:has-text("按钮")');
+    await addMaterial(page, '按钮');
     await expect(page.locator('.grid-node-wrapper')).toHaveCount(1);
+    await closeDrawer(page);
 
     await page.click('button:has-text("撤销")');
     await expect(page.locator('.grid-node-wrapper')).toHaveCount(0);
@@ -50,8 +64,37 @@ test.describe('低代码设计器核心闭环', () => {
   });
 
   test('保存并写入后端 JSON', async ({ page }) => {
-    await page.click('.material-item:has-text("按钮")');
+    await addMaterial(page, '按钮');
+    await closeDrawer(page);
     await page.click('button:has-text("保存并写入 JSON")');
     await expect(page.locator('.el-message--success')).toBeVisible();
+  });
+
+  test('未绑定数据源的表格显示占位姓名', async ({ page }) => {
+    await addMaterial(page, '高端表格');
+    await expect(page.locator('.grid-node-wrapper')).toContainText('张三');
+  });
+
+  test('按钮动作链打开默认隐藏的对话框', async ({ page }) => {
+    await page.getByRole('tab', { name: '多图层管理' }).click();
+    await page.getByRole('button', { name: '新建图层' }).click();
+    await page.getByRole('menuitem', { name: /弹窗\/对话框/ }).click();
+    const dialog = page.locator('.el-dialog').filter({ hasText: '业务弹窗图层' });
+    await expect(dialog).toBeHidden();
+
+    await addMaterial(page, '按钮');
+    const drawer = page.locator('.el-drawer');
+    await expect(drawer).toBeVisible();
+    await drawer.getByRole('tab', { name: '事件' }).click();
+    await drawer.getByRole('button', { name: '添加动作' }).click();
+    const eventPane = drawer.locator('.el-tab-pane:visible');
+    await eventPane.locator('.el-select').nth(0).click();
+    await page.getByRole('option', { name: '打开弹窗' }).click();
+    await eventPane.locator('.el-select').nth(1).click();
+    await page.getByRole('option', { name: /业务弹窗图层/ }).click();
+    await closeDrawer(page);
+
+    await page.locator('.grid-node-wrapper').getByRole('button', { name: '按钮' }).click();
+    await expect(dialog).toBeVisible();
   });
 });

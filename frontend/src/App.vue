@@ -5,7 +5,7 @@
       <div class="logo">
         <el-icon class="logo-icon"><Platform /></el-icon>
         <span class="logo-text">低代码前端可视化平台 (Low-Code Studio)</span>
-        <el-tag size="small" type="primary" effect="plain" style="margin-left: 10px">v1.5.0</el-tag>
+        <el-tag size="small" type="primary" effect="plain" style="margin-left: 10px">v1.6.0</el-tag>
       </div>
       <div class="header-actions">
         <el-button-group class="history-btn-group">
@@ -136,7 +136,7 @@
           <el-descriptions-item label="记录时间">{{ selectedLog.created_at }}</el-descriptions-item>
         </el-descriptions>
         <div style="font-weight: 600; font-size: 13px; margin-bottom: 8px; color: #303133">
-          JSON 结构化快照 Diff 细节：
+          {{ logDetailsTitle }}
         </div>
         <pre class="diff-json-code">{{ formattedLogDetails }}</pre>
       </div>
@@ -162,6 +162,7 @@ const designerStore = useDesignerStore();
 watch(
   () => JSON.stringify(designerStore.pageSchema),
   (next, prev) => {
+    if (designerStore.layoutGesture) return;
     if (prev && prev !== next) designerStore.noteSchemaChange(prev);
   },
   { flush: 'sync' }
@@ -187,6 +188,18 @@ const loadingLayers = computed(() => {
 });
 const logDiffDialogVisible = ref(false);
 const selectedLog = ref<any>(null);
+const logDetailsTitle = computed(() => {
+  try {
+    const raw = selectedLog.value?.details;
+    const parsed = typeof raw === 'string' ? JSON.parse(raw) : raw;
+    if (parsed?.initial) return '首次保存';
+    if (Array.isArray(parsed?.patch)) return '保存差异 (JSON Patch)';
+  } catch {
+    /* 旧日志保持原样展示 */
+  }
+  return '操作详情';
+});
+
 const formattedLogDetails = computed(() => {
   if (!selectedLog.value || !selectedLog.value.details) return '{}';
   try {

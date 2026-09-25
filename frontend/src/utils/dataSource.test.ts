@@ -94,6 +94,20 @@ describe('ApiExecutor 统一请求层', () => {
     await expect(executor.fetchData({ url: '/x' })).rejects.toThrow('HTTP 500');
   });
 
+  test('重定向到元数据地址会被拒绝，本机地址仍允许', async () => {
+    const fetchMock = vi.fn().mockResolvedValueOnce({
+      status: 302,
+      ok: false,
+      type: 'basic',
+      headers: { get: (name: string) => (name.toLowerCase() === 'location' ? 'http://169.254.169.254/latest' : null) }
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    const executor = new ApiExecutor();
+    await expect(executor.fetchData({ url: 'https://example.com/redirect' })).rejects.toThrow(/不允许/);
+    expect(() => assertFetchableUrl('http://127.0.0.1:3001/api/schemas')).not.toThrow();
+    expect(() => assertFetchableUrl('http://0x7f000001/')).toThrow(/不允许/);
+  });
+
   test('拒绝非 http(s) 地址', async () => {
     const executor = new ApiExecutor();
     await expect(executor.fetchData({ url: 'javascript:alert(1)' })).rejects.toThrow(/http/);
@@ -154,6 +168,33 @@ describe('executeActions 事件动作链', () => {
 
     expect(scope.currentRow).toEqual({ id: 5 });
     expect(notify).toHaveBeenCalledWith('success', '操作完成');
+  });
+
+  test('open_dialog 写入 payload，并丢弃原型链键', async () => {
+    const scope: Record<string, any> = {};
+    const setLayerVisible = vi.fn();
+    await executeActions(
+      [
+        {
+          id: 'a1',
+          type: 'open_dialog',
+          target: 'layer_dlg',
+          payload: JSON.parse('{"currentRow":"{{ $event.row }}","__proto__":{"polluted":true}}')
+        }
+      ],
+      {
+        scope,
+        event: { row: { id: 9 } },
+        getNode: () => undefined,
+        getLayer: () => undefined,
+        reloadNode: () => {},
+        setLayerVisible,
+        notify: () => {}
+      }
+    );
+    expect(scope.currentRow).toEqual({ id: 9 });
+    expect(({} as any).polluted).toBeUndefined();
+    expect(setLayerVisible).toHaveBeenCalledWith('layer_dlg', true);
   });
 
   test('open_dialog / close_dialog / reload_data 动作', async () => {

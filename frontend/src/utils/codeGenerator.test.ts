@@ -323,6 +323,113 @@ describe('出码引擎输入转义（防止用户配置破坏生成代码）', (
   });
 });
 
+describe('v1.6.0 出码正确性', () => {
+  test('数据源 URL 换行不会变成独立语句', () => {
+    const schema = buildTestSchema();
+    const table = schema.children.find((node) => node.type === 'pro-table');
+    if (!table) throw new Error('missing table');
+    table.apiBinding = { url: 'http://example.com\nconst injected = 1', method: 'GET' };
+    const sfc = generateVueSFC(schema);
+    const html = generateHTML(schema);
+    expect(sfc).not.toMatch(/^const injected = 1/m);
+    expect(html).not.toMatch(/^const injected = 1/m);
+    expect(sfc).toContain('数据源: http://example.com const injected = 1');
+    expect(html).toContain("redirect: 'manual'");
+  });
+
+  test('非法属性名和样式注入不会进入模板', () => {
+    const schema = buildTestSchema();
+    schema.children = [
+      {
+        id: 'box_1',
+        type: 'pro-container',
+        label: '容器',
+        layout: { x: 0, y: 0, w: 12, h: 4, i: 'box_1' },
+        props: { title: '容器', direction: 'row;background:url(javascript:alert(1))', padding: '8px' },
+        attrs: { '"><img': 'x' },
+        style: {},
+        events: {}
+      }
+    ];
+    const code = generateVueSFC(schema);
+    expect(code).not.toContain('"><img');
+    expect(code).not.toContain('flex-direction: row;');
+    expect(code).toContain('flex-direction: rowbackground:url(javascript:alert(1))');
+  });
+
+  test('两个表单按 id 查找，输入框和开关有声明', () => {
+    const schema = buildTestSchema();
+    schema.children.push({
+      id: 'form_2',
+      type: 'pro-form',
+      label: '第二表单',
+      layout: { x: 0, y: 12, w: 12, h: 4, i: 'form_2' },
+      props: {},
+      attrs: {},
+      style: {},
+      events: {},
+      config: { items: [] }
+    });
+    schema.children.push({
+      id: 'a-b',
+      type: 'el-input',
+      label: '输入',
+      layout: { x: 0, y: 16, w: 4, h: 2, i: 'a-b' },
+      props: { placeholder: '甲' },
+      attrs: {},
+      style: {},
+      events: {}
+    });
+    schema.children.push({
+      id: 'a_b',
+      type: 'el-switch',
+      label: '开关',
+      layout: { x: 4, y: 16, w: 2, h: 2, i: 'a_b' },
+      props: {},
+      attrs: {},
+      style: {},
+      events: {}
+    });
+    const code = generateVueSFC(schema);
+    expect(code).toContain('if (formId === "form_1") return formData_form_1;');
+    expect(code).toContain('if (formId === "form_2") return formData_form_2;');
+    expect(code).not.toContain('? formData_form_1');
+    expect(code).toContain('const formData_a_b = ref');
+    expect(code).toContain('v-model="formData_a_b"');
+    expect(code).toContain('const formData_a_b_');
+    expect(code).toContain('v-model="formData_a_b_');
+    const html = generateHTML(schema);
+    expect(html).toContain('if (formId === "form_2") return this.formData_form_2;');
+  });
+
+  test('分页变化会再次请求，安全表达式内联', () => {
+    const schema = buildTestSchema();
+    const table = schema.children.find((node) => node.type === 'pro-table');
+    const button = schema.children.find((node) => node.type === 'el-button');
+    if (!table || !button) throw new Error('missing nodes');
+    table.apiBinding = { url: '/api/users', method: 'GET', params: { q: 'a' } };
+    button.props.text = '{{ state.name }}';
+    button.props.bad = '{{ 1) || alert(1) || (1 }}';
+    const code = generateVueSFC(schema);
+    expect(code).toContain('onPage_tbl_1');
+    expect(code).toContain('loadData_tbl_1()');
+    expect(code).toContain('page: currentPage_tbl_1.value');
+    expect(code).toContain('>{{ state.name }}<');
+    expect(code).toContain('{{ 1) || alert(1) || (1 }}');
+    expect(code).not.toContain(':bad="1)');
+  });
+
+  test('图层初始可见性与 Schema 一致', () => {
+    const schema = buildTestSchema();
+    const dialog = schema.layers?.find((layer) => layer.type === 'dialog');
+    if (!dialog) throw new Error('missing dialog');
+    dialog.visible = true;
+    const code = generateVueSFC(schema);
+    expect(code).toContain('const dialogVisible_layer_dlg = ref(true);');
+    expect(code).toContain('const loadingVisible_layer_loading = ref(true);');
+  });
+});
+
 describe('物料与出码登记一致', () => {
   test('每个物料类型都有出码模板', () => {
     const registered = new Set<string>(RENDERED_NODE_TYPES);

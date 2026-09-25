@@ -138,7 +138,8 @@ const layoutItems = computed({
     return designerStore.activeChildren.map((node) => node.layout);
   },
   set(val) {
-    designerStore.updateNodeLayout(val);
+    if (!designerStore.layoutGesture) designerStore.beginLayoutGesture();
+    designerStore.updateNodeLayout(val, { history: false });
   }
 });
 
@@ -191,15 +192,18 @@ const calculateSnapLines = (movingId: string | number, newX: number, newY: numbe
 };
 
 const handleItemMove = (i: string | number, newX: number, newY: number) => {
+  designerStore.beginLayoutGesture();
   calculateSnapLines(i, newX, newY);
 };
 
 const handleItemMoved = () => {
+  designerStore.endLayoutGesture();
   activeSnapXLines.value = [];
   activeSnapYLines.value = [];
 };
 
 const handleItemResize = (i: string | number, newH: number, newW: number) => {
+  designerStore.beginLayoutGesture();
   const item = layoutItems.value.find((l) => l.i === i);
   if (item) {
     calculateSnapLines(i, item.x, item.y, newW, newH);
@@ -207,12 +211,14 @@ const handleItemResize = (i: string | number, newH: number, newW: number) => {
 };
 
 const handleItemResized = () => {
+  designerStore.endLayoutGesture();
   activeSnapXLines.value = [];
   activeSnapYLines.value = [];
 };
 
 const handleLayoutUpdated = (newLayout: any[]) => {
-  designerStore.updateNodeLayout(newLayout);
+  if (!designerStore.layoutGesture) designerStore.beginLayoutGesture();
+  designerStore.updateNodeLayout(newLayout, { history: false });
 };
 
 const handleDrop = (event: DragEvent) => {

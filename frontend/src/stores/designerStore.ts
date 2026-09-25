@@ -1,6 +1,26 @@
 import { defineStore } from 'pinia';
 import type { PageSchema, ComponentNode, MaterialItem } from '../types/designer';
 import { findNode } from '../utils/schemaTree';
+import { applyPatch, createPatch, type JsonPatchOp } from '../utils/jsonPatch';
+
+type HistoryEntry = { kind: 'snap'; data: string } | { kind: 'patch'; ops: JsonPatchOp[] };
+
+function materializeHistory(entries: HistoryEntry[]): PageSchema {
+  let index = entries.length - 1;
+  while (index > 0 && entries[index].kind !== 'snap') index--;
+  const base = entries[index];
+  if (!base || base.kind !== 'snap') throw new Error('历史栈缺少快照');
+  let doc = JSON.parse(base.data) as PageSchema;
+  for (let cursor = index + 1; cursor < entries.length; cursor++) {
+    const entry = entries[cursor];
+    doc = entry.kind === 'snap' ? (JSON.parse(entry.data) as PageSchema) : applyPatch(doc, entry.ops);
+  }
+  return doc;
+}
+
+function entrySize(entry: HistoryEntry): number {
+  return entry.kind === 'snap' ? entry.data.length : JSON.stringify(entry.ops).length;
+}
 
 /**
  * 主画布只有一份节点数组：pageSchema.children。
@@ -65,12 +85,16 @@ export const useDesignerStore = defineStore('designer', {
     copiedNode: null as ComponentNode | null,
     isDrawerOpen: false,
     drawerTab: 'props' as 'props' | 'config' | 'attrs' | 'json',
-    historyPast: [] as string[],
-    historyFuture: [] as string[],
+    historyPast: [] as HistoryEntry[],
+    historyFuture: [] as HistoryEntry[],
     /** 撤销/重做回放时不再把恢复动作记成新历史 */
     suppressHistory: false,
     historyPending: null as string | null,
-    historyTimer: null as ReturnType<typeof setTimeout> | null
+    historyTimer: null as ReturnType<typeof setTimeout> | null,
+    /** 拖拽/缩放过程中不入栈，松手时记一步 */
+    layoutGesture: false,
+    layoutBefore: null as string | null,
+    layoutTimer: null as ReturnType<typeof setTimeout> | null
   }),
   getters: {
     /** 当前编辑目标（图层 children 或主画布 children）的响应式数组引用 */
@@ -116,54 +140,87 @@ export const useDesignerStore = defineStore('designer', {
         this.flushPendingHistory();
       }, 400);
     },
-    pushSnapshot(snapshot: string) {
-      if (this.historyPast.length > 0 && this.historyPast[this.historyPast.length - 1] === snapshot) {
+    trimHistory(stack: HistoryEntry[]) {
+      const newest = stack[stack.length - 1];
+      const size = newest ? entrySize(newest) : 0;
+      const maxSteps = size > 200000 ? 8 : size > 50000 ? 15 : 30;
+      while (stack.length > maxSteps) this.dropOldest(stack);
+      let total = stack.reduce((sum, item) => sum + entrySize(item), 0);
+      while (stack.length > 1 && total > 1_500_000) {
+        this.dropOldest(stack);
+        total = stack.reduce((sum, item) => sum + entrySize(item), 0);
+      }
+    },
+    dropOldest(stack: HistoryEntry[]) {
+      if (stack.length >= 2 && stack[0].kind === 'snap' && stack[1].kind === 'patch') {
+        const state = materializeHistory(stack.slice(0, 2));
+        stack.splice(0, 2, { kind: 'snap', data: JSON.stringify(state) });
         return;
       }
-      this.historyPast.push(snapshot);
-      const size = snapshot.length;
-      const maxSteps = size > 200000 ? 8 : size > 50000 ? 15 : 30;
-      while (this.historyPast.length > maxSteps) {
-        this.historyPast.shift();
+      stack.shift();
+    },
+    pushEntry(stack: HistoryEntry[], snapshot: string) {
+      if (stack.length > 0 && JSON.stringify(materializeHistory(stack)) === snapshot) return;
+      if (stack.length === 0 || stack.length % 10 === 0) {
+        stack.push({ kind: 'snap', data: snapshot });
+      } else {
+        const prev = materializeHistory(stack);
+        stack.push({ kind: 'patch', ops: createPatch(prev, JSON.parse(snapshot)) });
       }
-      const byteBudget = 1_500_000;
-      let total = this.historyPast.reduce((sum, item) => sum + item.length, 0);
-      while (this.historyPast.length > 1 && total > byteBudget) {
-        total -= this.historyPast.shift()!.length;
-      }
+      this.trimHistory(stack);
+    },
+    pushSnapshot(snapshot: string) {
+      this.pushEntry(this.historyPast, snapshot);
       this.historyFuture = [];
     },
     recordHistory() {
       this.flushPendingHistory();
       this.pushSnapshot(JSON.stringify(this.pageSchema));
     },
+    beginLayoutGesture() {
+      if (!this.layoutGesture) {
+        this.layoutGesture = true;
+        this.layoutBefore = JSON.stringify(this.pageSchema);
+      }
+      if (this.layoutTimer) clearTimeout(this.layoutTimer);
+      this.layoutTimer = setTimeout(() => this.endLayoutGesture(), 50);
+    },
+    endLayoutGesture() {
+      if (this.layoutTimer) {
+        clearTimeout(this.layoutTimer);
+        this.layoutTimer = null;
+      }
+      if (!this.layoutGesture) return;
+      const before = this.layoutBefore;
+      this.layoutGesture = false;
+      this.layoutBefore = null;
+      if (before && before !== JSON.stringify(this.pageSchema)) this.pushSnapshot(before);
+    },
+    restoreSchema(snapshot: PageSchema) {
+      const keepId = this.selectedNodeId;
+      this.suppressHistory = true;
+      this.pageSchema = shareBaseCanvas(snapshot);
+      this.suppressHistory = false;
+      this.selectedNodeId = keepId && this.selectedNode ? keepId : null;
+      this.isDrawerOpen = !!this.selectedNodeId;
+    },
     undo() {
       this.flushPendingHistory();
       if (this.historyPast.length === 0) return;
       const currentSnapshot = JSON.stringify(this.pageSchema);
-      this.historyFuture.push(currentSnapshot);
-
-      const previousSnapshot = this.historyPast.pop()!;
-      const keepId = this.selectedNodeId;
-      this.suppressHistory = true;
-      this.pageSchema = shareBaseCanvas(JSON.parse(previousSnapshot));
-      this.suppressHistory = false;
-      this.selectedNodeId = keepId && this.selectedNode ? keepId : null;
-      this.isDrawerOpen = !!this.selectedNodeId;
+      const restored = materializeHistory(this.historyPast);
+      this.historyPast.pop();
+      this.pushEntry(this.historyFuture, currentSnapshot);
+      this.restoreSchema(restored);
     },
     redo() {
       this.flushPendingHistory();
       if (this.historyFuture.length === 0) return;
       const currentSnapshot = JSON.stringify(this.pageSchema);
-      this.historyPast.push(currentSnapshot);
-
-      const nextSnapshot = this.historyFuture.pop()!;
-      const keepId = this.selectedNodeId;
-      this.suppressHistory = true;
-      this.pageSchema = shareBaseCanvas(JSON.parse(nextSnapshot));
-      this.suppressHistory = false;
-      this.selectedNodeId = keepId && this.selectedNode ? keepId : null;
-      this.isDrawerOpen = !!this.selectedNodeId;
+      const restored = materializeHistory(this.historyFuture);
+      this.historyFuture.pop();
+      this.pushEntry(this.historyPast, currentSnapshot);
+      this.restoreSchema(restored);
     },
     selectNode(id: string | null) {
       this.selectedNodeId = id;
@@ -192,7 +249,8 @@ export const useDesignerStore = defineStore('designer', {
       this.activeChildren.push(newNode);
       this.selectNode(id);
     },
-    updateNodeLayout(layoutList: any[]) {
+    updateNodeLayout(layoutList: any[], options?: { history?: boolean }) {
+      const record = options?.history !== false && !this.layoutGesture;
       let isChanged = false;
       layoutList.forEach((item) => {
         const node = this.activeChildren.find((n) => n.id === item.i);
@@ -200,7 +258,7 @@ export const useDesignerStore = defineStore('designer', {
           node &&
           (node.layout.x !== item.x || node.layout.y !== item.y || node.layout.w !== item.w || node.layout.h !== item.h)
         ) {
-          if (!isChanged) {
+          if (!isChanged && record) {
             this.recordHistory();
             isChanged = true;
           }
@@ -287,13 +345,28 @@ export const useDesignerStore = defineStore('designer', {
     pasteNode() {
       if (!this.copiedNode) return false;
       this.recordHistory();
-      const newId = generateUniqueId(this.copiedNode.type);
       const pastedNode: ComponentNode = JSON.parse(JSON.stringify(this.copiedNode));
-      pastedNode.id = newId;
-      pastedNode.layout.i = newId;
-      pastedNode.layout.y += pastedNode.layout.h; // 下移一行排列
+      const idMap = new Map<string, string>();
+      const assignIds = (node: ComponentNode) => {
+        const nextId = generateUniqueId(node.type);
+        idMap.set(node.id, nextId);
+        node.id = nextId;
+        node.layout.i = nextId;
+        node.children?.forEach(assignIds);
+      };
+      assignIds(pastedNode);
+      const rewriteTargets = (node: ComponentNode) => {
+        for (const rule of Object.values(node.events || {})) {
+          rule.actions?.forEach((action) => {
+            if (action.target && idMap.has(action.target)) action.target = idMap.get(action.target);
+          });
+        }
+        node.children?.forEach(rewriteTargets);
+      };
+      rewriteTargets(pastedNode);
+      pastedNode.layout.y += pastedNode.layout.h;
       this.activeChildren.push(pastedNode);
-      this.selectNode(newId);
+      this.selectNode(pastedNode.id);
       return true;
     },
     moveSelectedNodeBy(deltaX: number, deltaY: number) {
@@ -335,7 +408,7 @@ export const useDesignerStore = defineStore('designer', {
         name:
           name || (type === 'dialog' ? '业务弹窗图层' : type === 'loading' ? 'Loading 遮罩图层' : '自定义 HTML 图层'),
         type,
-        visible: true,
+        visible: type === 'custom-html',
         zIndex: (this.pageSchema.layers.length + 1) * 10,
         props: defaultProps,
         children: []

@@ -10,6 +10,15 @@
       <el-tabs v-model="activeTab" class="drawer-tabs">
         <!-- 属性配置 Tab -->
         <el-tab-pane label="属性 Props" name="props">
+          <el-alert
+            v-if="missingFields.length > 0"
+            type="warning"
+            :closable="false"
+            show-icon
+            style="margin-bottom: 12px"
+            :title="`剩余 ${missingFields.length} 项必填参数未配置`"
+            :description="missingFields.map((field) => field.label).join('、')"
+          />
           <el-form label-position="top" size="small">
             <el-form-item label="组件标识 (ID)">
               <el-input v-model="node.id" disabled />
@@ -301,6 +310,7 @@ import { parseExpression } from '../utils/expression';
 import { ApiExecutor, nodeEventBus } from '../utils/dataSource';
 import type { ActionType, ComponentNode } from '../types/designer';
 import SchemaJsonViewer from './SchemaJsonViewer.vue';
+import { missingRequiredFields } from '../registry/materialContract';
 import { ElMessage } from 'element-plus';
 
 const designerStore = useDesignerStore();
@@ -325,6 +335,7 @@ const getExpressionPreview = (exprStr: string) => {
 const activeTab = ref('props');
 
 const node = computed(() => designerStore.selectedNode);
+const missingFields = computed(() => (node.value ? missingRequiredFields(node.value) : []));
 
 const handleClose = () => {
   designerStore.selectNode(null);

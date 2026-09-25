@@ -67,4 +67,36 @@ describe('StorageService 备份路径', () => {
     await expect(fs.stat(path.join(root, 'escaped.bak.1'))).rejects.toThrow();
     await expect(fs.stat(path.join(root, '..', 'escaped.json'))).rejects.toThrow();
   });
+
+  test('page 与 component 备份分目录，版本递增在队列内', async () => {
+    const root = await fs.mkdtemp(path.join(os.tmpdir(), 'lowcode-storage-'));
+    const pagesDir = path.join(root, 'pages');
+    const componentsDir = path.join(root, 'components');
+    await fs.mkdir(pagesDir);
+    await fs.mkdir(componentsDir);
+    const service = new StorageService(pagesDir, componentsDir);
+    const page = sampleSchema('shared_id');
+    const component = { ...sampleSchema('shared_id'), type: 'component' as const };
+
+    const [first, second] = await Promise.all([
+      service.saveVersioned(page),
+      service.saveVersioned({ ...page, title: '并发' })
+    ]);
+    const versions = [first.saved.meta.version, second.saved.meta.version].sort();
+    expect(versions).toEqual(['1.0.0', '1.0.1']);
+
+    await service.saveVersioned(component);
+    await service.saveVersioned({ ...component, title: '组件第二版' });
+    const pageBackups = await fs.readdir(path.join(pagesDir, 'backups'));
+    const componentBackups = await fs.readdir(path.join(componentsDir, 'backups'));
+    expect(pageBackups.some((name) => name.includes('shared_id'))).toBe(true);
+    expect(componentBackups.some((name) => name.includes('shared_id'))).toBe(true);
+
+    await Promise.all([
+      service.deleteSchema('shared_id', 'page'),
+      service.saveVersioned({ ...page, title: '删除竞争' })
+    ]);
+    const leftovers = (await fs.readdir(pagesDir)).filter((name) => name.includes('.tmp'));
+    expect(leftovers).toEqual([]);
+  });
 });

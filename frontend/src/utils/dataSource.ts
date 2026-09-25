@@ -53,11 +53,56 @@ export interface FetchResult {
 }
 
 const FETCH_TIMEOUT_MS = 10000;
-const BLOCKED_HOSTS = new Set(['169.254.169.254', 'metadata.google.internal']);
+const MAX_REDIRECTS = 3;
+const REDIRECT_STATUSES = new Set([301, 302, 303, 307, 308]);
+export const FORBIDDEN_STATE_KEYS = new Set(['__proto__', 'prototype', 'constructor']);
 
-/** 只允许相对路径与 http(s)，拒绝 javascript: 和云元数据地址 */
+function ipv4Parts(host: string): number[] | null {
+  const match = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/.exec(host);
+  if (!match) return null;
+  const parts = match.slice(1).map((item) => Number(item));
+  if (parts.some((item) => item > 255)) return null;
+  return parts;
+}
+
+/** 云元数据与链路本地地址。本机和私网地址保留，方便对接用户自己的 API。 */
+export function isBlockedFetchHost(hostname: string): boolean {
+  const host = hostname
+    .toLowerCase()
+    .replace(/\.$/, '')
+    .replace(/^\[|\]$/g, '');
+  if (host === 'metadata.google.internal' || host === 'metadata.google.internal.') return true;
+  if (/^0x[0-9a-f]+$/i.test(host) || /^\d+$/.test(host)) return true;
+  const ipv4 = ipv4Parts(host);
+  if (ipv4 && ipv4[0] === 169 && ipv4[1] === 254) return true;
+  if (host.includes(':')) {
+    if (/^fe[89ab]/i.test(host)) return true;
+    const mapped = /::ffff:(\d{1,3}(?:\.\d{1,3}){3})$/i.exec(host);
+    if (mapped && isBlockedFetchHost(mapped[1])) return true;
+  }
+  return false;
+}
+
+/** URL 解析会把 0x7f000001 收成 127.0.0.1，拦截要看原始主机。 */
+function rawHostname(url: string): string {
+  const match = /^[a-z][a-z\d+.-]*:\/\/([^/?#]*)/i.exec(url);
+  if (!match) return '';
+  let authority = match[1];
+  const at = authority.lastIndexOf('@');
+  if (at >= 0) authority = authority.slice(at + 1);
+  if (authority.startsWith('[')) {
+    const end = authority.indexOf(']');
+    return end >= 0 ? authority.slice(1, end) : authority;
+  }
+  return authority.replace(/:\d+$/, '');
+}
+
+/** 只允许相对路径与 http(s)，拒绝 javascript:、云元数据和链路本地地址 */
 export function assertFetchableUrl(url: string): void {
   if (url.startsWith('/') && !url.startsWith('//')) return;
+  if (isBlockedFetchHost(rawHostname(url))) {
+    throw new Error('不允许访问该地址');
+  }
   let parsed: URL;
   try {
     parsed = new URL(url);
@@ -67,10 +112,76 @@ export function assertFetchableUrl(url: string): void {
   if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
     throw new Error('数据源仅允许 http 或 https');
   }
-  if (BLOCKED_HOSTS.has(parsed.hostname.toLowerCase())) {
+  if (isBlockedFetchHost(parsed.hostname)) {
     throw new Error('不允许访问该地址');
   }
 }
+
+/** 手动跟随重定向，每一跳都重新校验。 */
+export async function fetchChecked(url: string, init: RequestInit = {}): Promise<Response> {
+  let current = url;
+  for (let hop = 0; hop <= MAX_REDIRECTS; hop++) {
+    assertFetchableUrl(current);
+    const res = await fetch(current, { ...init, redirect: 'manual' });
+    if (res.type === 'opaqueredirect' || REDIRECT_STATUSES.has(res.status)) {
+      if (hop === MAX_REDIRECTS) throw new Error('重定向次数过多');
+      const location = res.headers.get('location');
+      if (!location) throw new Error('重定向缺少 Location');
+      current = new URL(location, current).toString();
+      continue;
+    }
+    return res;
+  }
+  throw new Error('重定向次数过多');
+}
+
+/** 出码产物内嵌的同一套请求函数（普通 JavaScript，供 SFC 与 HTML 共用）。 */
+export const FETCH_CHECKED_SOURCE = `async function fetchChecked(url, init) {
+  const maxHops = 3;
+  const redirects = new Set([301, 302, 303, 307, 308]);
+  const blockedHost = (hostname) => {
+    const host = String(hostname || '').toLowerCase().replace(/\\.$/, '').replace(/^\\[|\\]$/g, '');
+    if (host === 'metadata.google.internal') return true;
+    if (/^0x[0-9a-f]+$/i.test(host) || /^\\d+$/.test(host)) return true;
+    const ipv4 = /^(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})$/.exec(host);
+    if (ipv4 && Number(ipv4[1]) === 169 && Number(ipv4[2]) === 254) return true;
+    if (host.includes(':') && /^fe[89ab]/i.test(host)) return true;
+    return false;
+  };
+  const rawHost = (value) => {
+    const match = /^[a-z][a-z\\d+.-]*:\\/\\/([^/?#]*)/i.exec(value);
+    if (!match) return '';
+    let authority = match[1];
+    const at = authority.lastIndexOf('@');
+    if (at >= 0) authority = authority.slice(at + 1);
+    if (authority.startsWith('[')) {
+      const end = authority.indexOf(']');
+      return end >= 0 ? authority.slice(1, end) : authority;
+    }
+    return authority.replace(/:\\d+$/, '');
+  };
+  const assertUrl = (value) => {
+    if (value.startsWith('/') && !value.startsWith('//')) return;
+    if (blockedHost(rawHost(value))) throw new Error('不允许访问该地址');
+    const parsed = new URL(value);
+    if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') throw new Error('数据源仅允许 http 或 https');
+    if (blockedHost(parsed.hostname)) throw new Error('不允许访问该地址');
+  };
+  let current = url;
+  for (let hop = 0; hop <= maxHops; hop++) {
+    assertUrl(current);
+    const res = await fetch(current, Object.assign({}, init, { redirect: 'manual' }));
+    if (res.type === 'opaqueredirect' || redirects.has(res.status)) {
+      if (hop === maxHops) throw new Error('重定向次数过多');
+      const location = res.headers.get('location');
+      if (!location) throw new Error('重定向缺少 Location');
+      current = new URL(location, current).toString();
+      continue;
+    }
+    return res;
+  }
+  throw new Error('重定向次数过多');
+}`;
 
 function fetchTimeoutSignal(): AbortSignal {
   if (typeof AbortSignal !== 'undefined' && typeof AbortSignal.timeout === 'function') {
@@ -119,7 +230,7 @@ export class ApiExecutor {
       init.body = JSON.stringify(params);
     }
 
-    const res = await fetch(finalUrl, { ...init, signal: fetchTimeoutSignal() });
+    const res = await fetchChecked(finalUrl, { ...init, signal: fetchTimeoutSignal() });
     if (!res.ok) {
       throw new Error(`HTTP ${res.status}: ${finalUrl}`);
     }
@@ -162,16 +273,23 @@ export async function executeActions(actions: ActionNode[], ctx: ActionContext):
   }
 }
 
+function assignState(scope: Record<string, any>, payload: Record<string, any> | undefined, event: unknown): void {
+  const entries = resolveTemplatedValue(payload ?? {}, {
+    ...scope,
+    event,
+    $event: event
+  });
+  if (!entries || typeof entries !== 'object') return;
+  for (const [key, value] of Object.entries(entries)) {
+    if (FORBIDDEN_STATE_KEYS.has(key)) continue;
+    scope[key] = value;
+  }
+}
+
 async function executeAction(action: ActionNode, ctx: ActionContext): Promise<void> {
   switch (action.type) {
     case 'set_state': {
-      // 同时注入 event 与 $event（与模板 $event 语义一致，兼容两种写法）
-      const entries = resolveTemplatedValue(action.payload ?? {}, {
-        ...ctx.scope,
-        event: ctx.event,
-        $event: ctx.event
-      });
-      Object.assign(ctx.scope, entries);
+      assignState(ctx.scope, action.payload, ctx.event);
       break;
     }
     case 'reload_data':
@@ -180,6 +298,7 @@ async function executeAction(action: ActionNode, ctx: ActionContext): Promise<vo
       break;
     case 'open_dialog':
       if (!action.target) throw new Error('打开弹窗缺少目标图层');
+      assignState(ctx.scope, action.payload, ctx.event);
       ctx.setLayerVisible(action.target, true);
       break;
     case 'close_dialog':

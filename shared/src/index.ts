@@ -107,6 +107,14 @@ export interface PageSchema {
 /** 物料类型分类 */
 export type MaterialCategory = 'pro' | 'element' | 'layout';
 
+/** 物料入参契约（缺必填项时只警告） */
+export interface MaterialInputContract {
+  name: string;
+  label: string;
+  type: 'string' | 'number' | 'boolean' | 'array' | 'object' | 'expression';
+  required: boolean;
+}
+
 /** 物料注册项 */
 export interface MaterialItem {
   type: string;
@@ -120,6 +128,8 @@ export interface MaterialItem {
   defaultProps: Record<string, any>;
   defaultAttrs: Record<string, any>;
   defaultConfig?: Record<string, any>;
+  inputs?: MaterialInputContract[];
+  outputs?: Array<{ name: string; label: string }>;
 }
 
 /** 操作审计日志 */

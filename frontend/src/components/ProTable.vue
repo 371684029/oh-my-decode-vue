@@ -50,20 +50,21 @@
 import { ref, computed, onMounted, onUnmounted } from 'vue';
 import type { ComponentNode } from '../types/designer';
 import { ElMessage } from 'element-plus';
-import { ApiExecutor } from '../utils/dataSource';
+import { ApiExecutor, executeActions, nodeEventBus } from '../utils/dataSource';
+import { findNode } from '../utils/schemaTree';
+import { TABLE_PLACEHOLDER_ROWS } from '../utils/tablePlaceholder';
 import { useDesignerStore } from '../stores/designerStore';
-import { nodeEventBus } from '../utils/dataSource';
 
 const props = defineProps<{
   node: ComponentNode;
 }>();
 
 const currentPage = ref(1);
-const totalCount = ref(4);
+const totalCount = ref<number>(TABLE_PLACEHOLDER_ROWS.length);
 const loading = ref(false);
 
 /** 数据行：优先 apiBinding 数据源，缺省为占位 mock */
-const rows = ref<any[]>([]);
+const rows = ref<any[]>([...TABLE_PLACEHOLDER_ROWS]);
 
 const executor = new ApiExecutor();
 
@@ -75,13 +76,8 @@ const pagination = computed(() => props.node.config?.pagination || { enabled: tr
 const loadData = async () => {
   const binding = props.node.apiBinding;
   if (!binding?.url) {
-    // 未配置数据源：使用占位 mock
-    rows.value = [
-      { id: '101', name: '张三', role: '系统管理员', status: '正常', updatedAt: '2026-09-15 10:00' },
-      { id: '102', name: '李四', role: '前端开发者', status: '启用', updatedAt: '2026-09-15 10:30' },
-      { id: '103', name: '王五', role: '测试工程师', status: '禁用', updatedAt: '2026-09-15 11:00' },
-      { id: '104', name: '赵六', role: '产品经理', status: '正常', updatedAt: '2026-09-15 11:15' }
-    ];
+    rows.value = [...TABLE_PLACEHOLDER_ROWS];
+    totalCount.value = TABLE_PLACEHOLDER_ROWS.length;
     return;
   }
   try {
@@ -106,7 +102,24 @@ const handlePageChange = (page: number) => {
   loadData();
 };
 
-const handleAction = (key: string, row: any) => {
+const handleAction = async (key: string, row: any) => {
+  const rule = props.node.events?.[key];
+  if (rule?.enabled && rule.actions.length > 0) {
+    const designerStore = useDesignerStore();
+    await executeActions(rule.actions, {
+      scope: designerStore.pageSchema.state,
+      event: { row, eventKey: key },
+      getNode: (id: string) => findNode(designerStore.activeChildren, id) ?? undefined,
+      getLayer: (id: string) => designerStore.pageSchema.layers?.find((layer) => layer.id === id),
+      reloadNode: (id: string) => nodeEventBus.emitReload(id),
+      setLayerVisible: (layerId: string, visible: boolean) => {
+        const layer = designerStore.pageSchema.layers?.find((item) => item.id === layerId);
+        if (layer) layer.visible = visible;
+      },
+      notify: (type, message) => ElMessage({ type, message })
+    });
+    return;
+  }
   ElMessage.info(`触发按钮 [${key}], 选中行: ${row.name}`);
 };
 
@@ -114,7 +127,7 @@ let unsubscribe: (() => void) | undefined;
 
 onMounted(() => {
   const binding = props.node.apiBinding;
-  if (binding?.url && binding.autoFetch !== false) {
+  if (!binding?.url || binding.autoFetch !== false) {
     loadData();
   }
   // 订阅动作链 reload

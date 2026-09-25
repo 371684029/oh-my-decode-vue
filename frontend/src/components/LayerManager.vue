@@ -92,7 +92,7 @@
           show-icon
           style="margin-bottom: 12px"
           title="安全提示"
-          description="自定义 HTML 渲染前会经 DOMPurify 消毒（剥离 script / on* 事件）；生命周期脚本将在浏览器本地执行，仅用于设计器内预览，导出代码时会原样嵌入目标代码，请由页面所有者自行评估脚本安全。"
+          description="自定义 HTML 会去掉 script 与内联事件后再放进 sandbox iframe；生命周期脚本只在该 iframe 内执行。预览与导出使用同一份文档。"
         />
         <el-form label-position="top" size="small">
           <el-form-item label="自定义 HTML 代码">

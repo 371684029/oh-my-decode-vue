@@ -16,6 +16,11 @@ export const MATERIAL_REGISTRY: MaterialItem[] = [
     defaultAttrs: {
       'data-testid': 'pro-table-wrapper'
     },
+    inputs: [{ name: 'columns', label: '列定义', type: 'array', required: true }],
+    outputs: [
+      { name: 'view', label: '查看行' },
+      { name: 'delete', label: '删除行' }
+    ],
     defaultConfig: {
       columns: [
         { prop: 'id', label: 'ID', width: '80', sortable: true, align: 'center' },
@@ -48,6 +53,8 @@ export const MATERIAL_REGISTRY: MaterialItem[] = [
     defaultAttrs: {
       'data-testid': 'pro-form-wrapper'
     },
+    inputs: [{ name: 'items', label: '表单项', type: 'array', required: true }],
+    outputs: [{ name: 'submit', label: '提交' }],
     defaultConfig: {
       items: [
         { field: 'username', label: '用户名', component: 'input', placeholder: '请输入用户名', required: true },
@@ -77,7 +84,8 @@ export const MATERIAL_REGISTRY: MaterialItem[] = [
       direction: 'row',
       padding: '16px'
     },
-    defaultAttrs: {}
+    defaultAttrs: {},
+    inputs: [{ name: 'title', label: '容器标题', type: 'string', required: true }]
   },
 
   // --- Element Plus 常用组件 ---

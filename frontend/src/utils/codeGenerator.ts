@@ -1,7 +1,10 @@
-import type { PageSchema, ComponentNode, LayerConfig, ApiBinding, ActionNode } from '../types/designer';
+import type { PageSchema, ComponentNode, LayerConfig, ApiBinding, ActionNode, EventRule } from '../types/designer';
 import { isRenderedNodeType } from '../registry/nodeTypes';
 import { sanitizeCss } from './sanitizeCss';
 import { canInlineExpression } from './expression';
+import { FETCH_CHECKED_SOURCE, FORBIDDEN_STATE_KEYS } from './dataSource';
+import { TABLE_PLACEHOLDER_ROWS } from './tablePlaceholder';
+import { buildCustomHtmlSrcdoc } from './customHtmlDocument';
 
 // ============================================================
 // 多目标出码引擎 (Code Generator)
@@ -54,23 +57,66 @@ function safeIdent(value: string): string {
   return out && !/^[0-9]/.test(out) ? out : 'n' + out;
 }
 
+function shortHash(value: string): string {
+  let hash = 2166136261;
+  for (let i = 0; i < value.length; i++) {
+    hash ^= value.charCodeAt(i);
+    hash = Math.imul(hash, 16777619);
+  }
+  return (hash >>> 0).toString(16).padStart(8, '0').slice(0, 6);
+}
+
+/** 同一页内把 id 映射成互不冲突的标识符。生成开始前绑定。 */
+let identOf = (id: string) => safeIdent(id);
+
+function bindIdents(schema: PageSchema): void {
+  const ids: string[] = [];
+  const walk = (nodes?: ComponentNode[]) => {
+    for (const node of nodes || []) {
+      ids.push(node.id);
+      walk(node.children);
+    }
+  };
+  walk(schema.children);
+  for (const layer of schema.layers || []) {
+    ids.push(layer.id);
+    walk(layer.children);
+  }
+  const used = new Set<string>();
+  const map = new Map<string, string>();
+  for (const id of ids) {
+    if (map.has(id)) continue;
+    let ident = safeIdent(id);
+    if (used.has(ident)) ident = `${ident}_${shortHash(id)}`;
+    let n = 2;
+    while (used.has(ident)) ident = `${safeIdent(id)}_${shortHash(id)}_${n++}`;
+    used.add(ident);
+    map.set(id, ident);
+  }
+  identOf = (id: string) => map.get(id) ?? safeIdent(id);
+}
+
+const ATTR_NAME = /^[A-Za-z_][A-Za-z0-9_:-]*$/;
+
+function safeAttrName(key: string): string | null {
+  return ATTR_NAME.test(key) ? key : null;
+}
+
+/** 写进 style 属性的单个声明值，避免用分号或花括号逃出声明。 */
+function safeStyleToken(value: unknown): string {
+  return String(value ?? '').replace(/[;{}<>\r\n]/g, '');
+}
+
+function renderBoundText(value: unknown, fallback = ''): string {
+  const text = value === undefined || value === null || value === '' ? fallback : String(value);
+  const full = text.match(/^\s*\{\{\s*(.*?)\s*\}\}\s*$/);
+  if (full && canInlineExpression(full[1])) return `{{ ${full[1].trim()} }}`;
+  return escapeHtml(text);
+}
+
 /** 嵌入 JS 字符串字面量，并把 `<` 写成 \\u003c，避免 `</script>` 打断 HTML/SFC */
 function embedJsString(value: string): string {
   return JSON.stringify(value).replace(/</g, '\\u003c');
-}
-
-function escapeScriptClose(code: string): string {
-  return code.replace(/<\/script/gi, '<\\/script');
-}
-
-/** 自定义 HTML 出码为 sandbox iframe 文档，脚本留在独立文档里 */
-function buildCustomHtmlSrcdoc(layer: LayerConfig): string {
-  const html = layer.props?.htmlCode || '<div>无 HTML 内容</div>';
-  const css = sanitizeCss(layer.props?.cssCode || '');
-  const mounted = escapeScriptClose(layer.props?.scriptMounted || '');
-  const updated = escapeScriptClose(layer.props?.scriptUpdated || '');
-  const unmounted = escapeScriptClose(layer.props?.scriptUnmounted || '');
-  return `<!DOCTYPE html><html><head><meta charset="utf-8"><style>${css}</style></head><body>${html}<script>(function(){var container=document.body;var state={};window.addEventListener('pagehide',function(){try{${unmounted}}catch(err){console.error(err)}});try{${mounted}}catch(err){console.error(err)}try{${updated}}catch(err){console.error(err)}})();</script></body></html>`;
 }
 
 /** 主画布节点 + 非 canvas 图层节点 + 嵌套 children（canvas 图层与 children 同源，不重复收集） */
@@ -132,21 +178,28 @@ function renderParamsLiteral(params: Record<string, any> | undefined): string {
 function stringifyAttributes(props: Record<string, any>, attrs: Record<string, any>): string {
   const parts: string[] = [];
 
-  for (const [key, val] of Object.entries(props)) {
-    if (val === undefined || val === null || val === '') continue;
+  const push = (key: string, val: unknown) => {
+    const name = safeAttrName(key);
+    if (!name || val === undefined || val === null || val === '') return;
     if (typeof val === 'boolean') {
-      if (val) parts.push(`:${key}="true"`);
-    } else if (typeof val === 'number') {
-      parts.push(`:${key}="${val}"`);
-    } else {
-      parts.push(`${key}="${escapeHtml(val)}"`);
+      if (val) parts.push(`:${name}="true"`);
+      return;
     }
-  }
+    if (typeof val === 'number') {
+      parts.push(`:${name}="${val}"`);
+      return;
+    }
+    const text = String(val);
+    const full = text.match(/^\s*\{\{\s*(.*?)\s*\}\}\s*$/);
+    if (full && canInlineExpression(full[1])) {
+      parts.push(`:${name}="${full[1].trim()}"`);
+      return;
+    }
+    parts.push(`${name}="${escapeHtml(text)}"`);
+  };
 
-  for (const [key, val] of Object.entries(attrs)) {
-    if (val === undefined || val === null || val === '') continue;
-    parts.push(`${key}="${escapeHtml(val)}"`);
-  }
+  for (const [key, val] of Object.entries(props)) push(key, val);
+  for (const [key, val] of Object.entries(attrs)) push(key, val);
 
   return parts.length > 0 ? ' ' + parts.join(' ') : '';
 }
@@ -162,14 +215,24 @@ function renderNodeToTemplate(node: ComponentNode, indentLevel = 3): string {
     case 'pro-table': {
       const columns = node.config?.columns || [];
       const colIndent = ' '.repeat((indentLevel + 1) * 2);
-      const dataName = `tableData_${safeIdent(node.id)}`;
-      const totalName = `totalCount_${safeIdent(node.id)}`;
-      const pageName = `currentPage_${safeIdent(node.id)}`;
+      const dataName = `tableData_${identOf(node.id)}`;
+      const totalName = `totalCount_${identOf(node.id)}`;
+      const pageName = `currentPage_${identOf(node.id)}`;
       let colsTemplate = '';
 
       columns.forEach((col: any) => {
         colsTemplate += `${colIndent}<el-table-column prop="${escapeHtml(col.prop)}" label="${escapeHtml(col.label)}"${col.width ? ` width="${escapeHtml(col.width)}"` : ''}${col.sortable ? ' sortable' : ''} />\n`;
       });
+
+      const rowActions = node.config?.actions?.length
+        ? node.config.actions
+        : [{ label: '查看', type: 'primary', eventKey: 'click' }];
+      const actionButtons = rowActions
+        .map((action: any) => {
+          const eventKey = String(action.eventKey || 'click');
+          return `${indent}        <el-button link type="${escapeHtml(action.type || 'primary')}" size="small" @click="handleRowAction('${escapeHtml(node.id)}', '${escapeHtml(eventKey)}', scope.row)">${escapeHtml(action.label || '查看')}</el-button>\n`;
+        })
+        .join('');
 
       return (
         `${indent}<!-- 高端表格 Component -->\n` +
@@ -178,7 +241,7 @@ function renderNodeToTemplate(node: ComponentNode, indentLevel = 3): string {
         colsTemplate +
         `${indent}    <el-table-column label="操作" align="center" width="160">\n` +
         `${indent}      <template #default="scope">\n` +
-        `${indent}        <el-button link type="primary" size="small" @click="handleRowAction('${escapeHtml(node.id)}', scope.row)">查看</el-button>\n` +
+        actionButtons +
         `${indent}      </template>\n` +
         `${indent}    </el-table-column>\n` +
         `${indent}  </el-table>\n` +
@@ -189,6 +252,7 @@ function renderNodeToTemplate(node: ComponentNode, indentLevel = 3): string {
         `${indent}    :total="${totalName}"\n` +
         `${indent}    size="small"\n` +
         `${indent}    style="margin-top: 10px; justify-content: flex-end"\n` +
+        `${indent}    @current-change="onPage_${identOf(node.id)}"\n` +
         `${indent}  />\n` +
         `${indent}</el-card>\n`
       );
@@ -197,7 +261,7 @@ function renderNodeToTemplate(node: ComponentNode, indentLevel = 3): string {
     case 'pro-form': {
       const items = node.config?.items || [];
       const itemIndent = ' '.repeat((indentLevel + 1) * 2);
-      const formName = `formData_${safeIdent(node.id)}`;
+      const formName = `formData_${identOf(node.id)}`;
       let itemsTemplate = '';
 
       items.forEach((item: any) => {
@@ -253,44 +317,44 @@ function renderNodeToTemplate(node: ComponentNode, indentLevel = 3): string {
     case 'el-button': {
       const clickBinding =
         node.events?.click?.enabled && node.events.click.actions.length > 0
-          ? ` @click="handleNodeClick('${escapeHtml(node.id)}', $event)"`
+          ? ` @click="handleNodeClick('${escapeHtml(node.id)}', 'click', $event)"`
           : '';
-      return `${indent}<el-button${attrStr}${clickBinding}>${escapeHtml(node.props.text) || '按钮'}</el-button>\n`;
+      return `${indent}<el-button${attrStr}${clickBinding}>${renderBoundText(node.props.text, '按钮')}</el-button>\n`;
     }
 
     case 'el-input':
-      return `${indent}<el-input v-model='formData_${safeIdent(node.id)}[${JSON.stringify(node.id)}]'${attrStr} />\n`;
+      return `${indent}<el-input v-model="formData_${identOf(node.id)}"${attrStr} />\n`;
 
     case 'el-card':
       return (
         `${indent}<el-card${attrStr}>\n` +
-        `${indent}  <p>${escapeHtml(node.props.content) || '卡片内容区域'}</p>\n` +
+        `${indent}  <p>${renderBoundText(node.props.content, '卡片内容区域')}</p>\n` +
         `${indent}</el-card>\n`
       );
 
     case 'el-tag':
-      return `${indent}<el-tag${attrStr}>${escapeHtml(node.props.text) || '标签'}</el-tag>\n`;
+      return `${indent}<el-tag${attrStr}>${renderBoundText(node.props.text, '标签')}</el-tag>\n`;
 
     case 'el-alert':
       return `${indent}<el-alert${attrStr} />\n`;
 
     case 'el-switch':
-      return `${indent}<el-switch v-model='formData_${safeIdent(node.id)}[${JSON.stringify(node.id)}]'${attrStr} />\n`;
+      return `${indent}<el-switch v-model="formData_${identOf(node.id)}"${attrStr} />\n`;
 
     case 'el-divider':
-      return `${indent}<el-divider${attrStr}>${escapeHtml(node.props.text) || ''}</el-divider>\n`;
+      return `${indent}<el-divider${attrStr}>${renderBoundText(node.props.text, '')}</el-divider>\n`;
 
     case 'pro-container': {
       let childrenTemplate = '';
       (node.children || []).forEach((child) => {
         childrenTemplate += renderNodeToTemplate(child, indentLevel + 1);
       });
-      const direction = escapeHtml(node.props.direction) || 'row';
-      const padding = escapeHtml(node.props.padding) || '12px';
+      const direction = safeStyleToken(node.props.direction) || 'row';
+      const padding = safeStyleToken(node.props.padding) || '12px';
       return (
         `${indent}<!-- 嵌套弹性容器 Component -->\n` +
         `${indent}<el-card class="pro-container-box"${attrStr}>\n` +
-        `${indent}  <template #header><span>${escapeHtml(node.props.title) || '嵌套弹性容器'}</span></template>\n` +
+        `${indent}  <template #header><span>${renderBoundText(node.props.title, '嵌套弹性容器')}</span></template>\n` +
         `${indent}  <div style="display: flex; flex-direction: ${direction}; gap: 12px; padding: ${padding}">\n` +
         childrenTemplate +
         `${indent}  </div>\n` +
@@ -326,7 +390,7 @@ function renderLayers(
 
   if (schema.layers && schema.layers.length > 0) {
     schema.layers.forEach((layer: LayerConfig) => {
-      const layerIdent = safeIdent(layer.id);
+      const layerIdent = identOf(layer.id);
       if (layer.type === 'dialog') {
         let dialogBody = '';
         (layer.children || []).forEach((child) => {
@@ -362,8 +426,9 @@ function collectLayerStateDecls(schema: PageSchema): { dialogVisible: string[]; 
   const dialogVisible: string[] = [];
   const loadingVisible: string[] = [];
   schema.layers?.forEach((l) => {
-    if (l.type === 'dialog') dialogVisible.push(`const dialogVisible_${safeIdent(l.id)} = ref(false);`);
-    else if (l.type === 'loading') loadingVisible.push(`const loadingVisible_${safeIdent(l.id)} = ref(true);`);
+    const visible = l.visible ? 'true' : 'false';
+    if (l.type === 'dialog') dialogVisible.push(`const dialogVisible_${identOf(l.id)} = ref(${visible});`);
+    else if (l.type === 'loading') loadingVisible.push(`const loadingVisible_${identOf(l.id)} = ref(${visible});`);
   });
   return { dialogVisible, loadingVisible };
 }
@@ -450,29 +515,45 @@ function renderPayloadExpr(value: unknown): string {
 }
 
 /** 生成 GET 请求块文本（options API 需 this. 前缀，composition 不需要） */
-function renderFetchRequestBlock(urlExpr: string, paramsLit: string, method: 'GET' | 'POST'): string {
+function renderFetchRequestBlock(
+  urlExpr: string,
+  paramsLit: string,
+  method: 'GET' | 'POST',
+  optionsApi: boolean,
+  pageExpr?: string
+): string {
+  const call = 'fetchChecked';
+  void optionsApi;
+  const merged = pageExpr ? `{ page: ${pageExpr}, size: 10, ...(${paramsLit}) }` : paramsLit;
   if (method === 'POST') {
-    return `    const res = await fetch(${urlExpr}, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(${paramsLit}), signal: AbortSignal.timeout(10000) });`;
+    return `    const res = await ${call}(${urlExpr}, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(${merged}), signal: AbortSignal.timeout(10000) });`;
   }
-  return `    const params = ${paramsLit};
+  return `    const params = ${merged};
     const qs = new URLSearchParams();
     Object.entries(params).forEach(([k, v]) => { if (v !== undefined && v !== null && v !== '') qs.append(k, String(v)); });
     const q = qs.toString();
     const base = ${urlExpr};
     const url = q ? (base.includes('?') ? base + '&' + q : base + '?' + q) : base;
-    const res = await fetch(url, { method: 'GET', headers: { 'Content-Type': 'application/json' }, signal: AbortSignal.timeout(10000) });`;
+    const res = await ${call}(url, { method: 'GET', headers: { 'Content-Type': 'application/json' }, signal: AbortSignal.timeout(10000) });`;
 }
 
 /** 生成表格节点加载函数（composition API） */
-function renderTableLoadFunction(node: ComponentNode, binding: ApiBinding): string {
-  const dataName = `tableData_${safeIdent(node.id)}`;
-  const totalName = `totalCount_${safeIdent(node.id)}`;
+function renderTableLoadFunction(node: ComponentNode, binding: ApiBinding, optionsApi = false): string {
+  const dataName = `tableData_${identOf(node.id)}`;
+  const totalName = `totalCount_${identOf(node.id)}`;
   const method = binding.method ?? 'GET';
   const listExpr = renderPathExpr(binding.responsePath, 'json');
   const totalExpr = binding.totalProp ? renderPathExpr(binding.totalProp, 'json') : 'undefined';
-  const requestBlock = renderFetchRequestBlock(renderUrlExpr(binding.url), renderParamsLiteral(binding.params), method);
+  const pageExpr = optionsApi ? `this.currentPage_${identOf(node.id)}` : `currentPage_${identOf(node.id)}.value`;
+  const requestBlock = renderFetchRequestBlock(
+    renderUrlExpr(binding.url),
+    renderParamsLiteral(binding.params),
+    method,
+    optionsApi,
+    pageExpr
+  );
 
-  return `const loadData_${safeIdent(node.id)} = async () => {
+  return `const loadData_${identOf(node.id)} = async () => {
   try {
 ${requestBlock}
     if (!res.ok) throw new Error('HTTP ' + res.status);
@@ -489,12 +570,17 @@ ${requestBlock}
 
 /** 生成表单节点加载函数（composition API） */
 function renderFormLoadFunction(node: ComponentNode, binding: ApiBinding): string {
-  const formName = `formData_${safeIdent(node.id)}`;
+  const formName = `formData_${identOf(node.id)}`;
   const method = binding.method ?? 'GET';
   const dataExpr = renderPathExpr(binding.responsePath, 'json');
-  const requestBlock = renderFetchRequestBlock(renderUrlExpr(binding.url), renderParamsLiteral(binding.params), method);
+  const requestBlock = renderFetchRequestBlock(
+    renderUrlExpr(binding.url),
+    renderParamsLiteral(binding.params),
+    method,
+    false
+  );
 
-  return `const loadData_${safeIdent(node.id)} = async () => {
+  return `const loadData_${identOf(node.id)} = async () => {
   try {
 ${requestBlock}
     if (!res.ok) throw new Error('HTTP ' + res.status);
@@ -509,41 +595,56 @@ ${requestBlock}
 };`;
 }
 
-/** 生成节点 click 动作链 handler（composition API） */
-function renderNodeClickHandler(eventNodes: ComponentNode[]): string {
-  if (eventNodes.length === 0) return '';
-  const blocks = eventNodes
-    .map((n) => {
-      const actions = n.events!.click.actions;
-      const stmts = actions
-        .map((a) => renderActionStatement(a, false))
+function enabledEventEntries(node: ComponentNode): Array<[string, EventRule]> {
+  return Object.entries(node.events || {}).filter((entry): entry is [string, EventRule] =>
+    Boolean(entry[1]?.enabled && (entry[1].actions?.length ?? 0) > 0)
+  );
+}
+
+function renderStateAssigns(payload: Record<string, any> | undefined, optionsApi: boolean): string {
+  return Object.entries(payload ?? {})
+    .filter(([key]) => !FORBIDDEN_STATE_KEYS.has(key))
+    .map(
+      ([key, value]) => `${optionsApi ? 'this.state' : 'state'}[${JSON.stringify(key)}] = ${renderPayloadExpr(value)};`
+    )
+    .join('\n    ');
+}
+
+/** 生成节点事件动作链 handler */
+function renderNodeClickHandler(eventNodes: ComponentNode[], optionsApi = false): string {
+  const blocks = eventNodes.flatMap((node) =>
+    enabledEventEntries(node).map(([eventKey, rule]) => {
+      const stmts = rule.actions
+        .map((action) => renderActionStatement(action, optionsApi))
         .filter(Boolean)
         .join('\n    ');
-      return `  if (nodeId === ${JSON.stringify(n.id)}) {\n    ${stmts}\n  }`;
+      return `  if (nodeId === ${JSON.stringify(node.id)} && eventKey === ${JSON.stringify(eventKey)}) {\n    ${stmts}\n  }`;
     })
-    .join('\n');
-  return `const handleNodeClick = async (nodeId: string, $event: any) => {\n${blocks}\n};`;
+  );
+  if (blocks.length === 0) return '';
+  if (optionsApi) return `handleNodeClick(nodeId, eventKey, $event) {\n${blocks.join('\n')}\n  },`;
+  return `const handleNodeClick = async (nodeId: string, eventKey: string, $event: any) => {\n${blocks.join('\n')}\n};`;
 }
 
 /** 单条动作语句；optionsApi=true 时变量经 this. 访问 */
 function renderActionStatement(action: ActionNode, optionsApi: boolean): string {
   const refAccess = (name: string) => (optionsApi ? `this.${name}` : `${name}.value`);
   switch (action.type) {
-    case 'set_state': {
-      const entries = Object.entries(action.payload ?? {});
-      return entries
-        .map(([k, v]) => `${optionsApi ? 'this.state' : 'state'}[${JSON.stringify(k)}] = ${renderPayloadExpr(v)};`)
-        .join('\n    ');
-    }
+    case 'set_state':
+      return renderStateAssigns(action.payload, optionsApi);
     case 'reload_data':
-      return action.target ? `await ${optionsApi ? 'this.' : ''}loadData_${safeIdent(action.target)}();` : '';
-    case 'open_dialog':
-      return action.target ? `${refAccess(`dialogVisible_${safeIdent(action.target)}`)} = true;` : '';
+      return action.target ? `await ${optionsApi ? 'this.' : ''}loadData_${identOf(action.target)}();` : '';
+    case 'open_dialog': {
+      if (!action.target) return '';
+      const assigns = renderStateAssigns(action.payload, optionsApi);
+      const show = `${refAccess(`dialogVisible_${identOf(action.target)}`)} = true;`;
+      return assigns ? `${assigns}\n    ${show}` : show;
+    }
     case 'close_dialog':
-      return action.target ? `${refAccess(`dialogVisible_${safeIdent(action.target)}`)} = false;` : '';
+      return action.target ? `${refAccess(`dialogVisible_${identOf(action.target)}`)} = false;` : '';
     case 'toggle_loading':
       return action.target
-        ? `${refAccess(`loadingVisible_${safeIdent(action.target)}`)} = ${action.payload?.visible ?? true};`
+        ? `${refAccess(`loadingVisible_${identOf(action.target)}`)} = ${action.payload?.visible ?? true};`
         : '';
     case 'show_message':
       return `ElMessage({ type: ${JSON.stringify(action.payload?.messageType ?? 'success')}, message: ${renderPayloadExpr(action.payload?.messageText ?? '操作完成')} });`;
@@ -553,19 +654,38 @@ function renderActionStatement(action: ActionNode, optionsApi: boolean): string 
 }
 
 /** 生成 Vue SFC script setup 主体（v1.3.0：数据源 + 事件动作链 + 参数化） */
+function renderFormLookup(formNodes: ComponentNode[], optionsApi: boolean): string {
+  const lines = formNodes.map((node) => {
+    const name = optionsApi ? `this.formData_${identOf(node.id)}` : `formData_${identOf(node.id)}`;
+    return `  if (formId === ${JSON.stringify(node.id)}) return ${name};`;
+  });
+  return `${lines.join('\n')}\n  return null;`;
+}
+
+function renderFieldRef(node: ComponentNode, optionsApi: boolean): string {
+  const name = `formData_${identOf(node.id)}`;
+  if (node.type === 'el-switch') {
+    const initial = typeof node.props?.value === 'boolean' ? String(node.props.value) : 'false';
+    return optionsApi ? `${name}: ${initial},` : `const ${name} = ref(${initial});`;
+  }
+  const initial = typeof node.props?.value === 'string' ? JSON.stringify(node.props.value) : "''";
+  return optionsApi ? `${name}: ${initial},` : `const ${name} = ref(${initial});`;
+}
+
 function renderScriptSetup(schema: PageSchema): string {
   const children = allEditableNodes(schema);
   const tableNodes = children.filter((n) => n.type === 'pro-table');
   const formNodes = children.filter((n) => n.type === 'pro-form');
-  const eventNodes = children.filter((n) => n.events?.click?.enabled && (n.events.click.actions?.length ?? 0) > 0);
+  const fieldNodes = children.filter((n) => n.type === 'el-input' || n.type === 'el-switch');
+  const eventNodes = children.filter((n) => enabledEventEntries(n).length > 0);
 
   const { dialogVisible, loadingVisible } = collectLayerStateDecls(schema);
   const customHtmlDecls = (schema.layers || [])
     .filter((layer) => layer.type === 'custom-html')
-    .map((layer) => `const customHtmlSrcdoc_${safeIdent(layer.id)} = ${embedJsString(buildCustomHtmlSrcdoc(layer))};`);
+    .map((layer) => `const customHtmlSrcdoc_${identOf(layer.id)} = ${embedJsString(buildCustomHtmlSrcdoc(layer))};`);
   const layerStateDecls = [...dialogVisible, ...loadingVisible, ...customHtmlDecls].join('\n');
 
-  const lines: string[] = [];
+  const lines: string[] = [FETCH_CHECKED_SOURCE, ''];
 
   // 1. 页面全局状态（表达式绑定作用域）
   const stateEntries = Object.entries(schema.state || {})
@@ -579,40 +699,46 @@ function renderScriptSetup(schema: PageSchema): string {
 
   // 2. 表格节点
   tableNodes.forEach((n) => {
-    const dataName = `tableData_${safeIdent(n.id)}`;
-    const totalName = `totalCount_${safeIdent(n.id)}`;
-    const pageName = `currentPage_${safeIdent(n.id)}`;
+    const dataName = `tableData_${identOf(n.id)}`;
+    const totalName = `totalCount_${identOf(n.id)}`;
+    const pageName = `currentPage_${identOf(n.id)}`;
     const binding = n.apiBinding;
     if (binding?.url) {
-      lines.push(`// 数据源: ${escapeHtml(binding.url)}`);
+      lines.push(`// 数据源: ${safeComment(binding.url)}`);
       lines.push(`const ${dataName} = ref<any[]>([]);`);
       lines.push(`const ${totalName} = ref(0);`);
       lines.push(`const ${pageName} = ref(1);`);
       lines.push(renderTableLoadFunction(n, binding));
-      if (binding.autoFetch !== false) autoFetchCalls.push(`  loadData_${safeIdent(n.id)}();`);
+      lines.push(
+        `const onPage_${identOf(n.id)} = (page: number) => { ${pageName}.value = page; state.page = page; loadData_${identOf(n.id)}(); };`
+      );
+      if (binding.autoFetch !== false) autoFetchCalls.push(`  loadData_${identOf(n.id)}();`);
     } else {
       lines.push(`// 占位数据：可在设计器中为该组件配置数据源替换`);
-      lines.push(`const ${dataName} = ref([`);
-      lines.push(`  { id: 101, name: '张三', role: '系统管理员', status: '正常', updatedAt: '2026-09-15' },`);
-      lines.push(`  { id: 102, name: '李四', role: '前端开发者', status: '启用', updatedAt: '2026-09-15' }`);
-      lines.push(`]);`);
-      lines.push(`const ${totalName} = ref(2);`);
+      lines.push(`const ${dataName} = ref(${JSON.stringify(TABLE_PLACEHOLDER_ROWS)});`);
+      lines.push(`const ${totalName} = ref(${TABLE_PLACEHOLDER_ROWS.length});`);
       lines.push(`const ${pageName} = ref(1);`);
+      lines.push(`const onPage_${identOf(n.id)} = (page: number) => { ${pageName}.value = page; state.page = page; };`);
     }
     lines.push('');
   });
 
   // 3. 表单节点
   formNodes.forEach((n) => {
-    const formName = `formData_${safeIdent(n.id)}`;
+    const formName = `formData_${identOf(n.id)}`;
     const binding = n.apiBinding;
     lines.push(`const ${formName} = ref<Record<string, any>>({});`);
     if (binding?.url) {
       lines.push(renderFormLoadFunction(n, binding));
-      if (binding.autoFetch !== false) autoFetchCalls.push(`  loadData_${safeIdent(n.id)}();`);
+      if (binding.autoFetch !== false) autoFetchCalls.push(`  loadData_${identOf(n.id)}();`);
     }
     lines.push('');
   });
+
+  fieldNodes.forEach((node) => {
+    lines.push(renderFieldRef(node, false));
+  });
+  if (fieldNodes.length > 0) lines.push('');
 
   // 4. 事件动作链 handler
   const clickHandler = renderNodeClickHandler(eventNodes);
@@ -623,29 +749,33 @@ function renderScriptSetup(schema: PageSchema): string {
 
   // 5. 表格行动作 + 表单提交/重置
   if (tableNodes.length > 0) {
-    lines.push(`const handleRowAction = async (nodeId: string, row: any) => {`);
+    const guards = eventNodes.flatMap((node) =>
+      enabledEventEntries(node).map(
+        ([eventKey]) => `(nodeId === ${JSON.stringify(node.id)} && eventKey === ${JSON.stringify(eventKey)})`
+      )
+    );
+    lines.push(`const handleRowAction = async (nodeId: string, eventKey: string, row: any) => {`);
+    if (guards.length > 0) {
+      lines.push(`  if (${guards.join(' || ')}) {`);
+      lines.push(`    await handleNodeClick(nodeId, eventKey, { row, eventKey });`);
+      lines.push(`    return;`);
+      lines.push(`  }`);
+    }
     lines.push(`  console.log('查看行数据:', row);`);
     lines.push(`  ElMessage.info('查看: ' + (row.name || row.id));`);
-    if (eventNodes.length > 0) lines.push(`  await handleNodeClick(nodeId, { row });`);
     lines.push(`};`);
     lines.push('');
   }
   if (formNodes.length > 0) {
-    const formMapLines = formNodes
-      .map((n, i) => {
-        const idExpr = JSON.stringify(n.id);
-        const name = `formData_${safeIdent(n.id)}`;
-        return i < formNodes.length - 1 ? `    ${idExpr} ? ${name}` : `    ${idExpr} ? ${name} : null`;
-      })
-      .join('\n');
+    lines.push(`const lookupForm = (formId: string) => {\n${renderFormLookup(formNodes, false)}\n};`);
     lines.push(`const handleSubmit = (formId: string) => {`);
-    lines.push(`  const form = ${formMapLines};\n  if (!form) return;`);
+    lines.push(`  const form = lookupForm(formId);\n  if (!form) return;`);
     lines.push(`  console.log('Form Submitted:', form.value);`);
     lines.push(`  ElMessage.success('表单提交成功');`);
     lines.push(`};`);
     lines.push('');
     lines.push(`const handleReset = (formId: string) => {`);
-    lines.push(`  const form = ${formMapLines};\n  if (!form) return;`);
+    lines.push(`  const form = lookupForm(formId);\n  if (!form) return;`);
     lines.push(`  Object.keys(form.value).forEach((key) => { form.value[key] = undefined; });`);
     lines.push(`  ElMessage.info('表单已重置');`);
     lines.push(`};`);
@@ -673,6 +803,7 @@ function renderScriptSetup(schema: PageSchema): string {
  * 1. 生成标准的 Vue 3 SFC 单文件组件 (.vue)
  */
 export function generateVueSFC(schema: PageSchema): string {
+  bindIdents(schema);
   const { extraLifecycleScripts, extraUnmountScripts } = renderLayers(schema);
 
   const templateBody = renderPageTemplateBody(schema, 2);
@@ -770,15 +901,22 @@ export default ${tagName.replace(/-/g, '_')};
 
 /** options API: 表格/表单数据加载方法（this. 访问数据） */
 function renderOptionsLoadFunction(node: ComponentNode, binding: ApiBinding, isForm: boolean): string {
-  const dataName = isForm ? `formData_${safeIdent(node.id)}` : `tableData_${safeIdent(node.id)}`;
-  const totalName = `totalCount_${safeIdent(node.id)}`;
+  const dataName = isForm ? `formData_${identOf(node.id)}` : `tableData_${identOf(node.id)}`;
+  const totalName = `totalCount_${identOf(node.id)}`;
   const method = binding.method ?? 'GET';
   const dataExpr = renderPathExpr(binding.responsePath, 'json');
   const totalExpr = binding.totalProp ? renderPathExpr(binding.totalProp, 'json') : 'undefined';
-  const requestBlock = renderFetchRequestBlock(renderUrlExpr(binding.url), renderParamsLiteral(binding.params), method);
+  const pageExpr = isForm ? undefined : `this.currentPage_${identOf(node.id)}`;
+  const requestBlock = renderFetchRequestBlock(
+    renderUrlExpr(binding.url),
+    renderParamsLiteral(binding.params),
+    method,
+    true,
+    pageExpr
+  );
 
   if (isForm) {
-    return `loadData_${safeIdent(node.id)}() {
+    return `async loadData_${identOf(node.id)}() {
   try {
 ${requestBlock}
     if (!res.ok) throw new Error('HTTP ' + res.status);
@@ -792,7 +930,7 @@ ${requestBlock}
   }
 }`;
   }
-  return `loadData_${safeIdent(node.id)}() {
+  return `async loadData_${identOf(node.id)}() {
   try {
 ${requestBlock}
     if (!res.ok) throw new Error('HTTP ' + res.status);
@@ -812,7 +950,6 @@ function renderOptionsData(schema: PageSchema): string {
   const children = allEditableNodes(schema);
   const tableNodes = children.filter((n) => n.type === 'pro-table');
   const formNodes = children.filter((n) => n.type === 'pro-form');
-  const { dialogVisible, loadingVisible } = collectLayerStateDecls(schema);
 
   const fields: string[] = [];
 
@@ -822,33 +959,37 @@ function renderOptionsData(schema: PageSchema): string {
   fields.push(`state: { ${stateEntries} },`);
 
   tableNodes.forEach((n) => {
-    const dataName = `tableData_${safeIdent(n.id)}`;
-    const totalName = `totalCount_${safeIdent(n.id)}`;
-    const pageName = `currentPage_${safeIdent(n.id)}`;
+    const dataName = `tableData_${identOf(n.id)}`;
+    const totalName = `totalCount_${identOf(n.id)}`;
+    const pageName = `currentPage_${identOf(n.id)}`;
     if (n.apiBinding?.url) {
-      fields.push(`${dataName}: [], // 数据源: ${n.apiBinding.url}`);
+      fields.push(`${dataName}: [], // 数据源: ${safeComment(n.apiBinding.url)}`);
       fields.push(`${totalName}: 0,`);
       fields.push(`${pageName}: 1,`);
     } else {
-      fields.push(`${dataName}: [ // 占位数据：可在设计器中配置数据源替换`);
-      fields.push(`  { id: 101, name: '张三', role: '系统管理员', status: '正常', updatedAt: '2026-09-15' },`);
-      fields.push(`  { id: 102, name: '李四', role: '前端开发者', status: '启用', updatedAt: '2026-09-15' }`);
-      fields.push(`],`);
-      fields.push(`${totalName}: 2,`);
+      fields.push(`${dataName}: ${JSON.stringify(TABLE_PLACEHOLDER_ROWS)}, // 占位数据：可在设计器中配置数据源替换`);
+      fields.push(`${totalName}: ${TABLE_PLACEHOLDER_ROWS.length},`);
       fields.push(`${pageName}: 1,`);
     }
   });
 
   formNodes.forEach((n) => {
-    fields.push(`formData_${safeIdent(n.id)}: {},`);
+    fields.push(`formData_${identOf(n.id)}: {},`);
   });
+  children
+    .filter((node) => node.type === 'el-input' || node.type === 'el-switch')
+    .forEach((node) => fields.push(renderFieldRef(node, true)));
 
-  dialogVisible.forEach((d) => fields.push(`${d.replace('const ', '').replace(' = ref(false);', '')}: false,`));
-  loadingVisible.forEach((l) => fields.push(`${l.replace('const ', '').replace(' = ref(true);', '')}: true,`));
+  (schema.layers || []).forEach((layer) => {
+    if (layer.type === 'dialog')
+      fields.push(`dialogVisible_${identOf(layer.id)}: ${layer.visible ? 'true' : 'false'},`);
+    if (layer.type === 'loading')
+      fields.push(`loadingVisible_${identOf(layer.id)}: ${layer.visible ? 'true' : 'false'},`);
+  });
   (schema.layers || [])
     .filter((layer) => layer.type === 'custom-html')
     .forEach((layer) => {
-      fields.push(`customHtmlSrcdoc_${safeIdent(layer.id)}: ${embedJsString(buildCustomHtmlSrcdoc(layer))},`);
+      fields.push(`customHtmlSrcdoc_${identOf(layer.id)}: ${embedJsString(buildCustomHtmlSrcdoc(layer))},`);
     });
 
   return fields.join('\n          ');
@@ -859,51 +1000,48 @@ function renderOptionsMethods(schema: PageSchema): string {
   const children = allEditableNodes(schema);
   const tableNodes = children.filter((n) => n.type === 'pro-table');
   const formNodes = children.filter((n) => n.type === 'pro-form');
-  const eventNodes = children.filter((n) => n.events?.click?.enabled && (n.events.click.actions?.length ?? 0) > 0);
+  const eventNodes = children.filter((n) => enabledEventEntries(n).length > 0);
 
   const methods: string[] = [];
 
   tableNodes.forEach((n) => {
     if (n.apiBinding?.url) methods.push(renderOptionsLoadFunction(n, n.apiBinding, false));
+    const pageName = `currentPage_${identOf(n.id)}`;
+    const reload = n.apiBinding?.url ? `this.loadData_${identOf(n.id)}();` : '';
+    methods.push(`onPage_${identOf(n.id)}(page) { this.${pageName} = page; this.state.page = page; ${reload} },`);
   });
   formNodes.forEach((n) => {
     if (n.apiBinding?.url) methods.push(renderOptionsLoadFunction(n, n.apiBinding, true));
   });
 
-  if (eventNodes.length > 0) {
-    const blocks = eventNodes
-      .map((n) => {
-        const stmts = n
-          .events!.click.actions.map((a) => renderActionStatement(a, true))
-          .filter(Boolean)
-          .join('\n      ');
-        return `    if (nodeId === ${JSON.stringify(n.id)}) {\n      ${stmts}\n    }`;
-      })
-      .join('\n');
-    methods.push(`handleNodeClick(nodeId, $event) {\n${blocks}\n  },`);
-  }
+  const clickHandler = renderNodeClickHandler(eventNodes, true);
+  if (clickHandler) methods.push(clickHandler);
 
   if (tableNodes.length > 0) {
-    const rowCall = eventNodes.length > 0 ? `    return this.handleNodeClick(nodeId, { row });` : '';
-    methods.push(`handleRowAction(nodeId, row) {
-    console.log('查看行数据:', row);
+    const guards = eventNodes.flatMap((node) =>
+      enabledEventEntries(node).map(
+        ([eventKey]) => `(nodeId === ${JSON.stringify(node.id)} && eventKey === ${JSON.stringify(eventKey)})`
+      )
+    );
+    const delegated = guards.length
+      ? `    if (${guards.join(' || ')}) {\n      return this.handleNodeClick(nodeId, eventKey, { row, eventKey });\n    }\n`
+      : '';
+    methods.push(`handleRowAction(nodeId, eventKey, row) {
+${delegated}    console.log('查看行数据:', row);
     ElementPlus.ElMessage.info('查看: ' + (row.name || row.id));
-${rowCall}
   },`);
   }
 
   if (formNodes.length > 0) {
-    const formMapLines = formNodes
-      .map((n) => `      ${JSON.stringify(n.id)} ? this.formData_${safeIdent(n.id)}`)
-      .join('\n');
+    methods.push(`lookupForm(formId) {\n${renderFormLookup(formNodes, true)}\n  },`);
     methods.push(`handleSubmit(formId) {
-    const form = ${formMapLines} : null;
+    const form = this.lookupForm(formId);
     if (!form) return;
     console.log('Form Submitted:', form);
     ElementPlus.ElMessage.success('表单提交成功');
   },`);
     methods.push(`handleReset(formId) {
-    const form = ${formMapLines} : null;
+    const form = this.lookupForm(formId);
     if (!form) return;
     Object.keys(form).forEach((key) => {
       form[key] = undefined;
@@ -921,6 +1059,7 @@ ${rowCall}
  * 模板直接内联，双击即可在浏览器运行。
  */
 export function generateHTML(schema: PageSchema): string {
+  bindIdents(schema);
   const children = allEditableNodes(schema);
   const tableNodes = children.filter((n) => n.type === 'pro-table');
   const formNodes = children.filter((n) => n.type === 'pro-form');
@@ -934,10 +1073,10 @@ export function generateHTML(schema: PageSchema): string {
   const autoFetchCalls = [
     ...tableNodes
       .filter((n) => n.apiBinding?.url && n.apiBinding.autoFetch !== false)
-      .map((n) => `this.loadData_${safeIdent(n.id)}();`),
+      .map((n) => `this.loadData_${identOf(n.id)}();`),
     ...formNodes
       .filter((n) => n.apiBinding?.url && n.apiBinding.autoFetch !== false)
-      .map((n) => `this.loadData_${safeIdent(n.id)}();`)
+      .map((n) => `this.loadData_${identOf(n.id)}();`)
   ].join('\n');
   const mountBody = [autoFetchCalls, extraLifecycleScripts].filter(Boolean).join('\n');
 
@@ -992,6 +1131,7 @@ ${templateBody}    </div>
   <script src="https://unpkg.com/element-plus"></script>
   <script>
     const { createApp } = Vue;
+    ${FETCH_CHECKED_SOURCE}
 
     const App = {
       template: \`

@@ -48,11 +48,14 @@ export class StorageService {
   }
 
   private getBackupDir(type: 'page' | 'component' = 'page'): string {
-    const dir = this.getTargetDir(type);
-    return path.join(dir, '../backups');
+    return path.join(this.getTargetDir(type), 'backups');
   }
 
-  /** 按 id 串行化写入任务（P2-3 并发写保护） */
+  private queueKey(id: string, type: 'page' | 'component'): string {
+    return `${type}:${String(id ?? '')}`;
+  }
+
+  /** 按类型和 id 串行化写入任务（P2-3 并发写保护） */
   private enqueue<T>(key: string, task: () => Promise<T>): Promise<T> {
     const prev = this.writeQueues.get(key) ?? Promise.resolve();
     const next = prev.then(task, task);
@@ -93,7 +96,29 @@ export class StorageService {
   }
 
   saveSchema(schema: PageSchema): Promise<void> {
-    return this.enqueue(String(schema.id), () => this.doSaveSchema(schema));
+    return this.enqueue(this.queueKey(schema.id, schema.type), () => this.doSaveSchema(schema));
+  }
+
+  /**
+   * 在写队列内读取旧版本、递增并落盘。
+   * previous 是递增前的文件内容，供审计 diff 使用。
+   */
+  saveVersioned(schema: PageSchema): Promise<{ saved: PageSchema; previous: PageSchema | null }> {
+    return this.enqueue(this.queueKey(schema.id, schema.type), async () => {
+      const existing = await this.getSchema(schema.id, schema.type);
+      const saved: PageSchema = {
+        ...schema,
+        meta: { ...(schema.meta ?? { author: '', description: '', version: '1.0.0' }) }
+      };
+      if (existing?.meta?.version) {
+        saved.meta.prevVersion = existing.meta.version;
+        saved.meta.version = bumpVersion(existing.meta.version);
+      } else {
+        saved.meta.version = saved.meta.version || '1.0.0';
+      }
+      await this.doSaveSchema(saved);
+      return { saved, previous: existing };
+    });
   }
 
   private async doSaveSchema(schema: PageSchema): Promise<void> {
@@ -137,14 +162,16 @@ export class StorageService {
     return schemas;
   }
 
-  async deleteSchema(id: string, type: 'page' | 'component' = 'page'): Promise<boolean> {
-    try {
-      const filePath = this.getFilePath(id, type);
-      await fs.unlink(filePath);
-      return true;
-    } catch {
-      return false;
-    }
+  deleteSchema(id: string, type: 'page' | 'component' = 'page'): Promise<boolean> {
+    return this.enqueue(this.queueKey(id, type), async () => {
+      try {
+        const filePath = this.getFilePath(id, type);
+        await fs.unlink(filePath);
+        return true;
+      } catch {
+        return false;
+      }
+    });
   }
 
   /** 列出某 schema 的备份代数（P2-2） */
