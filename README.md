@@ -123,7 +123,7 @@ low-code-platform/
 ├── .github/workflows/      # GitHub Actions CI（typecheck → lint → test → build）
 ├── docs/                   # 文档集
 │   ├── implemented/        # 技术规范 (CAE/物料/组件 I/O/管道编排) 与优化报告
-│   └── roadmap/            # 各版本规划与路线图 (0.x ~ 3.0.0，含 v1.3.0 记录)
+│   └── roadmap/            # 各版本规划与路线图 (0.x ~ 3.0.0，含 v1.3.0 记录与 v1.6.0 规划)
 ├── shared/                 # 共享类型包 @lowcode/shared（纯类型，前后端共用）
 │   └── src/index.ts        # ComponentNode / PageSchema / LayerConfig / MaterialItem ...
 ├── frontend/               # Vue 3 前端低代码设计器工程
@@ -303,4 +303,5 @@ npm run format      # Prettier 全仓格式化
 13. **[v1.1.0 体验增强版规划](docs/roadmap/1.1.0_PLAN.md)**：包含画布对齐参考线/吸附指示、键盘方向键微调、操作日志可视化 JSON Diff 比对。
 14. **[v1.2.0 多图层架构与生命周期规划](docs/roadmap/1.2.0_PLAN.md)**：包含对话框图层、Loading 加载框图层、自定义 HTML 图层及 JavaScript 生命周期钩子。
 15. **[v1.3.0 数据驱动能力与体验加固记录](docs/roadmap/1.3.0_PLAN.md)**：数据源绑定、表达式渲染、事件动作链、E2E、后端认证/版本化/备份轮转。该版本已合入 `main`。
-16. **[v3.0.0 远期企业级架构与生态规划](docs/roadmap/3.0.0_PLAN.md)**：包含企业级 RBAC/SSO 单点登录、PostgreSQL/S3 高可用分布式存储、CRDT 多人实时协同、一键 CI/CD 灰度发布、VS Code 插件与 CLI 工具链。
+16. **[v1.6.0 正确性与一致性加固规划](docs/roadmap/1.6.0_PLAN.md)**：出码换行注入、多表单分支、输入框状态、表格占位、行操作与分页、表达式出码、图层可见性、备份隔离、重定向校验、审计差异与撤销补丁。规划中，尚未改代码。
+17. **[v3.0.0 远期企业级架构与生态规划](docs/roadmap/3.0.0_PLAN.md)**：包含企业级 RBAC/SSO 单点登录、PostgreSQL/S3 高可用分布式存储、CRDT 多人实时协同、一键 CI/CD 灰度发布、VS Code 插件与 CLI 工具链。
