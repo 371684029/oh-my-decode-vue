@@ -120,6 +120,26 @@ test.describe('低代码设计器核心闭环', () => {
     await expect(button).toBeVisible();
   });
 
+  test('抽屉打开时仍可生成 Mock，试请求保留示例', async ({ page }) => {
+    await addMaterial(page, '高端表格');
+    await page.getByRole('button', { name: '生成 Mock 与接口文档' }).click();
+    const dialog = page.getByRole('dialog', { name: '前端接口文档' });
+    await expect(dialog).toContainText('/api/mock/');
+    await dialog.getByRole('button', { name: '关闭' }).click();
+    await page.getByRole('tab', { name: '数据源' }).click();
+    await page.getByRole('button', { name: '试请求并预览' }).click();
+    await expect(page.locator('.el-message').last()).toContainText('请求成功');
+    await expect(page.locator('.pro-table-wrapper').getByText('张三')).toBeVisible();
+    await expect(page.locator('.pro-table-wrapper')).toContainText('共');
+  });
+
+  test('表单项下移后画布顺序跟着变', async ({ page }) => {
+    await addMaterial(page, '高端表单');
+    await page.getByRole('tab', { name: '高级 Config' }).click();
+    await page.locator('.el-drawer').getByRole('button', { name: '下移' }).first().click();
+    await expect(page.locator('.pro-form-wrapper .el-form-item__label').first()).toContainText('性别');
+  });
+
   test('一键生成 Mock 与接口文档', async ({ page }) => {
     await addMaterial(page, '高端表格');
     await closeDrawer(page);

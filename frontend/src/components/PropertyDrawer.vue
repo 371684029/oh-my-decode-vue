@@ -1,9 +1,11 @@
 <template>
   <el-drawer
     v-model="designerStore.isDrawerOpen"
+    class="property-drawer"
     title="组件配置面板"
     direction="rtl"
     size="420px"
+    :modal="false"
     :before-close="handleClose"
   >
     <template v-if="node">
@@ -41,9 +43,9 @@
               </el-form-item>
               <el-form-item label="尺寸 (Size)">
                 <el-select v-model="node.props.size" style="width: 100%">
-                  <el-option label="Large" value="large" />
-                  <el-option label="Default" value="default" />
-                  <el-option label="Small" value="small" />
+                  <el-option label="大" value="large" />
+                  <el-option label="默认" value="default" />
+                  <el-option label="小" value="small" />
                 </el-select>
               </el-form-item>
             </template>
@@ -55,8 +57,8 @@
               </el-form-item>
               <el-form-item label="表单布局方式">
                 <el-radio-group v-model="node.props.layout">
-                  <el-radio value="horizontal">Horizontal (水平)</el-radio>
-                  <el-radio value="inline">Inline (内联)</el-radio>
+                  <el-radio value="horizontal">水平</el-radio>
+                  <el-radio value="inline">内联</el-radio>
                 </el-radio-group>
               </el-form-item>
             </template>
@@ -72,10 +74,10 @@
               </el-form-item>
               <el-form-item label="按钮类型">
                 <el-select v-model="node.props.type" style="width: 100%">
-                  <el-option label="Primary" value="primary" />
-                  <el-option label="Success" value="success" />
-                  <el-option label="Warning" value="warning" />
-                  <el-option label="Danger" value="danger" />
+                  <el-option label="主要" value="primary" />
+                  <el-option label="成功" value="success" />
+                  <el-option label="警告" value="warning" />
+                  <el-option label="危险" value="danger" />
                 </el-select>
               </el-form-item>
             </template>
@@ -87,9 +89,9 @@
               </el-form-item>
               <el-form-item label="阴影时机">
                 <el-select v-model="node.props.shadow" style="width: 100%">
-                  <el-option label="Always" value="always" />
-                  <el-option label="Hover" value="hover" />
-                  <el-option label="Never" value="never" />
+                  <el-option label="总是" value="always" />
+                  <el-option label="悬停" value="hover" />
+                  <el-option label="从不" value="never" />
                 </el-select>
               </el-form-item>
             </template>
@@ -101,10 +103,10 @@
               </el-form-item>
               <el-form-item label="标签类型">
                 <el-select v-model="node.props.type" style="width: 100%">
-                  <el-option label="Success" value="success" />
-                  <el-option label="Info" value="info" />
-                  <el-option label="Warning" value="warning" />
-                  <el-option label="Danger" value="danger" />
+                  <el-option label="成功" value="success" />
+                  <el-option label="信息" value="info" />
+                  <el-option label="警告" value="warning" />
+                  <el-option label="危险" value="danger" />
                 </el-select>
               </el-form-item>
             </template>
@@ -116,10 +118,10 @@
               </el-form-item>
               <el-form-item label="提示类型">
                 <el-select v-model="node.props.type" style="width: 100%">
-                  <el-option label="Success" value="success" />
-                  <el-option label="Info" value="info" />
-                  <el-option label="Warning" value="warning" />
-                  <el-option label="Error" value="error" />
+                  <el-option label="成功" value="success" />
+                  <el-option label="信息" value="info" />
+                  <el-option label="警告" value="warning" />
+                  <el-option label="错误" value="error" />
                 </el-select>
               </el-form-item>
             </template>
@@ -131,9 +133,9 @@
               </el-form-item>
               <el-form-item label="文案位置">
                 <el-select v-model="node.props.contentPosition" style="width: 100%">
-                  <el-option label="Left" value="left" />
-                  <el-option label="Center" value="center" />
-                  <el-option label="Right" value="right" />
+                  <el-option label="靠左" value="left" />
+                  <el-option label="居中" value="center" />
+                  <el-option label="靠右" value="right" />
                 </el-select>
               </el-form-item>
             </template>
@@ -154,6 +156,15 @@
               <div class="card-row">
                 <el-input v-model="col.width" placeholder="宽度(px)" style="width: 110px" />
                 <el-switch v-model="col.sortable" active-text="排序" />
+                <el-button link size="small" :disabled="index === 0" @click="moveTableColumn(Number(index), -1)">上移</el-button>
+                <el-button
+                  link
+                  size="small"
+                  :disabled="index === node.config.columns.length - 1"
+                  @click="moveTableColumn(Number(index), 1)"
+                >
+                  下移
+                </el-button>
                 <el-button type="danger" icon="Delete" circle size="small" @click="removeTableColumn(Number(index))" />
               </div>
             </div>
@@ -175,14 +186,29 @@
                   style="width: 140px"
                   @change="onFormComponentChange(item)"
                 >
-                  <el-option label="Input" value="input" />
-                  <el-option label="Select" value="select" />
-                  <el-option label="Date" value="date" />
-                  <el-option label="Switch" value="switch" />
+                  <el-option label="输入框" value="input" />
+                  <el-option label="下拉框" value="select" />
+                  <el-option label="日期" value="date" />
+                  <el-option label="开关" value="switch" />
                 </el-select>
                 <el-switch v-model="item.required" active-text="必填" />
+                <el-button link size="small" :disabled="index === 0" @click="moveFormItem(Number(index), -1)">上移</el-button>
+                <el-button
+                  link
+                  size="small"
+                  :disabled="index === node.config.items.length - 1"
+                  @click="moveFormItem(Number(index), 1)"
+                >
+                  下移
+                </el-button>
                 <el-button type="danger" icon="Delete" circle size="small" @click="removeFormItem(Number(index))" />
               </div>
+              <el-input
+                v-if="item.component !== 'switch'"
+                v-model="item.placeholder"
+                placeholder="占位提示"
+                style="margin-top: 6px"
+              />
               <div v-if="item.component === 'select'" class="select-options">
                 <div v-for="(opt, optIndex) in item.options || []" :key="optIndex" class="card-row">
                   <el-input v-model="opt.label" placeholder="显示文字" />
@@ -232,7 +258,7 @@
                 <el-radio value="POST">POST</el-radio>
               </el-radio-group>
             </el-form-item>
-            <el-form-item label="请求参数 (JSON，值支持 {{ state.xxx }})">
+            <el-form-item label="请求参数 (JSON，值支持 {{ state.xxx }})" :error="paramsError ? '参数不是合法的 JSON 对象，已保留上次的参数' : ''">
               <el-input
                 v-model="apiForm.paramsText"
                 type="textarea"
@@ -343,6 +369,7 @@ import type { ActionType, ComponentNode } from '../types/designer';
 import SchemaJsonViewer from './SchemaJsonViewer.vue';
 import { missingRequiredFields } from '../registry/materialContract';
 import { inlineableExpression } from '../utils/condition';
+import { mergeApiBinding, moveListItem } from '../utils/apiBindingForm';
 import { ElMessage } from 'element-plus';
 
 const designerStore = useDesignerStore();
@@ -394,6 +421,7 @@ const apiForm = ref<ApiFormState>({
   totalProp: '',
   autoFetch: true
 });
+const paramsError = ref(false);
 
 const hasApiBinding = computed(() => !!node.value?.apiBinding?.url);
 
@@ -417,25 +445,10 @@ watch(
 /** 表单状态 → node.apiBinding 同步 */
 const syncApiBinding = () => {
   if (!node.value) return;
-  const form = apiForm.value;
-  if (!form.url.trim()) {
-    node.value.apiBinding = undefined;
-    return;
-  }
-  let params: Record<string, any> = {};
-  try {
-    params = form.paramsText.trim() ? JSON.parse(form.paramsText) : {};
-  } catch {
-    params = {};
-  }
-  node.value.apiBinding = {
-    url: form.url.trim(),
-    method: form.method,
-    params,
-    autoFetch: form.autoFetch,
-    responsePath: form.responsePath.trim() || undefined,
-    totalProp: form.totalProp.trim() || undefined
-  };
+  const { binding, paramsError: invalid } = mergeApiBinding(node.value.apiBinding, apiForm.value);
+  paramsError.value = invalid;
+  if (JSON.stringify(node.value.apiBinding ?? null) === JSON.stringify(binding ?? null)) return;
+  node.value.apiBinding = binding;
 };
 
 watch(apiForm, syncApiBinding, { deep: true });
@@ -463,6 +476,7 @@ const clearApiBinding = () => {
     node.value.apiBinding = undefined;
   }
   apiForm.value = { url: '', method: 'GET', paramsText: '{}', responsePath: '', totalProp: '', autoFetch: true };
+  paramsError.value = false;
 };
 
 // ---------------------------------------------------------------------------
@@ -607,6 +621,14 @@ const removeFormItem = (index: number) => {
     node.value.config.items.splice(index, 1);
   }
 };
+
+const moveTableColumn = (index: number, delta: number) => {
+  if (node.value?.config?.columns) moveListItem(node.value.config.columns, index, delta);
+};
+
+const moveFormItem = (index: number, delta: number) => {
+  if (node.value?.config?.items) moveListItem(node.value.config.items, index, delta);
+};
 </script>
 
 <style scoped>
@@ -633,6 +655,7 @@ const removeFormItem = (index: number) => {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  flex-wrap: wrap;
   gap: 8px;
 }
 .no-selection {
@@ -657,5 +680,12 @@ const removeFormItem = (index: number) => {
   margin: 4px 0 0;
   color: #e6a23c;
   font-size: 12px;
+}
+</style>
+
+<style>
+.property-drawer.el-drawer {
+  top: 72px;
+  height: calc(100vh - 72px);
 }
 </style>
