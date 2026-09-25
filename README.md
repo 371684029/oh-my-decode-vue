@@ -8,7 +8,7 @@
 
 ## 📖 项目简介
 
-本项目旨在打造一款可通过**可视化拖拉拽**快速生成 Vue 3 页面的低代码平台。平台以 **JSON Schema 为唯一映射桥梁**连接 UI 组件层。当前版本 **v1.11.0**：拖拽配置的表格和表单，导出的 Vue 组件、Web Component 配套组件和独立 HTML 使用同一份占位、标签宽度、分页和行按钮。完整管道编排与远程物料仍在规划中（详见 `docs/`）。
+本项目旨在打造一款可通过**可视化拖拉拽**快速生成 Vue 3 页面的低代码平台。平台以 **JSON Schema 为唯一映射桥梁**连接 UI 组件层。当前版本 **v1.12.0**：导出语料库时，同一页面各写一条 Vue 组件和一条 HTML 组件。完整管道编排与远程物料仍在规划中（详见 `docs/`）。
 
 项目采用了 **Node.js + Express + SQLite** 架构，其中页面/组件的 Schema 配置文件**直接存储为本地 `.json` 文件**，而 SQLite 数据库专用于记录高可靠的**操作审计日志 (Operation Audit Logs)**。
 
@@ -123,7 +123,7 @@ low-code-platform/
 ├── .github/workflows/      # GitHub Actions CI（typecheck → lint → test → build）
 ├── docs/                   # 文档集
 │   ├── implemented/        # 技术规范 (CAE/物料/组件 I/O/管道编排) 与优化报告
-│   └── roadmap/            # 各版本规划与路线图 (0.x ~ 3.0.0，含 v1.3.0 至 v1.11.0)
+│   └── roadmap/            # 各版本规划与路线图 (0.x ~ 3.0.0，含 v1.3.0 至 v1.12.0)
 ├── shared/                 # 共享类型包 @lowcode/shared（纯类型，前后端共用）
 │   └── src/index.ts        # ComponentNode / PageSchema / LayerConfig / MaterialItem ...
 ├── frontend/               # Vue 3 前端低代码设计器工程
@@ -218,7 +218,11 @@ npm run format      # Prettier 全仓格式化
 
 ## 📝 版本变更历史 (Changelog)
 
-### 📌 v1.11.0 (当前版本 - 2026-09)
+### 📌 v1.12.0 (当前版本 - 2026-09)
+
+- **语料库导出**：同一页面写成 JSONL 里的两行，一行是 Vue 单文件组件，一行是独立 HTML。默认收当前画布，也可以并入已保存页面。
+
+### 📌 v1.11.0 (2026-09)
 
 - **出码跟画布用同一份配置**：表单占位提示、必填、标签宽度和内联布局会写进 Vue 组件、Web Component 配套组件和独立 HTML。
 - **表格不再另写一套**：分页大小跟配置走，请求参数使用同一个 `size`。没有行按钮时不再补一列「查看」。
@@ -353,4 +357,5 @@ npm run format      # Prettier 全仓格式化
 19. **[v1.9.0 Mock 与接口文档](docs/roadmap/1.9.0_PLAN.md)**：一键为未填地址的表格和表单补 Mock，并产出前端实际调用的接口文档。已实现。
 20. **[v1.10.0 交互打磨](docs/roadmap/1.10.0_PLAN.md)**：编辑数据源时保留 Mock 示例、配置项排序、抽屉不再挡住顶栏。已实现。
 21. **[v1.11.0 出码与画布对齐](docs/roadmap/1.11.0_PLAN.md)**：Vue、Web Component 配套组件和独立 HTML 使用画布上的占位、标签宽度、分页和行按钮。已实现。
-22. **[v3.0.0 远期企业级架构与生态规划](docs/roadmap/3.0.0_PLAN.md)**：包含企业级 RBAC/SSO 单点登录、PostgreSQL/S3 高可用分布式存储、CRDT 多人实时协同、一键 CI/CD 灰度发布、VS Code 插件与 CLI 工具链。
+22. **[v1.12.0 语料库导出](docs/roadmap/1.12.0_PLAN.md)**：同一页面导出为 Vue 组件和 HTML 组件两条语料。已实现。
+23. **[v3.0.0 远期企业级架构与生态规划](docs/roadmap/3.0.0_PLAN.md)**：包含企业级 RBAC/SSO 单点登录、PostgreSQL/S3 高可用分布式存储、CRDT 多人实时协同、一键 CI/CD 灰度发布、VS Code 插件与 CLI 工具链。
