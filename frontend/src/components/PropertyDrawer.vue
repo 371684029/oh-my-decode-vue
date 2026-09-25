@@ -426,17 +426,21 @@ const paramsError = ref(false);
 const hasApiBinding = computed(() => !!node.value?.apiBinding?.url);
 
 watch(
-  node,
-  (n) => {
-    if (!n) return;
-    const b = n.apiBinding;
+  () => ({ id: node.value?.id, binding: node.value?.apiBinding }),
+  (next, prev) => {
+    if (!node.value) return;
+    const bindingUrl = next.binding?.url ?? '';
+    const sameNode = !!prev && next.id === prev.id;
+    if (sameNode && apiForm.value.url.trim() === bindingUrl) return;
+    paramsError.value = false;
+    const binding = next.binding;
     apiForm.value = {
-      url: b?.url ?? '',
-      method: b?.method ?? 'GET',
-      paramsText: b?.params ? JSON.stringify(b.params, null, 2) : '{}',
-      responsePath: b?.responsePath ?? '',
-      totalProp: b?.totalProp ?? '',
-      autoFetch: b?.autoFetch ?? true
+      url: binding?.url ?? '',
+      method: binding?.method ?? 'GET',
+      paramsText: binding?.params ? JSON.stringify(binding.params, null, 2) : '{}',
+      responsePath: binding?.responsePath ?? '',
+      totalProp: binding?.totalProp ?? '',
+      autoFetch: binding?.autoFetch ?? true
     };
   },
   { immediate: true }

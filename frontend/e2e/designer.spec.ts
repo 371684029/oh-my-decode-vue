@@ -125,7 +125,7 @@ test.describe('低代码设计器核心闭环', () => {
     await page.getByRole('button', { name: '生成 Mock 与接口文档' }).click();
     const dialog = page.getByRole('dialog', { name: '前端接口文档' });
     await expect(dialog).toContainText('/api/mock/');
-    await dialog.getByRole('button', { name: '关闭' }).click();
+    await dialog.getByRole('button', { name: '关闭', exact: true }).click();
     await page.getByRole('tab', { name: '数据源' }).click();
     await page.getByRole('button', { name: '试请求并预览' }).click();
     await expect(page.locator('.el-message').last()).toContainText('请求成功');
