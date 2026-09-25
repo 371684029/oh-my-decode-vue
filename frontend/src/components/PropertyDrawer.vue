@@ -169,7 +169,12 @@
               <el-input v-model="item.label" placeholder="Label" style="margin-bottom: 6px" />
               <el-input v-model="item.field" placeholder="字段名 (field)" style="margin-bottom: 6px" />
               <div class="card-row">
-                <el-select v-model="item.component" placeholder="控件类型" style="width: 140px">
+                <el-select
+                  v-model="item.component"
+                  placeholder="控件类型"
+                  style="width: 140px"
+                  @change="onFormComponentChange(item)"
+                >
                   <el-option label="Input" value="input" />
                   <el-option label="Select" value="select" />
                   <el-option label="Date" value="date" />
@@ -177,6 +182,20 @@
                 </el-select>
                 <el-switch v-model="item.required" active-text="必填" />
                 <el-button type="danger" icon="Delete" circle size="small" @click="removeFormItem(Number(index))" />
+              </div>
+              <div v-if="item.component === 'select'" class="select-options">
+                <div v-for="(opt, optIndex) in item.options || []" :key="optIndex" class="card-row">
+                  <el-input v-model="opt.label" placeholder="显示文字" />
+                  <el-input v-model="opt.value" placeholder="值" />
+                  <el-button
+                    type="danger"
+                    icon="Delete"
+                    circle
+                    size="small"
+                    @click="removeFormOption(item, Number(optIndex))"
+                  />
+                </div>
+                <el-button type="primary" size="small" link @click="addFormOption(item)">添加选项</el-button>
               </div>
             </div>
           </div>
@@ -552,6 +571,24 @@ const removeTableColumn = (index: number) => {
   if (node.value && node.value.config) {
     node.value.config.columns.splice(index, 1);
   }
+};
+
+const onFormComponentChange = (item: any) => {
+  if (item.component === 'select' && !Array.isArray(item.options)) {
+    item.options = [
+      { label: '选项一', value: '1' },
+      { label: '选项二', value: '2' }
+    ];
+  }
+};
+
+const addFormOption = (item: any) => {
+  if (!Array.isArray(item.options)) item.options = [];
+  item.options.push({ label: '新选项', value: 'value_' + item.options.length });
+};
+
+const removeFormOption = (item: any, index: number) => {
+  item.options?.splice(index, 1);
 };
 
 const addFormItem = () => {

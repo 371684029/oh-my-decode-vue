@@ -119,4 +119,36 @@ test.describe('低代码设计器核心闭环', () => {
     await panel.getByPlaceholder('JSON 值').press('Enter');
     await expect(button).toBeVisible();
   });
+
+  test('纯预览隐藏搭建控件，退出后恢复', async ({ page }) => {
+    await addMaterial(page, '按钮');
+    await expect(page.locator('.delete-btn')).toBeVisible();
+    await closeDrawer(page);
+    await page.getByRole('button', { name: '纯预览模式' }).click();
+    await expect(page.locator('.delete-btn')).toHaveCount(0);
+    await expect(page.locator('.material-panel')).toBeHidden();
+    await expect(page.locator('.grid-node-wrapper').getByRole('button', { name: '按钮' })).toBeVisible();
+    await page.getByRole('button', { name: '退出预览' }).click();
+    await expect(page.locator('.delete-btn')).toBeVisible();
+  });
+
+  test('保存后可以从列表删除', async ({ page, request }) => {
+    const health = await request.get('http://localhost:3001/health').catch(() => null);
+    test.skip(!health?.ok(), '后端不可用');
+
+    await addMaterial(page, '按钮');
+    await closeDrawer(page);
+    const title = `删除用例${Date.now()}`;
+    await page.getByPlaceholder('页面标题').fill(title);
+    await page.getByRole('button', { name: '保存并写入 JSON' }).click();
+    await expect(page.locator('.el-message--success')).toBeVisible();
+
+    await page.getByRole('button', { name: '加载配置' }).click();
+    const dialog = page.locator('.el-dialog');
+    const row = dialog.locator('tr', { hasText: title });
+    await expect(row).toBeVisible();
+    await row.getByRole('button', { name: '删除' }).click();
+    await page.locator('.el-message-box').getByRole('button', { name: '删除' }).click();
+    await expect(dialog.locator('tr', { hasText: title })).toHaveCount(0);
+  });
 });

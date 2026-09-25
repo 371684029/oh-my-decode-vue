@@ -288,10 +288,7 @@ function renderNodeMarkup(node: ComponentNode, indentLevel = 3): string {
             `${itemIndent}  <el-input v-model='${formName}[${JSON.stringify(field)}]' placeholder="请输入${escapeHtml(item.label)}" />\n` +
             `${itemIndent}</el-form-item>\n`;
         } else if (itemType === 'select') {
-          const options = item.options || [
-            { label: '选项一', value: '1' },
-            { label: '选项二', value: '2' }
-          ];
+          const options = Array.isArray(item.options) ? item.options : [];
           let optTemplate = '';
           options.forEach((opt: any) => {
             optTemplate += `${itemIndent}    <el-option label="${escapeHtml(opt.label)}" value="${escapeHtml(opt.value)}" />\n`;

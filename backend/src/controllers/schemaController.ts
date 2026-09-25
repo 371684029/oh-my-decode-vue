@@ -5,6 +5,7 @@ import { PageSchema } from '../types/schema';
 import { pageSchemaValidator, formatZodErrors } from '../validation/schemaValidation';
 import { resolveOperator } from '../middleware/apiKeyAuth';
 import { buildSaveLogDetails } from '../utils/jsonPatch';
+import { parseRestoreIndex } from '../utils/restoreIndex';
 
 export class SchemaController {
   async saveSchema(req: Request, res: Response): Promise<void> {
@@ -137,7 +138,7 @@ export class SchemaController {
     try {
       const { id } = req.params;
       const type = (req.query.type as 'page' | 'component') || 'page';
-      const index = Number(req.query.backup ?? req.body?.backup ?? 1);
+      const index = parseRestoreIndex(req.body, req.query);
 
       const restored = await storageService.restoreBackup(id, type, index);
       if (!restored) {
@@ -155,7 +156,7 @@ export class SchemaController {
       res.json({
         success: true,
         message: 'Schema restored from backup',
-        data: { id, version: restored.meta?.version }
+        data: restored
       });
     } catch (err: any) {
       res.status(500).json({ success: false, message: err.message });
