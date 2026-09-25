@@ -151,6 +151,16 @@ test.describe('低代码设计器核心闭环', () => {
     await expect(dialog).toContainText('请填写账号');
   });
 
+  test('语料库同时包含 Vue 组件和 HTML 组件', async ({ page }) => {
+    await page.getByRole('button', { name: '导出代码' }).click();
+    const dialog = page.getByRole('dialog', { name: '零废码出码引擎 - 导出代码' });
+    await dialog.getByRole('tab', { name: '语料库 (corpus.jsonl)' }).click();
+    await expect(dialog).toContainText('"kind":"vue"');
+    await expect(dialog).toContainText('"kind":"html"');
+    await expect(dialog).toContainText('.vue');
+    await expect(dialog).toContainText('.html');
+  });
+
   test('一键生成 Mock 与接口文档', async ({ page }) => {
     await addMaterial(page, '高端表格');
     await closeDrawer(page);

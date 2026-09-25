@@ -1,41 +1,50 @@
-# 低代码前端可视化平台 (Low-Code Frontend Platform)
+# 低代码前端可视化平台
 
-> 高性能、高可扩展性、高度模块化的企级 Vue 3 低代码可视化前端搭建平台与出码引擎。
+拖拽搭页面，再导出成能运行的前端代码。当前版本 **v1.12.0**。
 
-![低代码可视化编辑器界面预览](docs/assets/preview.png)
-
----
-
-## 📖 项目简介
-
-本项目旨在打造一款可通过**可视化拖拉拽**快速生成 Vue 3 页面的低代码平台。平台以 **JSON Schema 为唯一映射桥梁**连接 UI 组件层。当前版本 **v1.11.0**：拖拽配置的表格和表单，导出的 Vue 组件、Web Component 配套组件和独立 HTML 使用同一份占位、标签宽度、分页和行按钮。完整管道编排与远程物料仍在规划中（详见 `docs/`）。
-
-项目采用了 **Node.js + Express + SQLite** 架构，其中页面/组件的 Schema 配置文件**直接存储为本地 `.json` 文件**，而 SQLite 数据库专用于记录高可靠的**操作审计日志 (Operation Audit Logs)**。
+页面在设计器里是一份 JSON Schema。表格、表单和按钮都由这份 Schema 渲染。导出时，同一份 Schema 生成 Vue 单文件组件、独立 HTML，以及由这两种组件组成的语料库。平台不生成后端业务代码。页面 JSON 存在本地文件里，SQLite 只记操作日志。
 
 ---
 
-## ✨ 核心特性
+## 界面
 
-> 状态标注：✅ 已实现　🔜 规划中/未实现（详见 `docs/` 各版本规划文档）
+拖入高端表格和高端表单后的画布。左侧是物料，中间是网格，顶栏负责预览、Mock、导出和保存。
 
-- **✅ 可视化网格布局引擎**：集成 `vue3-grid-layout-next` 拖拽画布，支持组件拖投放置、自由缩放拉伸、自动响应式网格布局、对齐参考线与吸附指示。
-- **✅ 丰富的分类物料库**：
-  - **自有高端组件 (Pro Components)**：`高端表格 (ProTable)`（支持列可视化定义、排序、分页、操作列按钮）、`高端表单 (ProForm)`（支持多列布局、多类型表单控件与必填校验）。
-  - **Element-UI 组件 (Native UI Components)**：`按钮 (Button)`、`输入框 (Input)`、`卡片 (Card)`、`标签 (Tag)`、`警告提示 (Alert)`、`开关 (Switch)`、`分割线 (Divider)` 等。
-- **✅ 可视化属性配置抽屉 (Property Drawer)**：
-  - **属性 Props**：实时修改组件外观与原生属性。
-  - **高级 Config**：动态可视化增删/重排表格列定义及表单项。
-  - **原生 Attrs**：动态透传原生 HTML 属性。
-  - **JSON 源码预览**：实时生成并渲染对应 Schema，支持一键复制。
-- **✅ 存储与审计解耦架构**：
-  - **JSON 文件直接存储**： Schema 数据写入后端 `storage/pages/{page_id}.json`，实现极佳的人类可读性与无缝 Git 版本追踪（原子写入 + 备份）。
-  - **SQLite 审计留痕**：所有的修改、保存与删除操作均自动落盘至 SQLite 操作日志表（`logs.db`）。
-- **✅ 多图层系统**：弹窗 (Dialog) / Loading 遮罩 / 自定义 HTML 三种图层，支持显隐切换、zIndex 管理与生命周期脚本钩子。
-- **✅ 多目标出码引擎**：Vue 3 SFC (`.vue`) / W3C Web Component (`.js`，配套 PageTemplate.vue) / 独立 HTML (`.html`，CDN 完整渲染) 三目标均为**完整渲染**，并对用户配置内容做 HTML 转义与标签名安全化。
-- **✅ 数据驱动能力**：接口数据源绑定（`apiBinding`）、表达式绑定真实渲染（`{{ }}`）、事件动作链（从列表选择目标；失败即停止），出码产物生成带 10 秒超时的前端 `fetch`。
-- **✅ 操作历史与自动保存**：撤销/重做覆盖布局和属性修改（连续输入合并成一步，并按体积丢弃最早快照）、复制/粘贴/删除快捷键、3 分钟无感自动保存。
-- **✅ 安全加固**：后端 Schema 落盘前 Zod 强校验（结构、脚本/HTML 长度、id 禁止路径字符）；表达式求值器为受限解释器（拒绝函数调用/赋值/原型链访问，不使用 `eval`），出码只内联通过该解释器的表达式；自定义 HTML 在设计器和导出页面都放进 sandbox iframe；API 默认只监听 `127.0.0.1`，CORS 默认只放行本地设计器。
-- **✅ 工程化与质量**：Vitest 单元测试（前端 69、后端 5）、ESLint + Prettier（0 error / 0 warning）、GitHub Actions CI（双 Node 版本）、`shared` 共享类型包、Element Plus 按需引入。
+![设计器画布：表格与表单](docs/assets/designer.png)
+
+表单项在属性抽屉里配置。可以改字段名、控件类型、必填、占位提示，并上移下移。表格列用同一套方式调整。
+
+![表单项配置](docs/assets/form-config.png)
+
+纯预览去掉拖拽手柄和删除按钮，页面上的表格、表单和按钮仍可操作。
+
+![纯预览](docs/assets/preview.png)
+
+导出对话框里的 Vue 单文件组件，和画布使用同一份占位、标签宽度和分页配置。旁边还有 Web Component 和独立 HTML。
+
+![导出 Vue 组件](docs/assets/export-vue.png)
+
+语料库把当前页面写成两行 JSONL：一行 Vue 组件，一行 HTML 组件。也可以并入已经保存的页面。
+
+![语料库导出](docs/assets/corpus.png)
+
+还没填地址的表格和表单，可以一键补上 `/api/mock/` 数据源，并写出前端实际会请求的接口说明。
+
+![Mock 与接口文档](docs/assets/api-doc.png)
+
+---
+
+## 能做什么
+
+- **拖拽搭页面**：网格画布上拖入、缩放、对齐。物料包括高端表格、高端表单，以及按钮、输入框、卡片、标签、警告、开关、分割线。
+- **改配置而不是改代码**：列、表单项、显隐条件、页面初始状态和事件动作都写在 Schema 里。
+- **出三种前端产物**：Vue 3 单文件组件、配套的 Web Component，以及用 CDN 就能打开的 HTML。
+- **导出语料库**：`corpus.jsonl` 里每个页面各有一条 Vue 记录和一条 HTML 记录。
+- **对接已有接口**：组件绑定 `apiBinding` 后，设计器和导出页面都用浏览器 `fetch` 取数。没有地址时可以生成 Mock，并附上接口文档。
+- **页面可以收尾**：改标题、保存、载入、删除、恢复上一份备份。撤销和重做覆盖拖拽和属性修改。
+- **本地保存**：Schema 写到 `backend/storage/pages/*.json`。保存、删除和恢复记在 SQLite。
+
+管道编排、远程物料、协同和登录不在当前版本里，规划见 `docs/roadmap/`。
 
 ### 🔜 规划中的核心能力（详见 `docs/`）
 
@@ -123,7 +132,7 @@ low-code-platform/
 ├── .github/workflows/      # GitHub Actions CI（typecheck → lint → test → build）
 ├── docs/                   # 文档集
 │   ├── implemented/        # 技术规范 (CAE/物料/组件 I/O/管道编排) 与优化报告
-│   └── roadmap/            # 各版本规划与路线图 (0.x ~ 3.0.0，含 v1.3.0 至 v1.11.0)
+│   └── roadmap/            # 各版本规划与路线图 (0.x ~ 3.0.0，含 v1.3.0 至 v1.12.0)
 ├── shared/                 # 共享类型包 @lowcode/shared（纯类型，前后端共用）
 │   └── src/index.ts        # ComponentNode / PageSchema / LayerConfig / MaterialItem ...
 ├── frontend/               # Vue 3 前端低代码设计器工程
@@ -192,7 +201,7 @@ npm run build
 ```bash
 npm run typecheck   # 前后端类型检查
 npm run lint        # ESLint（0 error / 0 warning 门槛）
-npm run test        # Vitest：前端 69 用例 + 后端 5 用例
+npm run test        # Vitest：前端 102 项 + 后端 11 项
 npm run format      # Prettier 全仓格式化
 ```
 
@@ -218,7 +227,11 @@ npm run format      # Prettier 全仓格式化
 
 ## 📝 版本变更历史 (Changelog)
 
-### 📌 v1.11.0 (当前版本 - 2026-09)
+### 📌 v1.12.0 (当前版本 - 2026-09)
+
+- **语料库导出**：同一页面写成 JSONL 里的两行，一行是 Vue 单文件组件，一行是独立 HTML。默认收当前画布，也可以并入已保存页面。
+
+### 📌 v1.11.0 (2026-09)
 
 - **出码跟画布用同一份配置**：表单占位提示、必填、标签宽度和内联布局会写进 Vue 组件、Web Component 配套组件和独立 HTML。
 - **表格不再另写一套**：分页大小跟配置走，请求参数使用同一个 `size`。没有行按钮时不再补一列「查看」。
@@ -353,4 +366,5 @@ npm run format      # Prettier 全仓格式化
 19. **[v1.9.0 Mock 与接口文档](docs/roadmap/1.9.0_PLAN.md)**：一键为未填地址的表格和表单补 Mock，并产出前端实际调用的接口文档。已实现。
 20. **[v1.10.0 交互打磨](docs/roadmap/1.10.0_PLAN.md)**：编辑数据源时保留 Mock 示例、配置项排序、抽屉不再挡住顶栏。已实现。
 21. **[v1.11.0 出码与画布对齐](docs/roadmap/1.11.0_PLAN.md)**：Vue、Web Component 配套组件和独立 HTML 使用画布上的占位、标签宽度、分页和行按钮。已实现。
-22. **[v3.0.0 远期企业级架构与生态规划](docs/roadmap/3.0.0_PLAN.md)**：包含企业级 RBAC/SSO 单点登录、PostgreSQL/S3 高可用分布式存储、CRDT 多人实时协同、一键 CI/CD 灰度发布、VS Code 插件与 CLI 工具链。
+22. **[v1.12.0 语料库导出](docs/roadmap/1.12.0_PLAN.md)**：同一页面导出为 Vue 组件和 HTML 组件两条语料。已实现。
+23. **[v3.0.0 远期企业级架构与生态规划](docs/roadmap/3.0.0_PLAN.md)**：包含企业级 RBAC/SSO 单点登录、PostgreSQL/S3 高可用分布式存储、CRDT 多人实时协同、一键 CI/CD 灰度发布、VS Code 插件与 CLI 工具链。

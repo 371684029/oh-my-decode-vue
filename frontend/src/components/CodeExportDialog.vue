@@ -97,6 +97,30 @@
         <pre class="code-block"><code v-html="highlight(apiDoc, 'markdown')"></code></pre>
       </el-tab-pane>
 
+      <el-tab-pane label="语料库 (corpus.jsonl)" name="corpus">
+        <el-alert
+          type="success"
+          :closable="false"
+          show-icon
+          style="margin-bottom: 12px"
+          title="同一页两种组件"
+          description="每条页面写成两行 JSONL：一行 Vue 单文件组件，一行独立 HTML。默认只收当前画布。"
+        />
+        <div class="code-header">
+          <span class="code-desc">{{ corpusSummary }}</span>
+          <div class="btn-group">
+            <el-button type="primary" size="small" icon="DocumentCopy" @click="handleCopy(corpusText)">
+              复制 JSONL
+            </el-button>
+            <el-button type="success" size="small" icon="Download" @click="handleDownload(corpusText, 'corpus.jsonl')">
+              下载 corpus.jsonl
+            </el-button>
+          </div>
+        </div>
+        <el-checkbox v-model="includeSavedPages" style="margin-bottom: 12px">包含已保存的页面</el-checkbox>
+        <pre class="code-block"><code>{{ corpusText }}</code></pre>
+      </el-tab-pane>
+
       <el-tab-pane label="package.json 清单" name="pkg">
         <div class="code-header">
           <span class="code-desc">自动提取当前低代码页面所依赖的项目构建 package.json：</span>
@@ -123,7 +147,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue';
+import { ref, computed, watch } from 'vue';
 import { useDesignerStore } from '../stores/designerStore';
 import {
   generateVueSFC,
@@ -133,6 +157,9 @@ import {
   generatePackageJson
 } from '../utils/codeGenerator';
 import { renderApiMarkdown } from '../utils/frontendApi';
+import { buildCorpus, renderCorpusJsonl } from '../utils/corpus';
+import { API_BASE } from '../utils/http';
+import type { PageSchema } from '../types/designer';
 import { ElMessage } from 'element-plus';
 import hljs from 'highlight.js';
 import 'highlight.js/styles/github-dark.css';
@@ -156,10 +183,42 @@ const emit = defineEmits<{
 
 const designerStore = useDesignerStore();
 const activeTab = ref('vue');
+const includeSavedPages = ref(false);
+const savedPages = ref<PageSchema[]>([]);
 
 const dialogVisible = computed({
   get: () => props.modelValue,
   set: (val: boolean) => emit('update:modelValue', val)
+});
+
+const loadSavedPages = async () => {
+  try {
+    const headers: Record<string, string> = { 'X-Operator': 'designer_user' };
+    const apiKey = import.meta.env.VITE_API_KEY;
+    if (apiKey) headers['X-Api-Key'] = apiKey;
+    const res = await fetch(`${API_BASE}/schemas?type=page`, { headers });
+    if (!res.ok) throw new Error(String(res.status));
+    const body = await res.json();
+    savedPages.value = body?.success && Array.isArray(body.data) ? body.data : [];
+  } catch {
+    savedPages.value = [];
+    ElMessage.warning('已保存页面没有读到，语料库仍包含当前画布');
+  }
+};
+
+watch(includeSavedPages, (checked) => {
+  if (checked) loadSavedPages();
+  else savedPages.value = [];
+});
+
+const corpusEntries = computed(() =>
+  buildCorpus(includeSavedPages.value ? [...savedPages.value, designerStore.pageSchema] : [designerStore.pageSchema])
+);
+const corpusText = computed(() => renderCorpusJsonl(corpusEntries.value));
+const corpusSummary = computed(() => {
+  const vueCount = corpusEntries.value.filter((entry) => entry.kind === 'vue').length;
+  const htmlCount = corpusEntries.value.filter((entry) => entry.kind === 'html').length;
+  return `${corpusEntries.value.length} 条语料：${vueCount} 个 Vue 组件，${htmlCount} 个 HTML 组件`;
 });
 
 const vueCode = computed(() => generateVueSFC(designerStore.pageSchema));
