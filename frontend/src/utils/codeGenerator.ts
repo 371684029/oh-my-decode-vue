@@ -220,6 +220,33 @@ function renderNodeToTemplate(node: ComponentNode, indentLevel = 3): string {
   return applyVisibleWhen(node, renderNodeMarkup(node, indentLevel), indent);
 }
 
+function attributesExcept(
+  props: Record<string, any>,
+  attrs: Record<string, any>,
+  omit: string[]
+): string {
+  const next = { ...props };
+  for (const key of omit) delete next[key];
+  return stringifyAttributes(next, attrs);
+}
+
+function formPlaceholder(item: { placeholder?: unknown; label?: unknown }, fallback: string): string {
+  const custom = typeof item.placeholder === 'string' ? item.placeholder.trim() : '';
+  return escapeHtml(custom || fallback);
+}
+
+function tablePageSize(node: ComponentNode): number {
+  const pagination = node.config?.pagination as { pageSize?: unknown } | undefined;
+  const size = pagination?.pageSize;
+  return typeof size === 'number' && size > 0 ? size : 10;
+}
+
+function tablePaginationEnabled(node: ComponentNode): boolean {
+  const pagination = node.config?.pagination as { enabled?: unknown } | undefined;
+  if (!pagination) return true;
+  return pagination.enabled !== false;
+}
+
 function renderNodeMarkup(node: ComponentNode, indentLevel = 3): string {
   const indent = ' '.repeat(indentLevel * 2);
   const attrStr = stringifyAttributes(node.props || {}, node.attrs || {});
@@ -234,39 +261,44 @@ function renderNodeMarkup(node: ComponentNode, indentLevel = 3): string {
       let colsTemplate = '';
 
       columns.forEach((col: any) => {
-        colsTemplate += `${colIndent}<el-table-column prop="${escapeHtml(col.prop)}" label="${escapeHtml(col.label)}"${col.width ? ` width="${escapeHtml(col.width)}"` : ''}${col.sortable ? ' sortable' : ''} />\n`;
+        colsTemplate += `${colIndent}<el-table-column prop="${escapeHtml(col.prop)}" label="${escapeHtml(col.label)}"${col.width ? ` width="${escapeHtml(col.width)}"` : ''}${col.align ? ` align="${escapeHtml(col.align)}"` : ''}${col.sortable ? ' sortable' : ''} />\n`;
       });
 
-      const rowActions = node.config?.actions?.length
-        ? node.config.actions
-        : [{ label: '查看', type: 'primary', eventKey: 'click' }];
+      const rowActions = Array.isArray(node.config?.actions) ? node.config.actions : [];
       const actionButtons = rowActions
         .map((action: any) => {
           const eventKey = String(action.eventKey || 'click');
-          return `${indent}        <el-button link type="${escapeHtml(action.type || 'primary')}" size="small" @click="handleRowAction('${escapeHtml(node.id)}', '${escapeHtml(eventKey)}', scope.row)">${escapeHtml(action.label || '查看')}</el-button>\n`;
+          return `${indent}        <el-button link type="${escapeHtml(action.type || 'primary')}" size="small" @click="handleRowAction('${escapeHtml(node.id)}', '${escapeHtml(eventKey)}', scope.row)">${escapeHtml(action.label || '操作')}</el-button>\n`;
         })
         .join('');
+      const actionColumn = actionButtons
+        ? `${indent}    <el-table-column label="操作" align="center" width="160">\n` +
+          `${indent}      <template #default="scope">\n` +
+          actionButtons +
+          `${indent}      </template>\n` +
+          `${indent}    </el-table-column>\n`
+        : '';
+      const pageSize = tablePageSize(node);
+      const pagination = tablePaginationEnabled(node)
+        ? `${indent}  <el-pagination\n` +
+          `${indent}    v-model:current-page="${pageName}"\n` +
+          `${indent}    :page-size="${pageSize}"\n` +
+          `${indent}    layout="total, prev, pager, next"\n` +
+          `${indent}    :total="${totalName}"\n` +
+          `${indent}    size="small"\n` +
+          `${indent}    style="margin-top: 10px; justify-content: flex-end"\n` +
+          `${indent}    @current-change="onPage_${identOf(node.id)}"\n` +
+          `${indent}  />\n`
+        : '';
 
       return (
         `${indent}<!-- 高端表格 Component -->\n` +
         `${indent}<el-card shadow="always">\n` +
         `${indent}  <el-table :data="${dataName}"${attrStr} style="width: 100%">\n` +
         colsTemplate +
-        `${indent}    <el-table-column label="操作" align="center" width="160">\n` +
-        `${indent}      <template #default="scope">\n` +
-        actionButtons +
-        `${indent}      </template>\n` +
-        `${indent}    </el-table-column>\n` +
+        actionColumn +
         `${indent}  </el-table>\n` +
-        `${indent}  <el-pagination\n` +
-        `${indent}    v-model:current-page="${pageName}"\n` +
-        `${indent}    :page-size="10"\n` +
-        `${indent}    layout="total, prev, pager, next"\n` +
-        `${indent}    :total="${totalName}"\n` +
-        `${indent}    size="small"\n` +
-        `${indent}    style="margin-top: 10px; justify-content: flex-end"\n` +
-        `${indent}    @current-change="onPage_${identOf(node.id)}"\n` +
-        `${indent}  />\n` +
+        pagination +
         `${indent}</el-card>\n`
       );
     }
@@ -275,17 +307,21 @@ function renderNodeMarkup(node: ComponentNode, indentLevel = 3): string {
       const items = node.config?.items || [];
       const itemIndent = ' '.repeat((indentLevel + 1) * 2);
       const formName = `formData_${identOf(node.id)}`;
+      const formAttrs = attributesExcept(node.props || {}, node.attrs || {}, ['labelWidth', 'layout', 'size']);
+      const inline = node.props.layout === 'inline' ? ' inline' : '';
+      const size = node.props.size ? ` size="${escapeHtml(String(node.props.size))}"` : '';
+      const labelWidth = escapeHtml(String(node.props.labelWidth || '100px'));
       let itemsTemplate = '';
 
       items.forEach((item: any) => {
-        // 兼容 component / type 两种字段命名，统一取 field 为数据绑定键
         const itemType = item.component || item.type;
         const field = item.field || item.name;
+        const required = item.required ? ' required' : '';
 
         if (itemType === 'input') {
           itemsTemplate +=
-            `${itemIndent}<el-form-item label="${escapeHtml(item.label)}" prop="${escapeHtml(field)}">\n` +
-            `${itemIndent}  <el-input v-model='${formName}[${JSON.stringify(field)}]' placeholder="请输入${escapeHtml(item.label)}" />\n` +
+            `${itemIndent}<el-form-item label="${escapeHtml(item.label)}" prop="${escapeHtml(field)}"${required}>\n` +
+            `${itemIndent}  <el-input v-model='${formName}[${JSON.stringify(field)}]' placeholder="${formPlaceholder(item, `请输入${item.label || ''}`)}" />\n` +
             `${itemIndent}</el-form-item>\n`;
         } else if (itemType === 'select') {
           const options = Array.isArray(item.options) ? item.options : [];
@@ -294,8 +330,8 @@ function renderNodeMarkup(node: ComponentNode, indentLevel = 3): string {
             optTemplate += `${itemIndent}    <el-option label="${escapeHtml(opt.label)}" value="${escapeHtml(opt.value)}" />\n`;
           });
           itemsTemplate +=
-            `${itemIndent}<el-form-item label="${escapeHtml(item.label)}" prop="${escapeHtml(field)}">\n` +
-            `${itemIndent}  <el-select v-model='${formName}[${JSON.stringify(field)}]' placeholder="请选择${escapeHtml(item.label)}">\n` +
+            `${itemIndent}<el-form-item label="${escapeHtml(item.label)}" prop="${escapeHtml(field)}"${required}>\n` +
+            `${itemIndent}  <el-select v-model='${formName}[${JSON.stringify(field)}]' placeholder="${formPlaceholder(item, `请选择${item.label || ''}`)}">\n` +
             optTemplate +
             `${itemIndent}  </el-select>\n` +
             `${itemIndent}</el-form-item>\n`;
@@ -306,15 +342,15 @@ function renderNodeMarkup(node: ComponentNode, indentLevel = 3): string {
             `${itemIndent}</el-form-item>\n`;
         } else if (itemType === 'date') {
           itemsTemplate +=
-            `${itemIndent}<el-form-item label="${escapeHtml(item.label)}" prop="${escapeHtml(field)}">\n` +
-            `${itemIndent}  <el-date-picker v-model='${formName}[${JSON.stringify(field)}]' type="date" placeholder="请选择日期" style="width: 100%" />\n` +
+            `${itemIndent}<el-form-item label="${escapeHtml(item.label)}" prop="${escapeHtml(field)}"${required}>\n` +
+            `${itemIndent}  <el-date-picker v-model='${formName}[${JSON.stringify(field)}]' type="date" placeholder="${formPlaceholder(item, '请选择日期')}" style="width: 100%" />\n` +
             `${itemIndent}</el-form-item>\n`;
         }
       });
 
       return (
         `${indent}<!-- 高端表单 Component -->\n` +
-        `${indent}<el-form :model="${formName}"${attrStr} label-width="100px">\n` +
+        `${indent}<el-form :model="${formName}"${formAttrs}${inline} label-width="${labelWidth}"${size}>\n` +
         itemsTemplate +
         `${indent}  <el-form-item>\n` +
         `${indent}    <el-button type="primary" @click="handleSubmit('${escapeHtml(node.id)}')">提交</el-button>\n` +
@@ -530,11 +566,12 @@ function renderFetchRequestBlock(
   paramsLit: string,
   method: 'GET' | 'POST',
   optionsApi: boolean,
-  pageExpr?: string
+  pageExpr?: string,
+  pageSize = 10
 ): string {
   const call = 'fetchChecked';
   void optionsApi;
-  const merged = pageExpr ? `{ page: ${pageExpr}, size: 10, ...(${paramsLit}) }` : paramsLit;
+  const merged = pageExpr ? `{ page: ${pageExpr}, size: ${pageSize}, ...(${paramsLit}) }` : paramsLit;
   if (method === 'POST') {
     return `    const res = await ${call}(${urlExpr}, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(${merged}), signal: AbortSignal.timeout(10000) });`;
   }
@@ -560,7 +597,8 @@ function renderTableLoadFunction(node: ComponentNode, binding: ApiBinding, optio
     renderParamsLiteral(binding.params),
     method,
     optionsApi,
-    pageExpr
+    pageExpr,
+    tablePageSize(node)
   );
 
   return `const loadData_${identOf(node.id)} = async () => {
@@ -952,7 +990,8 @@ function renderOptionsLoadFunction(node: ComponentNode, binding: ApiBinding, isF
     renderParamsLiteral(binding.params),
     method,
     true,
-    pageExpr
+    pageExpr,
+    isForm ? undefined : tablePageSize(node)
   );
 
   if (isForm) {
