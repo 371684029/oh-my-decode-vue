@@ -147,6 +147,44 @@ describe('nodeEventBus 节点 reload 通信', () => {
 });
 
 describe('executeActions 事件动作链', () => {
+  test('when 为假时跳过该动作，下一条仍执行', async () => {
+    const notify = vi.fn();
+    const scope = { ok: false };
+    await executeActions(
+      [
+        { id: 'a1', type: 'show_message', when: '{{ state.ok === true }}', payload: { messageText: '第一条' } },
+        { id: 'a2', type: 'show_message', payload: { messageText: '第二条' } }
+      ],
+      {
+        scope,
+        getNode: () => undefined,
+        getLayer: () => undefined,
+        reloadNode: () => {},
+        setLayerVisible: () => {},
+        notify
+      }
+    );
+    expect(notify).toHaveBeenCalledTimes(1);
+    expect(notify).toHaveBeenCalledWith('info', '第二条');
+    scope.ok = true;
+    notify.mockClear();
+    await executeActions(
+      [
+        { id: 'a1', type: 'show_message', when: '{{ state.ok === true }}', payload: { messageText: '第一条' } },
+        { id: 'a2', type: 'show_message', payload: { messageText: '第二条' } }
+      ],
+      {
+        scope,
+        getNode: () => undefined,
+        getLayer: () => undefined,
+        reloadNode: () => {},
+        setLayerVisible: () => {},
+        notify
+      }
+    );
+    expect(notify).toHaveBeenCalledTimes(2);
+  });
+
   test('按序执行 set_state 与 show_message', async () => {
     const scope: Record<string, any> = { currentRow: null };
     const notify = vi.fn();

@@ -2,6 +2,8 @@ import type { PageSchema, ComponentNode, LayerConfig, ApiBinding, ActionNode, Ev
 import { isRenderedNodeType } from '../registry/nodeTypes';
 import { sanitizeCss } from './sanitizeCss';
 import { canInlineExpression } from './expression';
+import { inlineableExpression } from './condition';
+import { requiredInputFields } from './formValidation';
 import { FETCH_CHECKED_SOURCE, FORBIDDEN_STATE_KEYS } from './dataSource';
 import { TABLE_PLACEHOLDER_ROWS } from './tablePlaceholder';
 import { buildCustomHtmlSrcdoc } from './customHtmlDocument';
@@ -207,7 +209,18 @@ function stringifyAttributes(props: Record<string, any>, attrs: Record<string, a
 /**
  * 将 ComponentNode 单节点递归转换为模板文本
  */
+function applyVisibleWhen(node: ComponentNode, html: string, indent: string): string {
+  const expr = inlineableExpression(node.visibleWhen);
+  if (!expr) return html;
+  return `${indent}<div v-show="${escapeHtml(expr)}">\n${html}${indent}</div>\n`;
+}
+
 function renderNodeToTemplate(node: ComponentNode, indentLevel = 3): string {
+  const indent = ' '.repeat(indentLevel * 2);
+  return applyVisibleWhen(node, renderNodeMarkup(node, indentLevel), indent);
+}
+
+function renderNodeMarkup(node: ComponentNode, indentLevel = 3): string {
   const indent = ' '.repeat(indentLevel * 2);
   const attrStr = stringifyAttributes(node.props || {}, node.attrs || {});
 
@@ -615,7 +628,7 @@ function renderNodeClickHandler(eventNodes: ComponentNode[], optionsApi = false)
   const blocks = eventNodes.flatMap((node) =>
     enabledEventEntries(node).map(([eventKey, rule]) => {
       const stmts = rule.actions
-        .map((action) => renderActionStatement(action, optionsApi))
+        .map((action) => wrapActionCondition(action, renderActionStatement(action, optionsApi)))
         .filter(Boolean)
         .join('\n    ');
       return `  if (nodeId === ${JSON.stringify(node.id)} && eventKey === ${JSON.stringify(eventKey)}) {\n    ${stmts}\n  }`;
@@ -624,6 +637,33 @@ function renderNodeClickHandler(eventNodes: ComponentNode[], optionsApi = false)
   if (blocks.length === 0) return '';
   if (optionsApi) return `handleNodeClick(nodeId, eventKey, $event) {\n${blocks.join('\n')}\n  },`;
   return `const handleNodeClick = async (nodeId: string, eventKey: string, $event: any) => {\n${blocks.join('\n')}\n};`;
+}
+
+function wrapActionCondition(action: ActionNode, statement: string): string {
+  if (!statement) return '';
+  const raw = action.when?.trim();
+  if (!raw) return statement;
+  const expr = inlineableExpression(raw);
+  if (!expr) return '';
+  const body = statement.replaceAll('\n', '\n      ');
+  return `if (${expr}) {\n      ${body}\n    }`;
+}
+
+function renderSubmitGuards(formNodes: ComponentNode[], optionsApi: boolean): string {
+  const lines: string[] = [];
+  for (const node of formNodes) {
+    const fields = requiredInputFields(node.config?.items);
+    for (const field of fields) {
+      const access = `${optionsApi ? 'form' : 'form.value'}[${JSON.stringify(field.field)}]`;
+      const warn = optionsApi
+        ? `ElementPlus.ElMessage.warning(${JSON.stringify(`请填写${field.label}`)})`
+        : `ElMessage.warning(${JSON.stringify(`请填写${field.label}`)})`;
+      lines.push(
+        `if (formId === ${JSON.stringify(node.id)} && (${access} == null || String(${access}).trim() === '')) { ${warn}; return; }`
+      );
+    }
+  }
+  return lines.join('\n  ');
 }
 
 /** 单条动作语句；optionsApi=true 时变量经 this. 访问 */
@@ -768,8 +808,11 @@ function renderScriptSetup(schema: PageSchema): string {
   }
   if (formNodes.length > 0) {
     lines.push(`const lookupForm = (formId: string) => {\n${renderFormLookup(formNodes, false)}\n};`);
-    lines.push(`const handleSubmit = (formId: string) => {`);
+    lines.push(`const handleSubmit = async (formId: string) => {`);
     lines.push(`  const form = lookupForm(formId);\n  if (!form) return;`);
+    const guards = renderSubmitGuards(formNodes, false);
+    if (guards) lines.push(`  ${guards}`);
+    if (clickHandler) lines.push(`  await handleNodeClick(formId, 'submit', form.value);`);
     lines.push(`  console.log('Form Submitted:', form.value);`);
     lines.push(`  ElMessage.success('表单提交成功');`);
     lines.push(`};`);
@@ -1034,10 +1077,12 @@ ${delegated}    console.log('查看行数据:', row);
 
   if (formNodes.length > 0) {
     methods.push(`lookupForm(formId) {\n${renderFormLookup(formNodes, true)}\n  },`);
-    methods.push(`handleSubmit(formId) {
+    const guards = renderSubmitGuards(formNodes, true);
+    const submitCall = clickHandler ? `await this.handleNodeClick(formId, 'submit', form);\n    ` : '';
+    methods.push(`async handleSubmit(formId) {
     const form = this.lookupForm(formId);
     if (!form) return;
-    console.log('Form Submitted:', form);
+    ${guards ? `${guards}\n    ` : ''}${submitCall}console.log('Form Submitted:', form);
     ElementPlus.ElMessage.success('表单提交成功');
   },`);
     methods.push(`handleReset(formId) {

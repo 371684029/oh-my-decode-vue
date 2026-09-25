@@ -8,7 +8,7 @@
     >
       <el-row :gutter="16">
         <el-col v-for="item in items" :key="item.field" :span="node.props.layout === 'inline' ? undefined : 12">
-          <el-form-item :label="item.label" :required="item.required">
+          <el-form-item :label="item.label" :required="item.required" :error="fieldErrors[item.field]">
             <!-- Input -->
             <el-input
               v-if="item.component === 'input'"
@@ -37,6 +37,10 @@
           </el-form-item>
         </el-col>
       </el-row>
+      <el-form-item>
+        <el-button type="primary" @click="handleSubmit">提交</el-button>
+        <el-button @click="handleReset">重置</el-button>
+      </el-form-item>
     </el-form>
   </div>
 </template>
@@ -45,7 +49,9 @@
 import { ref, computed, onMounted, onUnmounted } from 'vue';
 import type { ComponentNode } from '../types/designer';
 import { ElMessage } from 'element-plus';
-import { ApiExecutor, nodeEventBus } from '../utils/dataSource';
+import { ApiExecutor, executeActions, nodeEventBus } from '../utils/dataSource';
+import { submitDesignerForm } from '../utils/formValidation';
+import { findNode } from '../utils/schemaTree';
 import { useDesignerStore } from '../stores/designerStore';
 
 const props = defineProps<{
@@ -53,11 +59,41 @@ const props = defineProps<{
 }>();
 
 const formData = ref<Record<string, any>>({});
+const fieldErrors = ref<Record<string, string>>({});
 const loading = ref(false);
 
 const executor = new ApiExecutor();
 
 const items = computed(() => props.node.config?.items || []);
+
+const handleSubmit = async () => {
+  const designerStore = useDesignerStore();
+  const result = await submitDesignerForm(props.node.events, items.value, formData.value, {
+    notify: (type, message) => ElMessage({ type, message }),
+    runActions: (actions) =>
+      executeActions(actions, {
+        scope: designerStore.pageSchema.state,
+        event: formData.value,
+        getNode: (id: string) => findNode(designerStore.activeChildren, id) ?? undefined,
+        getLayer: (id: string) => designerStore.pageSchema.layers?.find((layer) => layer.id === id),
+        reloadNode: (id: string) => nodeEventBus.emitReload(id),
+        setLayerVisible: (layerId: string, visible: boolean) => {
+          const layer = designerStore.pageSchema.layers?.find((item) => item.id === layerId);
+          if (layer) layer.visible = visible;
+        },
+        notify: (type, message) => ElMessage({ type, message })
+      })
+  });
+  fieldErrors.value = {};
+  if (!result.ok) {
+    for (const item of result.missing) fieldErrors.value[item.field] = `请填写${item.label}`;
+  }
+};
+
+const handleReset = () => {
+  for (const key of Object.keys(formData.value)) formData.value[key] = undefined;
+  fieldErrors.value = {};
+};
 
 /** 加载数据：接口返回对象按 field 回填表单；缺省为空表单 */
 const loadData = async () => {

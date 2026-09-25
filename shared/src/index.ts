@@ -28,6 +28,8 @@ export interface ActionNode {
   type: ActionType;
   target?: string; // 目标节点 id 或图层 id
   payload?: Record<string, any>;
+  /** 整段 {{ expr }}。为空则始终执行；无法安全求值时跳过。 */
+  when?: string;
 }
 
 /** 事件规则：监听某事件并按序执行动作链 */
@@ -57,6 +59,8 @@ export interface ComponentNode {
   children?: ComponentNode[];
   /** 接口数据源绑定（缺省 = 不请求，沿用 mock） */
   apiBinding?: ApiBinding;
+  /** 整段 {{ expr }}。为空则始终显示；无法安全求值时保持显示。 */
+  visibleWhen?: string;
 }
 
 /** 图层类型 */

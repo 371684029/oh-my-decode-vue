@@ -41,6 +41,9 @@
       <el-tab-pane label="多图层管理" name="multi-layers">
         <LayerManager />
       </el-tab-pane>
+      <el-tab-pane label="页面状态" name="page-state">
+        <PageStatePanel />
+      </el-tab-pane>
     </el-tabs>
   </div>
 </template>
@@ -52,6 +55,7 @@ import type { MaterialItem } from '../types/designer';
 import { useDesignerStore } from '../stores/designerStore';
 import LayerTree from './LayerTree.vue';
 import LayerManager from './LayerManager.vue';
+import PageStatePanel from './PageStatePanel.vue';
 
 const designerStore = useDesignerStore();
 const activeTab = ref('pro');

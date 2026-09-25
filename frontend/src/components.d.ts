@@ -53,6 +53,7 @@ declare module 'vue' {
     LayerTree: typeof import('./components/LayerTree.vue')['default']
     MaterialList: typeof import('./components/MaterialList.vue')['default']
     NodeRenderer: typeof import('./components/NodeRenderer.vue')['default']
+    PageStatePanel: typeof import('./components/PageStatePanel.vue')['default']
     ProForm: typeof import('./components/ProForm.vue')['default']
     PropertyDrawer: typeof import('./components/PropertyDrawer.vue')['default']
     ProTable: typeof import('./components/ProTable.vue')['default']
