@@ -456,6 +456,19 @@ describe('v1.6.0 出码正确性', () => {
     expect(html).toContain('return;');
   });
 
+  test('下拉选项按配置出码，空选项不写死默认项', () => {
+    const schema = buildTestSchema();
+    const code = generateVueSFC(schema);
+    expect(code).toContain('label="男"');
+    expect(code).toContain('value="male"');
+    const form = schema.children.find((node) => node.type === 'pro-form');
+    const gender = form?.config?.items?.find((item: { field?: string }) => item.field === 'gender');
+    if (!gender) throw new Error('missing gender');
+    gender.options = [];
+    const empty = generateVueSFC(schema);
+    expect(empty).not.toContain('选项一');
+  });
+
   test('图层初始可见性与 Schema 一致', () => {
     const schema = buildTestSchema();
     const dialog = schema.layers?.find((layer) => layer.type === 'dialog');

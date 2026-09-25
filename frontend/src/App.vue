@@ -5,7 +5,7 @@
       <div class="logo">
         <el-icon class="logo-icon"><Platform /></el-icon>
         <span class="logo-text">低代码前端可视化平台 (Low-Code Studio)</span>
-        <el-tag size="small" type="primary" effect="plain" style="margin-left: 10px">v1.7.0</el-tag>
+        <el-tag size="small" type="primary" effect="plain" style="margin-left: 10px">v1.8.0</el-tag>
       </div>
       <div class="header-actions">
         <el-button-group class="history-btn-group">
@@ -40,7 +40,7 @@
       <MaterialList v-if="!isPreviewMode" />
 
       <!-- Center Main Canvas -->
-      <CanvasContainer v-slot="{ node }">
+      <CanvasContainer v-slot="{ node }" :preview="isPreviewMode">
         <NodeRenderer v-if="node" :node="node" />
       </CanvasContainer>
 
@@ -98,13 +98,15 @@
     </div>
 
     <!-- Dialogs -->
-    <el-dialog v-model="loadDialogVisible" title="已保存的 JSON 配置列表" width="600px">
+    <el-dialog v-model="loadDialogVisible" title="已保存的 JSON 配置列表" width="720px">
       <el-table :data="savedSchemas" style="width: 100%">
         <el-table-column prop="title" label="页面名称" />
         <el-table-column prop="id" label="页面ID" width="180" />
-        <el-table-column label="操作" width="120" align="center">
+        <el-table-column label="操作" width="240" align="center">
           <template #default="scope">
-            <el-button type="primary" size="small" link @click="handleSelectSchema(scope.row)"> 载入 </el-button>
+            <el-button type="primary" size="small" link @click="handleSelectSchema(scope.row)">载入</el-button>
+            <el-button type="warning" size="small" link @click="handleRestoreSchema(scope.row)">恢复上一份</el-button>
+            <el-button type="danger" size="small" link @click="handleDeleteSchema(scope.row)">删除</el-button>
           </template>
         </el-table-column>
       </el-table>
@@ -154,7 +156,7 @@ import PropertyDrawer from './components/PropertyDrawer.vue';
 import NodeRenderer from './components/NodeRenderer.vue';
 import CodeExportDialog from './components/CodeExportDialog.vue';
 import CustomHtmlLayerNode from './components/CustomHtmlLayerNode.vue';
-import { ElMessage } from 'element-plus';
+import { ElMessage, ElMessageBox } from 'element-plus';
 import { Loading } from '@element-plus/icons-vue';
 
 const designerStore = useDesignerStore();
@@ -340,10 +342,57 @@ const handleOpenLoadDialog = async () => {
   }
 };
 
-const handleSelectSchema = (schema: any) => {
-  designerStore.setPageSchema(schema);
-  loadDialogVisible.value = false;
-  ElMessage.success(`已成功载入配置: ${schema.title}`);
+const handleSelectSchema = async (schema: any) => {
+  try {
+    const res = await http.get(`/schemas/${schema.id}`, { params: { type: schema.type || 'page' } });
+    if (!res.data.success) return;
+    designerStore.setPageSchema(res.data.data);
+    loadDialogVisible.value = false;
+    ElMessage.success(`已成功载入配置: ${res.data.data.title}`);
+  } catch (err: any) {
+    ElMessage.error('载入失败: ' + (err.response?.data?.message || err.message));
+  }
+};
+
+const handleDeleteSchema = async (schema: any) => {
+  try {
+    await ElMessageBox.confirm(`删除页面「${schema.title || schema.id}」？`, '删除已保存页面', {
+      type: 'warning',
+      confirmButtonText: '删除',
+      cancelButtonText: '取消'
+    });
+  } catch {
+    return;
+  }
+  try {
+    const res = await http.delete(`/schemas/${schema.id}`, { params: { type: schema.type || 'page' } });
+    if (res.data.success) {
+      savedSchemas.value = savedSchemas.value.filter((item) => item.id !== schema.id);
+      ElMessage.success('已删除');
+    }
+  } catch (err: any) {
+    ElMessage.error('删除失败: ' + (err.response?.data?.message || err.message));
+  }
+};
+
+const handleRestoreSchema = async (schema: any) => {
+  try {
+    const type = schema.type || 'page';
+    const listed = await http.get(`/schemas/${schema.id}/backups`, { params: { type } });
+    const backups = listed.data.data || [];
+    if (!backups.length) {
+      ElMessage.warning('还没有可恢复的上一份');
+      return;
+    }
+    const res = await http.post(`/schemas/${schema.id}/restore`, { index: backups[0].index }, { params: { type } });
+    if (res.data.success) {
+      designerStore.setPageSchema(res.data.data);
+      loadDialogVisible.value = false;
+      ElMessage.success('已恢复上一份');
+    }
+  } catch (err: any) {
+    ElMessage.error('恢复失败: ' + (err.response?.data?.message || err.message));
+  }
 };
 
 const handleOpenLogsDialog = async () => {

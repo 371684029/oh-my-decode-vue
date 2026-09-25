@@ -1,7 +1,13 @@
 <template>
   <div class="canvas-container" @dragover.prevent @drop="handleDrop" @click="handleBackgroundClick">
     <div class="canvas-header">
-      <span class="page-title">{{ designerStore.pageSchema.title }}</span>
+      <el-input
+        v-if="!preview"
+        v-model="designerStore.pageSchema.title"
+        class="page-title-input"
+        placeholder="页面标题"
+      />
+      <span v-else class="page-title">{{ designerStore.pageSchema.title }}</span>
       <el-tag v-if="editingLayer" type="warning" size="small" class="editing-layer-tag">
         正在编辑图层: {{ editingLayer.name }}
         <el-button link size="small" type="warning" @click="designerStore.exitLayerEdit()">退出</el-button>
@@ -58,8 +64,8 @@
         v-model:layout="layoutItems"
         :col-num="colNum"
         :row-height="50"
-        :is-draggable="true"
-        :is-resizable="true"
+        :is-draggable="!preview"
+        :is-resizable="!preview"
         :vertical-compact="true"
         :use-css-transforms="true"
         class="grid-canvas"
@@ -75,13 +81,13 @@
           :i="item.i"
           class="grid-node-wrapper"
           :class="{ selected: designerStore.selectedNodeId === item.i }"
-          @click.stop="designerStore.selectNode(item.i)"
+          @click.stop="onSelectNode(item.i)"
           @move="handleItemMove"
           @moved="handleItemMoved"
           @resize="handleItemResize"
           @resized="handleItemResized"
         >
-          <div class="node-toolbar">
+          <div v-if="!preview" class="node-toolbar">
             <span class="node-type-tag">{{ getNodeLabel(item.i) }}</span>
             <el-icon class="delete-btn" @click.stop="designerStore.removeNode(item.i)">
               <Delete />
@@ -104,7 +110,17 @@ import { useDesignerStore } from '../stores/designerStore';
 import type { MaterialItem } from '../types/designer';
 import { Monitor, Platform, Cellphone, Iphone, UploadFilled, Delete } from '@element-plus/icons-vue';
 
+const props = defineProps<{
+  preview?: boolean;
+}>();
+
 const designerStore = useDesignerStore();
+const preview = computed(() => props.preview === true);
+
+const onSelectNode = (id: string) => {
+  if (preview.value) return;
+  designerStore.selectNode(id);
+};
 const viewportMode = ref<'desktop' | 'laptop' | 'tablet' | 'mobile'>('desktop');
 
 const colNum = computed(() => {
@@ -258,9 +274,11 @@ const handleBackgroundClick = () => {
   align-items: center;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
 }
-.page-title {
+.page-title,
+.page-title-input {
   font-weight: 600;
   color: #303133;
+  width: 220px;
 }
 .viewport-selector {
   display: flex;
