@@ -1,4 +1,5 @@
 import { parseExpression } from './expression';
+import { shouldRunAction } from './condition';
 import type { ActionNode, ApiBinding, ComponentNode, LayerConfig } from '../types/designer';
 
 // ============================================================
@@ -287,6 +288,7 @@ function assignState(scope: Record<string, any>, payload: Record<string, any> | 
 }
 
 async function executeAction(action: ActionNode, ctx: ActionContext): Promise<void> {
+  if (!shouldRunAction(action.when, ctx.scope, ctx.event)) return;
   switch (action.type) {
     case 'set_state': {
       assignState(ctx.scope, action.payload, ctx.event);

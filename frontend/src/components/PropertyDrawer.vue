@@ -26,6 +26,10 @@
             <el-form-item label="组件显示名称">
               <el-input v-model="node.label" />
             </el-form-item>
+            <el-form-item label="显隐条件">
+              <el-input v-model="node.visibleWhen" placeholder="留空始终显示，例如 {{ state.show === true }}" />
+              <p v-if="visibleWhenWarning" class="field-warning">{{ visibleWhenWarning }}</p>
+            </el-form-item>
 
             <!-- ProTable 属性 -->
             <template v-if="node.type === 'pro-table'">
@@ -238,7 +242,7 @@
         <!-- 事件动作链 Tab (v1.3.0 L3) -->
         <el-tab-pane label="事件" name="events">
           <div class="section-title">
-            <span>click 事件动作链</span>
+            <span>{{ eventName }} 事件动作链</span>
             <el-button type="primary" size="small" icon="Plus" link @click="addAction">添加动作</el-button>
           </div>
           <el-alert
@@ -281,6 +285,14 @@
               </el-option-group>
             </el-select>
             <el-input
+              v-model="action.when"
+              placeholder="条件，如 {{ state.ok === true }}，留空则始终执行"
+              style="margin-top: 6px"
+            />
+            <p v-if="action.when && !whenIsSafe(action.when)" class="field-warning">
+              该条件无法安全求值，此动作会被跳过
+            </p>
+            <el-input
               v-model="action.payloadText"
               type="textarea"
               :rows="2"
@@ -311,6 +323,7 @@ import { ApiExecutor, nodeEventBus } from '../utils/dataSource';
 import type { ActionType, ComponentNode } from '../types/designer';
 import SchemaJsonViewer from './SchemaJsonViewer.vue';
 import { missingRequiredFields } from '../registry/materialContract';
+import { inlineableExpression } from '../utils/condition';
 import { ElMessage } from 'element-plus';
 
 const designerStore = useDesignerStore();
@@ -451,19 +464,30 @@ interface ClickActionForm {
   type: ActionType | '';
   target?: string;
   payloadText: string;
+  when?: string;
 }
+
+const eventName = computed(() => (node.value?.type === 'pro-form' ? 'submit' : 'click'));
+const visibleWhenWarning = computed(() => {
+  const raw = node.value?.visibleWhen?.trim();
+  if (!raw) return '';
+  return inlineableExpression(raw) ? '' : '显隐表达式无法安全求值，组件将保持显示';
+});
+const whenIsSafe = (when: string) => Boolean(inlineableExpression(when));
 
 const clickActions = ref<ClickActionForm[]>([]);
 
 watch(
   node,
   (n) => {
-    const rule = n?.events?.click;
+    const name = n?.type === 'pro-form' ? 'submit' : 'click';
+    const rule = n?.events?.[name];
     clickActions.value = (rule?.actions ?? []).map((a) => ({
       id: a.id,
       type: a.type,
       target: a.target ?? '',
-      payloadText: a.payload ? JSON.stringify(a.payload, null, 2) : ''
+      payloadText: a.payload ? JSON.stringify(a.payload, null, 2) : '',
+      when: a.when ?? ''
     }));
   },
   { immediate: true }
@@ -485,10 +509,14 @@ const syncEvents = () => {
         id: a.id || 'act_' + Date.now().toString(36),
         type: a.type as ActionType,
         target: a.target?.trim() || undefined,
-        payload
+        payload,
+        when: a.when?.trim() || undefined
       };
     });
-  node.value.events = validActions.length > 0 ? { click: { enabled: true, actions: validActions } } : {};
+  const next = { ...(node.value.events || {}) };
+  if (validActions.length > 0) next[eventName.value] = { enabled: true, actions: validActions };
+  else delete next[eventName.value];
+  node.value.events = next;
 };
 
 watch(clickActions, syncEvents, { deep: true });
@@ -587,5 +615,10 @@ const removeFormItem = (index: number) => {
 .preview-val {
   color: #409eff;
   font-weight: 600;
+}
+.field-warning {
+  margin: 4px 0 0;
+  color: #e6a23c;
+  font-size: 12px;
 }
 </style>

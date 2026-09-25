@@ -419,6 +419,43 @@ describe('v1.6.0 出码正确性', () => {
     expect(code).not.toContain(':bad="1)');
   });
 
+  test('显隐、动作条件和必填提交', () => {
+    const schema = buildTestSchema();
+    const button = schema.children.find((node) => node.type === 'el-button');
+    const form = schema.children.find((node) => node.type === 'pro-form');
+    if (!button || !form) throw new Error('missing nodes');
+    button.visibleWhen = '{{ state.show === true }}';
+    button.events = {
+      click: {
+        enabled: true,
+        actions: [
+          { id: 'a1', type: 'show_message', when: '{{ state.ok === true }}', payload: { messageText: '第一条' } },
+          { id: 'a2', type: 'show_message', payload: { messageText: '第二条' } },
+          { id: 'a3', type: 'show_message', when: '{{ 1) || alert(1) || (1 }}', payload: { messageText: '坏条件' } }
+        ]
+      }
+    };
+    form.events = {
+      submit: { enabled: true, actions: [{ id: 's1', type: 'show_message', payload: { messageText: '已提交' } }] }
+    };
+    const code = generateVueSFC(schema);
+    expect(code).toContain('v-show="state.show === true"');
+    expect(code).toContain('if (state.ok === true)');
+    expect(code).toContain('第二条');
+    expect(code).not.toContain('alert(1)');
+    expect(code).toContain('请填写用户名');
+    expect(code).toContain("await handleNodeClick(formId, 'submit', form.value)");
+    const hidden = { ...button, visibleWhen: '{{ 1) || alert(1) || (1 }}' };
+    const bad = generateVueSFC({
+      ...schema,
+      children: schema.children.map((node) => (node.id === button.id ? hidden : node))
+    });
+    expect(bad).not.toContain('v-show="1)');
+    const html = generateHTML(schema);
+    expect(html).toContain('请填写用户名');
+    expect(html).toContain('return;');
+  });
+
   test('图层初始可见性与 Schema 一致', () => {
     const schema = buildTestSchema();
     const dialog = schema.layers?.find((layer) => layer.type === 'dialog');

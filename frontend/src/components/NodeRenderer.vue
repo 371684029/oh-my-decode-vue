@@ -1,6 +1,6 @@
 <template>
   <!-- eslint-disable vue/no-mutating-props -- 设计器场景 node 为响应式 store 节点，el-switch 需双向绑定 props -->
-  <div class="node-renderer-root" @click.stop="designerStore.selectNode(node.id)">
+  <div v-show="shown" class="node-renderer-root" @click.stop="designerStore.selectNode(node.id)">
   <ErrorBoundary>
     <!-- 自有高端组件 -->
     <ProTable v-if="node.type === 'pro-table'" :node="node" />
@@ -97,7 +97,9 @@
 </template>
 
 <script setup lang="ts">
+import { computed } from 'vue';
 import { parseExpression } from '../utils/expression';
+import { visibleByExpression } from '../utils/condition';
 import { executeActions, nodeEventBus } from '../utils/dataSource';
 import { findNode } from '../utils/schemaTree';
 import { useDesignerStore } from '../stores/designerStore';
@@ -112,6 +114,8 @@ const props = defineProps<{
 }>();
 
 const designerStore = useDesignerStore();
+
+const shown = computed(() => visibleByExpression(props.node.visibleWhen, designerStore.pageSchema.state));
 
 /** 节点 props 表达式真实求值（{{ state.xxx }} → 运行时值） */
 const np = (n: ComponentNode): Record<string, any> => {

@@ -26,7 +26,8 @@ const actionNodeSchema = z.object({
   id: z.string().min(1).max(100),
   type: z.enum(['reload_data', 'open_dialog', 'close_dialog', 'toggle_loading', 'show_message', 'set_state']),
   target: z.string().max(200).optional(),
-  payload: z.record(z.string(), z.unknown()).optional()
+  payload: z.record(z.string(), z.unknown()).optional(),
+  when: z.string().max(500).optional()
 });
 
 const eventRuleSchema = z.object({
@@ -55,6 +56,7 @@ const componentNodeSchema: z.ZodType<any> = z.lazy(() =>
     style: z.record(z.string(), z.unknown()).default({}),
     events: z.record(z.string(), eventRuleSchema).default({}),
     apiBinding: apiBindingSchema.optional(),
+    visibleWhen: z.string().max(500).optional(),
     children: z.array(componentNodeSchema).optional()
   })
 );

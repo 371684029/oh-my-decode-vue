@@ -97,4 +97,26 @@ test.describe('低代码设计器核心闭环', () => {
     await page.locator('.grid-node-wrapper').getByRole('button', { name: '按钮' }).click();
     await expect(dialog).toBeVisible();
   });
+
+  test('页面状态控制按钮显隐', async ({ page }) => {
+    await page.getByRole('tab', { name: '页面状态' }).click();
+    await page.getByRole('button', { name: '添加状态' }).click();
+    const panel = page.locator('.page-state-panel');
+    await panel.getByPlaceholder('键名').fill('show');
+    await panel.getByPlaceholder('JSON 值').fill('false');
+    await panel.getByPlaceholder('JSON 值').blur();
+
+    await addMaterial(page, '按钮');
+    const drawer = page.locator('.el-drawer');
+    await drawer.getByPlaceholder('留空始终显示，例如 {{ state.show === true }}').fill('{{ state.show === true }}');
+    await closeDrawer(page);
+
+    const button = page.locator('.grid-node-wrapper').getByRole('button', { name: '按钮' });
+    await expect(button).toBeHidden();
+
+    await page.getByRole('tab', { name: '页面状态' }).click();
+    await panel.getByPlaceholder('JSON 值').fill('true');
+    await panel.getByPlaceholder('JSON 值').press('Enter');
+    await expect(button).toBeVisible();
+  });
 });
