@@ -41,7 +41,8 @@ const apiBindingSchema = z.object({
   params: z.record(z.string(), z.unknown()).optional(),
   autoFetch: z.boolean().optional(),
   responsePath: z.string().max(500).optional(),
-  totalProp: z.string().max(500).optional()
+  totalProp: z.string().max(500).optional(),
+  example: z.unknown().optional()
 });
 
 const componentNodeSchema: z.ZodType<any> = z.lazy(() =>

@@ -213,6 +213,12 @@ export class ApiExecutor {
     if (typeof rawUrl !== 'string' || !rawUrl.trim()) {
       throw new Error('数据源 URL 未配置');
     }
+    if (rawUrl.trim().startsWith('/api/mock/') && api.example !== undefined) {
+      return {
+        data: extractByPath(api.example, api.responsePath),
+        total: api.totalProp ? extractByPath(api.example, api.totalProp) : undefined
+      };
+    }
     const url = /^https?:\/\//.test(rawUrl) ? rawUrl : this.baseUrl + rawUrl;
     assertFetchableUrl(url);
     const params = resolveTemplatedValue(api.params ?? {}, this.scope) as Record<string, any>;

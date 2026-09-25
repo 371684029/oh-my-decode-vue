@@ -120,6 +120,16 @@ test.describe('低代码设计器核心闭环', () => {
     await expect(button).toBeVisible();
   });
 
+  test('一键生成 Mock 与接口文档', async ({ page }) => {
+    await addMaterial(page, '高端表格');
+    await closeDrawer(page);
+    await page.getByRole('button', { name: '生成 Mock 与接口文档' }).click();
+    const dialog = page.getByRole('dialog', { name: '前端接口文档' });
+    await expect(dialog).toContainText('/api/mock/');
+    await expect(dialog).toContainText('data.list');
+    await expect(page.locator('.pro-table-wrapper').getByText('张三')).toBeVisible();
+  });
+
   test('纯预览隐藏搭建控件，退出后恢复', async ({ page }) => {
     await addMaterial(page, '按钮');
     await expect(page.locator('.delete-btn')).toBeVisible();

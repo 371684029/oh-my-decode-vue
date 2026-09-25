@@ -119,6 +119,21 @@ describe('ApiExecutor 统一请求层', () => {
     const executor = new ApiExecutor();
     await expect(executor.fetchData({ url: '' })).rejects.toThrow('URL 未配置');
   });
+
+  test('设计器 Mock 直接返回示例，不发起请求', async () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+    const executor = new ApiExecutor();
+    const result = await executor.fetchData({
+      url: '/api/mock/tbl_1',
+      responsePath: 'data.list',
+      totalProp: 'data.total',
+      example: { data: { list: [{ name: '张三' }], total: 1 } }
+    });
+    expect(result.data).toEqual([{ name: '张三' }]);
+    expect(result.total).toBe(1);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
 });
 
 describe('nodeEventBus 节点 reload 通信', () => {
