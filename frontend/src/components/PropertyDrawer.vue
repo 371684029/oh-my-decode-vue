@@ -349,6 +349,51 @@
         </el-tab-pane>
 
         <!-- JSON 实时预览 Tab -->
+        <el-tab-pane v-if="node.materialRef" label="物料" name="material">
+          <el-form label-position="top" size="small">
+            <el-alert
+              type="info"
+              :closable="false"
+              show-icon
+              style="margin-bottom: 12px"
+              :title="`黑盒物料：${node.materialRef.id}`"
+              description="实例锁定具体版本；切换版本即升级/回滚，inputs 值注入快照，outputs 为对外事件出口"
+            />
+            <el-form-item label="当前锁定版本">
+              <el-input :model-value="`${node.materialRef.id}@${node.materialRef.version}`" disabled />
+            </el-form-item>
+            <el-form-item label="切换版本（升级 / 回滚）">
+              <el-select :model-value="node.materialRef.version" style="width: 100%" @change="onSwitchVersion">
+                <el-option v-for="v in materialVersions" :key="v" :label="v" :value="v" />
+              </el-select>
+            </el-form-item>
+            <el-form-item label="跟随策略">
+              <el-select v-model="node.materialRef.follow" style="width: 100%">
+                <el-option label="精确锁定 (pin)" value="pin" />
+                <el-option label="跟随 minor（兼容更新自动生效）" value="minor" />
+                <el-option label="跟随 patch（仅补丁自动生效）" value="patch" />
+              </el-select>
+            </el-form-item>
+
+            <el-divider content-position="left">输入 (inputs)</el-divider>
+            <el-form-item v-for="input in materialInputs" :key="input.name" :label="input.label">
+              <el-input v-model="node.props[input.name]" :placeholder="`注入到 ${input.nodeId}.${input.fieldPath}`" />
+            </el-form-item>
+            <el-empty v-if="materialInputs.length === 0" description="该物料未暴露输入" :image-size="40" />
+
+            <el-divider content-position="left">输出 (outputs)</el-divider>
+            <div v-for="out in materialOutputs" :key="out.name" class="output-row">
+              <span>{{ out.label }}</span>
+              <el-switch
+                :model-value="!!node.events?.[out.name]"
+                @change="(val: any) => toggleOutput(out.name, Boolean(val))"
+              />
+            </div>
+            <el-empty v-if="materialOutputs.length === 0" description="该物料未暴露事件出口" :image-size="40" />
+            <p class="output-hint">开启后到「事件」标签配置该出口的动作链</p>
+          </el-form>
+        </el-tab-pane>
+
         <el-tab-pane label="JSON 源码" name="json">
           <SchemaJsonViewer />
         </el-tab-pane>
@@ -365,11 +410,13 @@ import { ref, computed, watch } from 'vue';
 import { useDesignerStore } from '../stores/designerStore';
 import { parseExpression } from '../utils/expression';
 import { ApiExecutor, nodeEventBus } from '../utils/dataSource';
-import type { ActionType, ComponentNode } from '../types/designer';
+import type { ActionType, ComponentNode, MaterialVersion } from '../types/designer';
 import SchemaJsonViewer from './SchemaJsonViewer.vue';
 import { missingRequiredFields } from '../registry/materialContract';
 import { inlineableExpression } from '../utils/condition';
 import { mergeApiBinding, moveListItem } from '../utils/apiBindingForm';
+import { resolveMaterial } from '../utils/materialResolver';
+import { http } from '../utils/http';
 import { ElMessage } from 'element-plus';
 
 const designerStore = useDesignerStore();
@@ -394,6 +441,52 @@ const getExpressionPreview = (exprStr: string) => {
 const activeTab = ref('props');
 
 const node = computed(() => designerStore.selectedNode);
+
+// ============================================================
+// 黑盒物料实例（v2.1.0）：版本切换 / inputs 注入 / outputs 绑定
+// ============================================================
+const materialVersion = ref<MaterialVersion | null>(null);
+const materialVersions = ref<string[]>([]);
+const materialInputs = computed(() => materialVersion.value?.contract?.inputs || []);
+const materialOutputs = computed(() => materialVersion.value?.contract?.outputs || []);
+
+const loadMaterialMeta = async () => {
+  const ref0 = node.value?.materialRef;
+  if (!ref0) {
+    materialVersion.value = null;
+    materialVersions.value = [];
+    return;
+  }
+  materialVersion.value = await resolveMaterial(ref0);
+  try {
+    const resp = await http.get(`/materials/${encodeURIComponent(ref0.id)}/versions`);
+    materialVersions.value = ((resp.data?.data || []) as Array<{ version: string }>).map((v) => v.version);
+  } catch {
+    materialVersions.value = [];
+  }
+};
+
+watch(() => node.value?.id, loadMaterialMeta, { immediate: true });
+watch(() => node.value?.materialRef?.version, loadMaterialMeta);
+
+const onSwitchVersion = (v: string) => {
+  if (!node.value?.materialRef) return;
+  designerStore.recordHistory();
+  node.value.materialRef.version = v;
+  loadMaterialMeta();
+};
+
+const toggleOutput = (name: string, on: boolean) => {
+  const n = node.value;
+  if (!n) return;
+  designerStore.recordHistory();
+  if (!n.events) n.events = {};
+  if (on) {
+    n.events[name] = { enabled: true, actions: [] };
+  } else {
+    delete n.events[name];
+  }
+};
 const missingFields = computed(() => (node.value ? missingRequiredFields(node.value) : []));
 
 const handleClose = () => {
@@ -683,6 +776,18 @@ const moveFormItem = (index: number, delta: number) => {
 .field-warning {
   margin: 4px 0 0;
   color: #e6a23c;
+  font-size: 12px;
+}
+.output-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 0;
+  font-size: 13px;
+}
+.output-hint {
+  margin: 4px 0 0;
+  color: #909399;
   font-size: 12px;
 }
 </style>

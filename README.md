@@ -1,6 +1,6 @@
 # 低代码前端可视化平台
 
-拖拽搭页面，再导出成能运行的前端代码。当前版本 **v1.12.0**。
+拖拽搭页面，再导出成能运行的前端代码。当前版本 **v2.1.0**。
 
 页面在设计器里是一份 JSON Schema。表格、表单和按钮都由这份 Schema 渲染。导出时，同一份 Schema 生成 Vue 单文件组件、独立 HTML，以及由这两种组件组成的语料库。平台不生成后端业务代码。页面 JSON 存在本地文件里，SQLite 只记操作日志。
 
@@ -42,15 +42,17 @@
 - **导出语料库**：`corpus.jsonl` 里每个页面各有一条 Vue 记录和一条 HTML 记录。
 - **对接已有接口**：组件绑定 `apiBinding` 后，设计器和导出页面都用浏览器 `fetch` 取数。没有地址时可以生成 Mock，并附上接口文档。
 - **页面可以收尾**：改标题、保存、载入、删除、恢复上一份备份。撤销和重做覆盖拖拽和属性修改。
+- **生成即物料（自我循环）**：画布上选中任意组件组，一键打包为自定义物料；物料可拖拽复用、导出自描述代码（Vue / HTML 内嵌物料定义）、再导入还原——平台能消化自己生成的产物。
+- **黑盒物料与版本管理**：物料可打包为"黑盒"（带 inputs/outputs 契约与不可变版本）。实例锁定具体版本、显式升级/回滚；发布新版本、差异对比、归档、fork、批量升级实例一应俱全。
 - **本地保存**：Schema 写到 `backend/storage/pages/*.json`。保存、删除和恢复记在 SQLite。
 
 管道编排、远程物料、协同和登录不在当前版本里，规划见 `docs/roadmap/`。
 
 ### 🔜 规划中的核心能力（详见 `docs/`）
 
-- **Component - API - Event (CAE) 三角解耦模型**：REST 数据源与最小动作链已实现；GraphQL、Event Flow Orchestrator 仍规划中。
+- **Component - API - Event (CAE) 三角解耦模型**：REST 数据源、最小动作链、物料黑盒引用与版本契约已实现；GraphQL、Event Flow Orchestrator 仍规划中。
 - **数据与事件管道编排 (Pipeline Orchestration)**：`beforeTransform` / `asyncFetch` / `scriptTransform` / `afterTransform` 生命周期管道、页面路由跳转 — 规划中。
-- **组件 I/O 契约强校验**、**Module Federation 远程物料插件**、**可视化逻辑流编排** — 规划中。
+- **物料市场 / 远程物料 SDK**（v2.2）、**Module Federation 远程物料插件**、**可视化逻辑流编排** — 规划中。
 
 ---
 
@@ -68,7 +70,7 @@
 - `click`: 点击事件动作链（刷新数据、开关弹窗、消息、写入 state）。✅
 - `functions`: 对应作用域/域下的逻辑处理函数与业务脚本。🔜 规划中
 
-### 2. Component - API - Event (CAE) 三角解耦模型 🟡 最小闭环已落地
+### 2. Component - API - Event (CAE) 三角解耦模型 🟡 最小闭环 + 物料黑盒/版本已落地
 
 > 组件渲染、`apiBinding` 数据源和 click 动作链已经接通。GraphQL、可视化流程编排和完整管道仍按下方蓝图演进。
 
@@ -132,17 +134,17 @@ low-code-platform/
 ├── .github/workflows/      # GitHub Actions CI（typecheck → lint → test → build）
 ├── docs/                   # 文档集
 │   ├── implemented/        # 技术规范 (CAE/物料/组件 I/O/管道编排) 与优化报告
-│   └── roadmap/            # 各版本规划与路线图 (0.x ~ 3.0.0，含 v1.3.0 至 v1.12.0)
+│   └── roadmap/            # 各版本规划与路线图 (0.x ~ 3.0.0，含 v1.3.0 至 v2.1.0)
 ├── shared/                 # 共享类型包 @lowcode/shared（纯类型，前后端共用）
-│   └── src/index.ts        # ComponentNode / PageSchema / LayerConfig / MaterialItem ...
+│   └── src/index.ts        # ComponentNode / PageSchema / MaterialManifest / MaterialVersion ...
 ├── frontend/               # Vue 3 前端低代码设计器工程
 │   ├── src/
-│   │   ├── components/     # 设计器 UI 组件 (CanvasContainer, MaterialList, PropertyDrawer ...)
-│   │   ├── registry/       # 物料注册 (materials.ts) 与已登记节点类型 (nodeTypes.ts)
+│   │   ├── components/     # 设计器 UI (CanvasContainer, MaterialList, PropertyDrawer, MaterialManager ...)
+│   │   ├── registry/       # 内置物料种子 (materials.ts) + 运行时注册表 (materialRegistry.ts) + 节点类型 (nodeTypes.ts)
 │   │   ├── stores/         # Pinia 全局设计器 Store (designerStore.ts)
-│   │   ├── utils/          # 出码 (codeGenerator.ts) / 表达式 (expression.ts) / 数据源 (dataSource.ts)
+│   │   ├── utils/          # 出码 (codeGenerator.ts) / 物料 (materialPacker, materialImport, materialResolver, materialInject) / 表达式 / 数据源
 │   │   ├── types/          # 类型 re-export（统一来自 @lowcode/shared）
-│   │   ├── *.test.ts       # Vitest 单元测试（Store / 出码引擎 / 表达式求值器）
+│   │   ├── *.test.ts       # Vitest 单元测试（Store / 出码 / 物料循环 / 版本解析 ...）
 │   │   └── App.vue         # 主应用与 API 联调界面
 │   ├── .env / .env.example # VITE_API_BASE 环境变量
 │   ├── eslint.config.js    # ESLint flat config（vue + TS + prettier 协调）
@@ -151,15 +153,17 @@ low-code-platform/
 │   └── vite.config.ts      # unplugin 按需引入 + vendor 分包
 ├── backend/                # Node.js + Express 后端服务工程
 │   ├── src/
-│   │   ├── controllers/    # JSON Schema CRUD 与日志控制器
+│   │   ├── controllers/    # Schema CRUD / 物料与版本控制器 (materialController.ts)
 │   │   ├── middleware/     # X-Api-Key 认证
 │   │   ├── db/             # SQLite logs.db 初始化脚本
-│   │   ├── services/       # 文件读写存储服务 (storageService.ts)
-│   │   ├── validation/     # Zod 落盘强校验 (schemaValidation.ts)
+│   │   ├── services/       # 存储 (storageService/materialService/materialVersionService) + 引用扫描 / 批量升级
+│   │   ├── utils/          # JSON Patch 审计差异 + 版本判定 (versionClassify.ts)
+│   │   ├── validation/     # Zod 落盘强校验 (schemaValidation.ts / materialValidation.ts)
 │   │   └── server.ts       # Express 服务入口
 │   ├── storage/            # JSON 文件持久化存储目录
 │   │   ├── pages/          # 页面配置 JSON 集合 (*.json)
-│   │   └── components/     # 组件配置 JSON 集合 (*.json)
+│   │   ├── components/     # 组件配置 JSON 集合 (*.json)
+│   │   └── materials/      # 物料目录：<id>/{manifest.json, draft.json, versions/<v>.json}
 │   ├── data/               # SQLite 数据库存储目录 (logs.db)
 │   ├── eslint.config.mjs   # ESLint flat config（TS + prettier 协调）
 │   ├── package.json
@@ -201,7 +205,7 @@ npm run build
 ```bash
 npm run typecheck   # 前后端类型检查
 npm run lint        # ESLint（0 error / 0 warning 门槛）
-npm run test        # Vitest：前端 102 项 + 后端 11 项
+npm run test        # Vitest：前端 137 项 + 后端 43 项
 npm run format      # Prettier 全仓格式化
 ```
 
@@ -219,6 +223,26 @@ npm run format      # Prettier 全仓格式化
 | **GET**    | `/api/schemas/:id/backups` | 列出该 Schema 的备份代数                                                                      | `?type=page`                      |
 | **POST**   | `/api/schemas/:id/restore` | 从指定备份代恢复                                                                              | Body: `{ "index": 1 }`            |
 
+### 物料与版本管理 (v2.0 / v2.1)
+
+| 请求方式   | 路径                                | 描述                                                       | 参数 / Body                                      |
+| :--------- | :---------------------------------- | :--------------------------------------------------------- | :----------------------------------------------- |
+| **GET**    | `/api/materials`                    | 物料清单（兼容 v2.0 单文件与 v2.1 目录结构）               | —                                                |
+| **POST**   | `/api/materials`                    | 注册物料；携带 `contract` 的黑盒物料走目录结构并发布首版   | Body: `MaterialManifest`                         |
+| **GET**    | `/api/materials/:id`                | 物料详情                                                   | —                                                |
+| **DELETE** | `/api/materials/:id`                | 删除物料（被引用时返回 409，需 `?force=true`）             | `?force=true` (可选)                             |
+| **GET**    | `/api/materials/:id/refs`           | 引用计数与引用页面列表                                     | —                                                |
+| **PUT**    | `/api/materials/:id/draft`          | 保存草稿（编辑态，不产生版本）                             | Body: `MaterialVersion`                          |
+| **DELETE** | `/api/materials/:id/draft`          | 丢弃草稿                                                   | —                                                |
+| **GET**    | `/api/materials/:id/versions`       | 版本列表（版本号 / 发布时间 / 契约签名 / 引用数）          | —                                                |
+| **POST**   | `/api/materials/:id/versions`       | 发布：草稿 → 不可变版本（服务端判定建议版本号）            | Body: `{ draft, suggestedVersion? }`             |
+| **GET**    | `/api/materials/:id/versions/:v`    | 指定版本详情                                               | —                                                |
+| **GET**    | `/api/materials/:id/versions/:v/diff` | 两版本差异（契约层 + 结构层）                            | `?base=:b`                                       |
+| **DELETE** | `/api/materials/:id/versions/:v`    | 归档版本（当前版本不可归档，被引用需 `?force=true`）       | `?force=true` (可选)                             |
+| **POST**   | `/api/materials/:id/rollback`       | 回滚：历史版本设为当前                                     | Body: `{ "version": "1.0.0" }`                   |
+| **POST**   | `/api/materials/:id/fork`           | 从指定版本派生新物料                                       | Body: `{ fromVersion, newType, label, icon }`    |
+| **POST**   | `/api/pages/upgrade-material`       | 批量升级：改写页面中引用某物料旧版本的实例                 | Body: `{ materialId, fromVersion, toVersion }`   |
+
 配置了环境变量 `API_KEY` 后，以上接口要求请求头 `X-Api-Key`。`CORS_ORIGIN` 默认 `http://localhost:5173`，`HOST` 默认 `127.0.0.1`。
 
 `VITE_API_KEY` 会打进前端包，只适合挡住对本机端口的随意扫描，不能当作用户口令或服务端机密。未配置 `API_KEY` 时接口保持开放，方便本地开发。
@@ -227,7 +251,25 @@ npm run format      # Prettier 全仓格式化
 
 ## 📝 版本变更历史 (Changelog)
 
-### 📌 v1.12.0 (当前版本 - 2026-09)
+### 📌 v2.1.0 (2026-09)
+
+- **黑盒引用**：复合物料可打包为"黑盒"（`materialRef` 单一实例节点），渲染/出码按引用解析物料定义；实例本身可作为事件目标。
+- **契约 (inputs / outputs)**：打包黑盒时自动生成契约——inputs 声明注入点（nodeId + 字段路径），outputs 声明事件出口；属性面板可配置 inputs 值并在「事件」面板为 outputs 绑定动作链。
+- **版本管理**：每个物料独立版本线；**草稿 + 不可变发布版本**（发布后永不改写）。版本号自动判定（契约签名变化 = major / 结构增删 = minor / 纯值变化 = patch）。
+- **实例锁定与升级**：实例默认 `pin` 具体版本，可选 `follow-minor` / `follow-patch`；版本切换（升级/回滚）、差异对比（契约层 + 结构层）、归档、fork、批量升级实例。
+- **引用保护**：删除被引用物料 / 归档被引用版本会被阻止（附引用列表）；缺版本容错回退当前版本并渲染占位，页面不崩溃。
+- **存储与接口**：`materials/<id>/{manifest.json, draft.json, versions/<v>.json}`，兼容 v2.0 单文件惰性迁移；`/api/materials/:id/{versions,draft,rollback,fork,refs}` + `/api/pages/upgrade-material`，全部 Zod 校验 + SQLite 审计。
+
+### 📌 v2.0.0 (2026-09)
+
+- **自我循环物料机制**：画布上任意组件组可一键打包为自定义物料，出现在「自定义物料」面板。
+- **拖拽复用**：自定义物料拖入画布即实例化为等价子树（坐标平移 + id / 事件引用重写，多选 + Ctrl/Shift 追加选择）。
+- **自描述出码**：物料导出 Vue / 独立 HTML 时内嵌 `@lowcode-material` 定义注释块——导出文件 = 可运行代码 + 可导入物料定义。
+- **导入还原**：物料管理支持导入 `.json` / `.vue` / `.html`（内嵌注释块零猜测还原；无注释的第三方源码降级为空快照物料并提示）。
+- **循环幂等**：打包 → 出码 → 导入 → 再打包 结构逐轮稳定（`instantiate(package(nodes)) ≅ nodes` 回归测试锁定）。
+- **物料治理**：运行时注册表（`custom-` 命名空间隔离、内置物料只读）、后端 `/api/materials` CRUD + Zod 强校验（前缀 / 长度 / 节点数 / 嵌套深度）+ SQLite 审计、物料管理器（导入 / 导出 / 编辑 / 删除）。
+
+### 📌 v1.12.0 (2026-09)
 
 - **语料库导出**：同一页面写成 JSONL 里的两行，一行是 Vue 单文件组件，一行是独立 HTML。默认收当前画布，也可以并入已保存页面。
 
@@ -367,4 +409,7 @@ npm run format      # Prettier 全仓格式化
 20. **[v1.10.0 交互打磨](docs/roadmap/1.10.0_PLAN.md)**：编辑数据源时保留 Mock 示例、配置项排序、抽屉不再挡住顶栏。已实现。
 21. **[v1.11.0 出码与画布对齐](docs/roadmap/1.11.0_PLAN.md)**：Vue、Web Component 配套组件和独立 HTML 使用画布上的占位、标签宽度、分页和行按钮。已实现。
 22. **[v1.12.0 语料库导出](docs/roadmap/1.12.0_PLAN.md)**：同一页面导出为 Vue 组件和 HTML 组件两条语料。已实现。
-23. **[v3.0.0 远期企业级架构与生态规划](docs/roadmap/3.0.0_PLAN.md)**：包含企业级 RBAC/SSO 单点登录、PostgreSQL/S3 高可用分布式存储、CRDT 多人实时协同、一键 CI/CD 灰度发布、VS Code 插件与 CLI 工具链。
+23. **[v2.0.0 自我循环物料机制规划](docs/roadmap/2.0.0_PLAN.md)**：画布生成物料的自我循环闭环、映射规则、关系模型、自描述出码与导入管道。已实现。
+24. **[v2.1.0 物料版本管理与黑盒引用规划](docs/roadmap/2.1.0_PLAN.md)**：黑盒引用、版本发布/锁定/升级/回滚、引用保护与 fork。已实现。
+25. **[v2.1.0 版本管理实现解析](docs/roadmap/2.1.0_IMPLEMENTATION.md)**：版本管理的函数级实现方案（存储/判定/解析链/测试）。已实现。
+26. **[v3.0.0 远期企业级架构与生态规划](docs/roadmap/3.0.0_PLAN.md)**：包含企业级 RBAC/SSO 单点登录、PostgreSQL/S3 高可用分布式存储、CRDT 多人实时协同、一键 CI/CD 灰度发布、VS Code 插件与 CLI 工具链。

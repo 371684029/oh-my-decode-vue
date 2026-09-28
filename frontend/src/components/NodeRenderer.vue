@@ -1,9 +1,12 @@
 <template>
   <!-- eslint-disable vue/no-mutating-props -- 设计器场景 node 为响应式 store 节点，el-switch 需双向绑定 props -->
-  <div v-show="shown" class="node-renderer-root" @click.stop="designerStore.selectNode(node.id)">
+  <div v-show="shown" class="node-renderer-root" @click.stop="designerStore.toggleNodeSelected(node.id, $event.ctrlKey || $event.metaKey || $event.shiftKey)">
   <ErrorBoundary>
+    <!-- 黑盒物料实例（v2.1.0） -->
+    <MaterialBlackBox v-if="node.materialRef" :node="node" />
+
     <!-- 自有高端组件 -->
-    <ProTable v-if="node.type === 'pro-table'" :node="node" />
+    <ProTable v-else-if="node.type === 'pro-table'" :node="node" />
     <ProForm v-else-if="node.type === 'pro-form'" :node="node" />
 
     <el-card v-else-if="node.type === 'pro-container'" class="pro-container-box">
@@ -107,6 +110,7 @@ import type { ComponentNode, MaterialItem } from '../types/designer';
 import ProTable from './ProTable.vue';
 import ProForm from './ProForm.vue';
 import ErrorBoundary from './ErrorBoundary.vue';
+import MaterialBlackBox from './MaterialBlackBox.vue';
 import { ElMessage } from 'element-plus';
 
 const props = defineProps<{

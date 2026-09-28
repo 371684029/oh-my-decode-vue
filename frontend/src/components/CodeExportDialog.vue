@@ -154,7 +154,8 @@ import {
   generatePageTemplate,
   generateWebComponent,
   generateHTML,
-  generatePackageJson
+  generatePackageJson,
+  preloadMaterialSchemas
 } from '../utils/codeGenerator';
 import { renderApiMarkdown } from '../utils/frontendApi';
 import { buildCorpus, renderCorpusJsonl } from '../utils/corpus';
@@ -221,12 +222,44 @@ const corpusSummary = computed(() => {
   return `${corpusEntries.value.length} 条语料：${vueCount} 个 Vue 组件，${htmlCount} 个 HTML 组件`;
 });
 
-const vueCode = computed(() => generateVueSFC(designerStore.pageSchema));
+/** 黑盒快照预解析完成计数（触发代码 computed 重算） */
+const materialPreloadTick = ref(0);
+
+const vueCode = computed(() => {
+  void materialPreloadTick.value;
+  return generateVueSFC(designerStore.pageSchema);
+});
 const pageTemplateCode = computed(() => generatePageTemplate(designerStore.pageSchema));
 const wcCode = computed(() => generateWebComponent(designerStore.pageSchema));
-const htmlCode = computed(() => generateHTML(designerStore.pageSchema));
+const htmlCode = computed(() => {
+  void materialPreloadTick.value;
+  return generateHTML(designerStore.pageSchema);
+});
 const pkgCode = computed(() => generatePackageJson(designerStore.pageSchema));
 const apiDoc = computed(() => renderApiMarkdown(designerStore.pageSchema));
+
+/** 黑盒物料引用签名（含 id@version）：变化时重新预解析快照 */
+const materialSignature = computed(() => {
+  const ids: string[] = [];
+  const walk = (nodes: any[]) => {
+    for (const n of nodes || []) {
+      if (n.materialRef) ids.push(`${n.id}@${n.materialRef.version}:${n.materialRef.follow || 'pin'}`);
+      if (n.children?.length) walk(n.children);
+    }
+  };
+  walk(designerStore.pageSchema.children || []);
+  for (const layer of designerStore.pageSchema.layers || []) walk(layer.children || []);
+  return ids.join(',');
+});
+
+watch(
+  materialSignature,
+  async () => {
+    await preloadMaterialSchemas(designerStore.pageSchema);
+    materialPreloadTick.value++;
+  },
+  { immediate: true }
+);
 
 const handleCopy = (text: string) => {
   navigator.clipboard.writeText(text);

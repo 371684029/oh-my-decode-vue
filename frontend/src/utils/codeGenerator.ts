@@ -1,4 +1,4 @@
-import type { PageSchema, ComponentNode, LayerConfig, ApiBinding, ActionNode, EventRule } from '../types/designer';
+import type { PageSchema, ComponentNode, LayerConfig, ApiBinding, ActionNode, EventRule, MaterialManifest } from '../types/designer';
 import { isRenderedNodeType } from '../registry/nodeTypes';
 import { sanitizeCss } from './sanitizeCss';
 import { canInlineExpression } from './expression';
@@ -7,6 +7,31 @@ import { requiredInputFields } from './formValidation';
 import { FETCH_CHECKED_SOURCE, FORBIDDEN_STATE_KEYS } from './dataSource';
 import { TABLE_PLACEHOLDER_ROWS } from './tablePlaceholder';
 import { buildCustomHtmlSrcdoc } from './customHtmlDocument';
+import { resolveMaterial } from './materialResolver';
+import { mapOutputEvents } from './materialInject';
+
+/**
+ * 黑盒物料解析结果映射：node.id → 已注入 inputs / 对齐 outputs 的快照子树。
+ * 出码是同步的，调用方需先 await preloadMaterialSchemas(schema) 填充本映射。
+ */
+const materialSchemaMap = new Map<string, ComponentNode[]>();
+
+export function clearMaterialSchemas(): void {
+  materialSchemaMap.clear();
+}
+
+/** 预解析页面内所有黑盒实例（填 materialSchemaMap），供同步出码渲染 */
+export async function preloadMaterialSchemas(schema: PageSchema): Promise<void> {
+  materialSchemaMap.clear();
+  const nodes = allEditableNodes(schema);
+  for (const node of nodes) {
+    if (!node.materialRef) continue;
+    const version = await resolveMaterial(node.materialRef);
+    if (version) {
+      materialSchemaMap.set(node.id, mapOutputEvents(version.schema, node, version.contract));
+    }
+  }
+}
 
 // ============================================================
 // 多目标出码引擎 (Code Generator)
@@ -249,6 +274,16 @@ function tablePaginationEnabled(node: ComponentNode): boolean {
 
 function renderNodeMarkup(node: ComponentNode, indentLevel = 3): string {
   const indent = ' '.repeat(indentLevel * 2);
+
+  // 黑盒物料实例（v2.1.0）：解析后的快照已由 preloadMaterialSchemas 注入映射
+  if (node.materialRef) {
+    const snapshot = materialSchemaMap.get(node.id);
+    if (!snapshot || snapshot.length === 0) {
+      return `${indent}<div style="padding:8px;border:1px dashed #e6a23c;border-radius:4px;color:#b88230">${escapeHtml(node.label)}（物料 ${escapeHtml(node.materialRef.id)}@${escapeHtml(node.materialRef.version)} 未解析）</div>`;
+    }
+    return snapshot.map((n) => renderNodeToTemplate(n, indentLevel)).join('\n');
+  }
+
   const attrStr = stringifyAttributes(node.props || {}, node.attrs || {});
 
   switch (node.type) {
@@ -1272,4 +1307,32 @@ export function generatePackageJson(schema: PageSchema): string {
     null,
     2
   );
+}
+
+// ============================================================
+// 物料自描述出码 (v2.0.0)
+// 导出文件 = 可运行代码 + 可导入物料定义（内嵌 @lowcode-material 注释块）
+// ============================================================
+
+/** 序列化 manifest 为可嵌入注释的安全 JSON：`--` 转义为 `\u002d`，防止闭合 HTML 注释 */
+export function buildMaterialManifestComment(manifest: MaterialManifest): string {
+  const compact = JSON.stringify(manifest).replace(/--/g, '\\u002d\\u002d');
+  return `<!-- @lowcode-material ${compact} -->\n`;
+}
+
+/** 导出物料：Vue SFC / 独立 HTML，头部内嵌 @lowcode-material manifest 注释块（v2.0.0） */
+export function generateMaterialBundle(manifest: MaterialManifest): { vue: string; html: string } {
+  const schema: PageSchema = {
+    id: `material_${manifest.type}`,
+    title: manifest.label,
+    type: 'component',
+    meta: { author: 'LowCode Material', description: '', version: '1.0.0' },
+    state: {},
+    children: manifest.schema || []
+  };
+  const head = buildMaterialManifestComment(manifest);
+  return {
+    vue: head + generateVueSFC(schema),
+    html: head + generateHTML(schema)
+  };
 }

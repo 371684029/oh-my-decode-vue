@@ -40,6 +40,13 @@ export interface EventRule {
   actions: ActionNode[];
 }
 
+/** 黑盒实例的物料引用（v2.1.0） */
+export interface MaterialRef {
+  id: string; // 物料 type，如 "custom-user-card"
+  version: string; // 锁定版本号（精确锁定，无 range）
+  follow?: 'pin' | 'minor' | 'patch'; // 跟随策略，默认 'pin'
+}
+
 /** 画布组件节点 */
 export interface ComponentNode {
   id: string;
@@ -63,6 +70,8 @@ export interface ComponentNode {
   apiBinding?: ApiBinding;
   /** 整段 {{ expr }}。为空则始终显示；无法安全求值时保持显示。 */
   visibleWhen?: string;
+  /** 黑盒实例引用（存在 = 黑盒模式，渲染/出码按引用解析物料定义；v2.1.0） */
+  materialRef?: MaterialRef;
 }
 
 /** 图层类型 */
@@ -136,6 +145,74 @@ export interface MaterialItem {
   defaultConfig?: Record<string, any>;
   inputs?: MaterialInputContract[];
   outputs?: Array<{ name: string; label: string }>;
+}
+
+/** 物料种类：atomic = 内置原子；composite = 用户生成复合（v2.0.0） */
+export type MaterialKind = 'atomic' | 'composite';
+
+/** 物料 Manifest（v2.0.0）：复合物料 = MaterialItem 描述 + schema 快照 */
+export interface MaterialManifest extends MaterialItem {
+  kind: MaterialKind;
+  /** 复合物料核心：画布节点子树快照（拖入时展开实例化） */
+  schema?: ComponentNode[];
+  /** 包含组件类型清单（展示用，非契约）：如 ["pro-table", "el-button"] */
+  summary?: string[];
+  /** 当前版本号（v2.1.0 版本管理；manifest.json 索引不含 schema） */
+  currentVersion?: string;
+  /** 版本索引：version → 元信息（含契约签名 / 发布时间 / 引用数） */
+  versions?: Record<string, MaterialVersionMeta>;
+  /** 被引用实例数（扫描得出，提示用；删除前实时复核） */
+  refCount?: number;
+  /** 当前版本的契约（黑盒模式下才有运行时意义） */
+  contract?: MaterialContract;
+}
+
+// ============================================================
+// v2.1.0 物料版本管理与黑盒引用类型
+// ============================================================
+
+/** 契约输入：实例配置值注入快照的定位声明 */
+export interface MaterialInput {
+  name: string; // 实例 props 上的 key，如 "title"
+  label: string; // 面板显示名，如 "标题"
+  type: 'string' | 'number' | 'boolean' | 'expression' | 'data';
+  nodeId: string; // 快照内目标节点 id（黑盒不展开，id 稳定）
+  fieldPath: string; // 点路径，如 "props.title" / "config.columns"
+  required: boolean;
+  default?: unknown;
+}
+
+/** 契约输出：内部事件出口声明 */
+export interface MaterialOutput {
+  name: string; // 事件出口名，如 "submit"
+  label: string;
+  nodeId: string; // 快照内事件源节点 id
+  event: string; // 内部事件名，如 "click" / "submit"
+}
+
+export interface MaterialContract {
+  inputs: MaterialInput[];
+  outputs: MaterialOutput[];
+}
+
+/** 不可变版本快照（发布后永不改写） */
+export interface MaterialVersion {
+  version: string; // 严格 \d+\.\d+\.\d+
+  schema: ComponentNode[]; // 归一化快照（id 为种子）
+  contract: MaterialContract;
+  contractSignature: string; // 契约规范化哈希（major 判定硬标准）
+  summary: string[];
+  changelog: string; // 发布时变更摘要
+  publishedAt: string; // ISO 时间戳
+  releasedBy: string;
+}
+
+/** 版本索引元信息（manifest.versions 的值） */
+export interface MaterialVersionMeta {
+  version: string;
+  contractSignature: string;
+  publishedAt: string;
+  refCount: number;
 }
 
 /** 操作审计日志 */

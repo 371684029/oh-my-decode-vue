@@ -3,6 +3,9 @@
     <div class="panel-header">
       <el-icon><Menu /></el-icon>
       <span>物料与图层大纲</span>
+      <el-button class="pack-btn" link type="primary" size="small" @click="saveDialogOpen = true">
+        打包为物料
+      </el-button>
     </div>
     <el-tabs v-model="activeTab" class="material-tabs">
       <el-tab-pane label="自有高端组件" name="pro">
@@ -35,6 +38,31 @@
           </div>
         </div>
       </el-tab-pane>
+      <el-tab-pane label="自定义物料" name="custom">
+        <div class="custom-toolbar">
+          <span class="custom-toolbar-title">用户打包生成的物料</span>
+          <el-button link type="primary" size="small" @click="managerOpen = true">管理</el-button>
+        </div>
+        <div v-if="customMaterials.length > 0" class="material-grid">
+          <div
+            v-for="item in customMaterials"
+            :key="item.type"
+            class="material-item custom-item"
+            draggable="true"
+            @dragstart="handleDragStart($event, item)"
+            @click="handleClickAdd(item)"
+          >
+            <el-icon class="material-icon"><component :is="item.icon" /></el-icon>
+            <span class="material-label">{{ item.label }}</span>
+            <span class="material-meta">{{ item.summary?.length || 0 }} 组件</span>
+          </div>
+        </div>
+        <div v-else class="material-empty">
+          <el-icon><Box /></el-icon>
+          <p>暂无自定义物料</p>
+          <p class="empty-tip">选中画布组件后点击「打包为物料」创建</p>
+        </div>
+      </el-tab-pane>
       <el-tab-pane label="图层大纲" name="layers">
         <LayerTree />
       </el-tab-pane>
@@ -45,23 +73,31 @@
         <PageStatePanel />
       </el-tab-pane>
     </el-tabs>
+    <MaterialSaveDialog :visible="saveDialogOpen" @close="saveDialogOpen = false" />
+    <MaterialManager :visible="managerOpen" @close="managerOpen = false" />
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, computed } from 'vue';
 import { MATERIAL_REGISTRY } from '../registry/materials';
+import { listCustomMaterials } from '../registry/materialRegistry';
 import type { MaterialItem } from '../types/designer';
 import { useDesignerStore } from '../stores/designerStore';
 import LayerTree from './LayerTree.vue';
 import LayerManager from './LayerManager.vue';
 import PageStatePanel from './PageStatePanel.vue';
+import MaterialSaveDialog from './MaterialSaveDialog.vue';
+import MaterialManager from './MaterialManager.vue';
 
 const designerStore = useDesignerStore();
 const activeTab = ref('pro');
+const saveDialogOpen = ref(false);
+const managerOpen = ref(false);
 
 const proMaterials = computed(() => MATERIAL_REGISTRY.filter((m) => m.category === 'pro'));
 const elementMaterials = computed(() => MATERIAL_REGISTRY.filter((m) => m.category === 'element'));
+const customMaterials = computed(() => listCustomMaterials());
 
 const handleDragStart = (event: DragEvent, item: MaterialItem) => {
   if (event.dataTransfer) {
@@ -70,7 +106,7 @@ const handleDragStart = (event: DragEvent, item: MaterialItem) => {
 };
 
 const handleClickAdd = (item: MaterialItem) => {
-  designerStore.addNodeFromMaterial(item, 0, 1000);
+  designerStore.addMaterialSmart(item, 0, 1000);
 };
 </script>
 
@@ -136,5 +172,44 @@ const handleClickAdd = (item: MaterialItem) => {
   font-size: 12px;
   text-align: center;
   word-break: break-all;
+}
+.custom-item:hover {
+  border-color: #e6a23c;
+  background-color: #fdf6ec;
+  color: #e6a23c;
+}
+.material-meta {
+  font-size: 11px;
+  color: #909399;
+  margin-top: 2px;
+}
+.material-empty {
+  padding: 28px 0;
+  text-align: center;
+  color: #909399;
+  font-size: 13px;
+}
+.material-empty .el-icon {
+  font-size: 30px;
+  margin-bottom: 6px;
+}
+.material-empty p {
+  margin: 2px 0;
+}
+.material-empty .empty-tip {
+  font-size: 12px;
+}
+.pack-btn {
+  margin-left: auto;
+}
+.custom-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 2px 2px;
+}
+.custom-toolbar-title {
+  font-size: 12px;
+  color: #909399;
 }
 </style>

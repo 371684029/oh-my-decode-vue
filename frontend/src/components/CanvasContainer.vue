@@ -80,8 +80,8 @@
           :h="item.h"
           :i="item.i"
           class="grid-node-wrapper"
-          :class="{ selected: designerStore.selectedNodeId === item.i }"
-          @click.stop="onSelectNode(item.i)"
+          :class="{ selected: designerStore.selectedNodeIds.includes(item.i) }"
+          @click.stop="onSelectNode(item.i, $event)"
           @move="handleItemMove"
           @moved="handleItemMoved"
           @resize="handleItemResize"
@@ -117,9 +117,9 @@ const props = defineProps<{
 const designerStore = useDesignerStore();
 const preview = computed(() => props.preview === true);
 
-const onSelectNode = (id: string) => {
+const onSelectNode = (id: string, e?: MouseEvent) => {
   if (preview.value) return;
-  designerStore.selectNode(id);
+  designerStore.toggleNodeSelected(id, Boolean(e?.ctrlKey || e?.metaKey || e?.shiftKey));
 };
 const viewportMode = ref<'desktop' | 'laptop' | 'tablet' | 'mobile'>('desktop');
 
@@ -242,7 +242,7 @@ const handleDrop = (event: DragEvent) => {
   if (data) {
     try {
       const material: MaterialItem = JSON.parse(data);
-      designerStore.addNodeFromMaterial(material, 0, 1000);
+      designerStore.addMaterialSmart(material, 0, 1000);
     } catch (e) {
       console.error('Failed to parse dropped material', e);
     }

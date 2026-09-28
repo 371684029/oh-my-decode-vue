@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia';
-import type { PageSchema, ComponentNode, MaterialItem } from '../types/designer';
+import type { PageSchema, ComponentNode, MaterialItem, MaterialManifest } from '../types/designer';
 import { findNode } from '../utils/schemaTree';
 import { applyPatch, createPatch, type JsonPatchOp } from '../utils/jsonPatch';
 
@@ -54,6 +54,33 @@ export function shareBaseCanvas(schema: PageSchema): PageSchema {
 const generateUniqueId = (prefix: string): string =>
   `${prefix}_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`;
 
+/** 重写节点树全部 id（对深拷贝调用）；返回旧 id → 新 id 映射（v2.0.0 提取自 pasteNode） */
+export function rewriteNodeIds(root: ComponentNode, generateId: (type: string) => string): Map<string, string> {
+  const idMap = new Map<string, string>();
+  const assignIds = (node: ComponentNode) => {
+    const nextId = generateId(node.type);
+    idMap.set(node.id, nextId);
+    node.id = nextId;
+    node.layout.i = nextId;
+    node.children?.forEach(assignIds);
+  };
+  assignIds(root);
+  return idMap;
+}
+
+/** 按 idMap 重写事件动作链 target 引用；不在映射内的 target 保留（执行时安全跳过） */
+export function rewriteActionTargets(root: ComponentNode, idMap: Map<string, string>): void {
+  const rewriteTargets = (node: ComponentNode) => {
+    for (const rule of Object.values(node.events || {})) {
+      rule.actions?.forEach((action) => {
+        if (action.target && idMap.has(action.target)) action.target = idMap.get(action.target);
+      });
+    }
+    node.children?.forEach(rewriteTargets);
+  };
+  rewriteTargets(root);
+}
+
 export const useDesignerStore = defineStore('designer', {
   state: () => ({
     pageSchema: shareBaseCanvas({
@@ -82,6 +109,8 @@ export const useDesignerStore = defineStore('designer', {
     /** 当前编辑目标图层 id（null = 主画布）；进入非 canvas 图层后在其 children 中编辑 */
     editingLayerId: null as string | null,
     selectedNodeId: null as string | null,
+    /** 多选节点 id 集合（v2.0.0，用于打包为物料） */
+    selectedNodeIds: [] as string[],
     copiedNode: null as ComponentNode | null,
     isDrawerOpen: false,
     drawerTab: 'props' as 'props' | 'config' | 'attrs' | 'json',
@@ -202,6 +231,7 @@ export const useDesignerStore = defineStore('designer', {
       this.pageSchema = shareBaseCanvas(snapshot);
       this.suppressHistory = false;
       this.selectedNodeId = keepId && this.selectedNode ? keepId : null;
+      this.selectedNodeIds = this.selectedNodeId ? [this.selectedNodeId] : [];
       this.isDrawerOpen = !!this.selectedNodeId;
     },
     undo() {
@@ -225,6 +255,21 @@ export const useDesignerStore = defineStore('designer', {
     selectNode(id: string | null) {
       this.selectedNodeId = id;
       this.isDrawerOpen = !!id;
+      this.selectedNodeIds = id ? [id] : [];
+    },
+    /** 多选切换（additive = ctrl/shift 追加模式） */
+    toggleNodeSelected(id: string, additive: boolean) {
+      if (!additive || !this.selectedNodeId) {
+        this.selectNode(id);
+        return;
+      }
+      if (this.selectedNodeIds.includes(id)) {
+        this.selectedNodeIds = this.selectedNodeIds.filter((n) => n !== id);
+      } else {
+        this.selectedNodeIds = [...this.selectedNodeIds, id];
+      }
+      this.selectedNodeId = this.selectedNodeIds[this.selectedNodeIds.length - 1] ?? null;
+      this.isDrawerOpen = !!this.selectedNodeId;
     },
     addNodeFromMaterial(material: MaterialItem, x = 0, y = 0) {
       this.recordHistory();
@@ -248,6 +293,80 @@ export const useDesignerStore = defineStore('designer', {
       };
       this.activeChildren.push(newNode);
       this.selectNode(id);
+    },
+    /** 复合物料拖入实例化：深拷贝快照 → 平移落点 → 重写 id/target → 推入画布（v2.0.0） */
+    addCompositeFromMaterial(manifest: MaterialManifest, dropX = 0, dropY = 0): string {
+      const snapshot = manifest.schema || [];
+      if (snapshot.length === 0) return '';
+      this.recordHistory();
+      const nodes = JSON.parse(JSON.stringify(snapshot)) as ComponentNode[];
+
+      // 克隆快照包围盒原点（兼容非 0 起点快照），整体平移到落点
+      let minX = Infinity;
+      let minY = Infinity;
+      const measure = (list: ComponentNode[]) => {
+        for (const node of list) {
+          minX = Math.min(minX, node.layout.x);
+          minY = Math.min(minY, node.layout.y);
+          if (node.children?.length) measure(node.children);
+        }
+      };
+      measure(nodes);
+      const tx = dropX - (Number.isFinite(minX) ? minX : 0);
+      const ty = dropY - (Number.isFinite(minY) ? minY : 0);
+      const translate = (list: ComponentNode[]) => {
+        for (const node of list) {
+          node.layout.x += tx;
+          node.layout.y += ty;
+          if (node.children?.length) translate(node.children);
+        }
+      };
+      translate(nodes);
+
+      // 先共享 idMap 重写全部子孙 id，再统一重写事件 target（跨顶层节点的引用也正确）
+      const idMap = new Map<string, string>();
+      for (const node of nodes) {
+        const map = rewriteNodeIds(node, generateUniqueId);
+        map.forEach((next, prev) => idMap.set(prev, next));
+      }
+      for (const node of nodes) {
+        rewriteActionTargets(node, idMap);
+      }
+
+      this.activeChildren.push(...nodes);
+      this.selectNode(nodes[0].id);
+      return nodes[0].id;
+    },
+    /** 黑盒物料拖入：创建带 materialRef 的单一实例节点（渲染/出码按引用解析） */
+    addBlackBoxFromMaterial(manifest: MaterialManifest, x = 0, y = 0): string {
+      this.recordHistory();
+      const id = generateUniqueId(manifest.type);
+      const node: ComponentNode = {
+        id,
+        type: manifest.type,
+        label: manifest.label,
+        layout: { x, y, w: manifest.defaultLayout.w, h: manifest.defaultLayout.h, i: id },
+        props: {},
+        attrs: {},
+        style: {},
+        events: {},
+        materialRef: { id: manifest.type, version: manifest.currentVersion || '1.0.0', follow: 'pin' }
+      };
+      this.activeChildren.push(node);
+      this.selectNode(id);
+      return id;
+    },
+    /** 按物料形态智能落位：黑盒（有契约）→ 单实例；展开（有快照）→ 子树；原子 → 普通节点 */
+    addMaterialSmart(material: MaterialItem, x = 0, y = 1000): string {
+      const m = material as MaterialManifest;
+      if (m.kind === 'composite' && m.contract) {
+        return this.addBlackBoxFromMaterial(m, x, y);
+      }
+      if (m.kind === 'composite' && Array.isArray(m.schema) && m.schema.length > 0) {
+        return this.addCompositeFromMaterial(m, x, y);
+      }
+      this.addNodeFromMaterial(material, x, y);
+      return '';
     },
     updateNodeLayout(layoutList: any[], options?: { history?: boolean }) {
       const record = options?.history !== false && !this.layoutGesture;
@@ -346,24 +465,8 @@ export const useDesignerStore = defineStore('designer', {
       if (!this.copiedNode) return false;
       this.recordHistory();
       const pastedNode: ComponentNode = JSON.parse(JSON.stringify(this.copiedNode));
-      const idMap = new Map<string, string>();
-      const assignIds = (node: ComponentNode) => {
-        const nextId = generateUniqueId(node.type);
-        idMap.set(node.id, nextId);
-        node.id = nextId;
-        node.layout.i = nextId;
-        node.children?.forEach(assignIds);
-      };
-      assignIds(pastedNode);
-      const rewriteTargets = (node: ComponentNode) => {
-        for (const rule of Object.values(node.events || {})) {
-          rule.actions?.forEach((action) => {
-            if (action.target && idMap.has(action.target)) action.target = idMap.get(action.target);
-          });
-        }
-        node.children?.forEach(rewriteTargets);
-      };
-      rewriteTargets(pastedNode);
+      const idMap = rewriteNodeIds(pastedNode, generateUniqueId);
+      rewriteActionTargets(pastedNode, idMap);
       pastedNode.layout.y += pastedNode.layout.h;
       this.activeChildren.push(pastedNode);
       this.selectNode(pastedNode.id);

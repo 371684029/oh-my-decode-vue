@@ -13,6 +13,8 @@ const safeIdSchema = z
   .max(200)
   .regex(/^[A-Za-z0-9_-]+$/, 'only letters, numbers, "_" and "-" are allowed');
 
+export { safeIdSchema };
+
 const layoutSchema = z.object({
   x: z.number(),
   y: z.number(),
@@ -45,6 +47,15 @@ const apiBindingSchema = z.object({
   example: z.unknown().optional()
 });
 
+/** 黑盒实例物料引用（v2.1.0） */
+const materialRefSchema = z
+  .object({
+    id: z.string().min(1).max(100),
+    version: z.string().regex(/^\d+\.\d+\.\d+$/, 'semver required'),
+    follow: z.enum(['pin', 'minor', 'patch']).optional()
+  })
+  .optional();
+
 const componentNodeSchema: z.ZodType<any> = z.lazy(() =>
   z.object({
     id: safeIdSchema,
@@ -58,9 +69,12 @@ const componentNodeSchema: z.ZodType<any> = z.lazy(() =>
     events: z.record(z.string(), eventRuleSchema).default({}),
     apiBinding: apiBindingSchema.optional(),
     visibleWhen: z.string().max(500).optional(),
+    materialRef: materialRefSchema,
     children: z.array(componentNodeSchema).optional()
   })
 );
+
+export { componentNodeSchema };
 
 const layerPropsSchema = z.object({
   title: z.string().max(200).optional(),
