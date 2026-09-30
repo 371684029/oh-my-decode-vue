@@ -387,7 +387,8 @@ const handleSaveEdit = async () => {
   editForm.value = null;
 };
 
-const handleDelete = async (manifest: MaterialManifest) => {  try {
+const handleDelete = async (manifest: MaterialManifest) => {
+  try {
     await ElMessageBox.confirm(
       `删除物料「${manifest.label}」？已拖入画布的实例不受影响（展开模式实例与定义零引用）。`,
       '确认删除',
@@ -396,13 +397,39 @@ const handleDelete = async (manifest: MaterialManifest) => {  try {
   } catch {
     return;
   }
-  unregisterMaterial(manifest.type);
+
+  // 先请求后端；成功后再移除本地，避免"本地已删、后端仍在"的不一致。
   try {
     await http.delete(`/materials/${encodeURIComponent(manifest.type)}`);
-    ElMessage.success('物料已删除');
-  } catch {
-    ElMessage.warning('物料已从本地面板移除，但后端删除失败');
+  } catch (err: any) {
+    const status = err?.response?.status;
+    const refs = err?.response?.data?.data?.refs;
+    if (status === 409 && refs) {
+      // 被引用：展示引用列表，用户确认后强制删除
+      try {
+        const pageList = (refs.pages || []).map((p: any) => p.title).join('、');
+        await ElMessageBox.confirm(
+          `该物料被 ${refs.count} 个实例引用（${pageList}）。删除后这些实例将渲染占位。仍要强制删除？`,
+          '物料被引用',
+          { type: 'warning', confirmButtonText: '强制删除', cancelButtonText: '取消' }
+        );
+      } catch {
+        return;
+      }
+      try {
+        await http.delete(`/materials/${encodeURIComponent(manifest.type)}?force=true`);
+      } catch (forceErr: any) {
+        ElMessage.error(forceErr?.response?.data?.message || '强制删除失败');
+        return;
+      }
+    } else {
+      ElMessage.error(err?.response?.data?.message || '删除失败（后端不可达），物料仍在面板中');
+      return;
+    }
   }
+
+  unregisterMaterial(manifest.type);
+  ElMessage.success('物料已删除');
 };
 </script>
 

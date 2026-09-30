@@ -57,6 +57,22 @@ describe('materialRegistry 运行时注册表', () => {
     expect(registerMaterial({ ...sampleManifest(), schema: [] }).ok).toBe(false);
   });
 
+  test('接受 v2.1 黑盒物料（无 schema，有契约 + 当前版本）', () => {
+    const blackbox = {
+      ...sampleManifest('custom-box'),
+      schema: undefined,
+      contract: { inputs: [], outputs: [] },
+      currentVersion: '1.0.0'
+    };
+    expect(registerMaterial(blackbox as any).ok).toBe(true);
+    expect(getMaterial('custom-box')?.currentVersion).toBe('1.0.0');
+  });
+
+  test('黑盒物料既无 schema 又无契约 → 拒绝', () => {
+    const bad = { ...sampleManifest('custom-empty'), schema: undefined } as any;
+    expect(registerMaterial(bad).ok).toBe(false);
+  });
+
   test('注册为深拷贝，外部修改不影响注册表', () => {
     const manifest = sampleManifest();
     registerMaterial(manifest);

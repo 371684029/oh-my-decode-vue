@@ -161,6 +161,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue';
 import { http } from './utils/http';
+import { loadMaterialsFromBackend } from './registry/materialRegistry';
 import { useDesignerStore } from './stores/designerStore';
 import MaterialList from './components/MaterialList.vue';
 import CanvasContainer from './components/CanvasContainer.vue';
@@ -360,6 +361,9 @@ onMounted(() => {
   autoSaveTimer = setInterval(() => {
     performAutoSave();
   }, AUTO_SAVE_INTERVAL);
+
+  // 启动时加载后端已存的自定义物料（后端不可达时静默降级，仅显示内置物料）
+  void loadMaterialsFromBackend();
 
   window.addEventListener('keydown', handleKeydown);
 });

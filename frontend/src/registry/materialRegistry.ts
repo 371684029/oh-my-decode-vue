@@ -1,5 +1,6 @@
 import type { MaterialItem, MaterialManifest } from '@lowcode/shared';
 import { MATERIAL_REGISTRY } from './materials';
+import { http } from '../utils/http';
 
 /**
  * 运行时物料注册表 (v2.0.0)
@@ -23,7 +24,10 @@ export function registerMaterial(m: MaterialManifest): { ok: true } | { ok: fals
     return { ok: false, reason: `内置物料已占用 type: ${m.type}，不可覆盖` };
   }
   if (!m.schema || m.schema.length === 0) {
-    return { ok: false, reason: '复合物料必须携带非空 schema 快照' };
+    // v2.1 黑盒物料：schema 存于后端版本文件，manifest 只带契约 + 当前版本号
+    if (!m.contract || !m.currentVersion) {
+      return { ok: false, reason: '复合物料必须携带非空 schema 快照（或黑盒契约 + 当前版本号）' };
+    }
   }
   custom.set(m.type, JSON.parse(JSON.stringify(m)));
   return { ok: true };
@@ -57,4 +61,23 @@ export function listAllMaterials(): MaterialItem[] {
 /** 清空运行时注册（测试/会话重置用） */
 export function resetMaterialRegistry(): void {
   custom.clear();
+}
+
+/** 启动时从后端加载已持久化的自定义物料（刷新页面后面板不丢失） */
+export async function loadMaterialsFromBackend(): Promise<{ loaded: number; failed: string[] }> {
+  const failed: string[] = [];
+  try {
+    const resp = await http.get('/materials');
+    const list = (resp.data?.data || []) as MaterialManifest[];
+    let loaded = 0;
+    for (const manifest of list) {
+      if (manifest.kind !== 'composite') continue;
+      const reg = registerMaterial(manifest);
+      if (!reg.ok) failed.push(manifest.type);
+      else loaded++;
+    }
+    return { loaded, failed };
+  } catch {
+    return { loaded: 0, failed: ['后端不可达，物料面板仅显示内置物料'] };
+  }
 }
