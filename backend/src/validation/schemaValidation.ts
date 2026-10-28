@@ -105,7 +105,14 @@ export const pageSchemaValidator = z.object({
     author: z.string().max(200),
     description: z.string().max(2000),
     version: z.string().max(50),
-    prevVersion: z.string().max(50).optional()
+    prevVersion: z.string().max(50).optional(),
+    grid: z
+      .object({
+        cols: z.number(),
+        rowHeight: z.number(),
+        showAlways: z.boolean()
+      })
+      .optional()
   }),
   state: z.record(z.string(), z.unknown()).default({}),
   children: z.array(componentNodeSchema).default([]),

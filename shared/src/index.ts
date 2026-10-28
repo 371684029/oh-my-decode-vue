@@ -106,6 +106,12 @@ export interface PageMeta {
   description: string;
   version: string; // 保存时自动递增（如 1.0.0 → 1.0.1）
   prevVersion?: string; // 记录上一版本号，供回滚
+  /** 网格设置（v2.3.0 可视可选网格：列数 / 行高 / 常显） */
+  grid?: {
+    cols: number;
+    rowHeight: number;
+    showAlways: boolean;
+  };
 }
 
 /** 页面 Schema */
