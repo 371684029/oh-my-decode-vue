@@ -393,33 +393,48 @@ class ExpressionEvaluator {
 /**
  * 安全求值 {{ ... }} 表达式，失败时回退原始文本
  */
+function evaluateRawExpression(rawExpression: string, contextScope: Record<string, any>): any {
+  const tokens = tokenize(rawExpression);
+  const evaluator = new ExpressionEvaluator(tokens, contextScope);
+  const result = evaluator.parse();
+  const remaining = evaluator['peek']();
+  if (remaining.type !== 'eof') {
+    throw new Error(`Unexpected token after expression: "${remaining.value}"`);
+  }
+  return result;
+}
+
+/**
+ * 动态 JS 表达式计算求解器 (Safe Expression Evaluator)
+ * - 整串 `{{ expr }}` → 求值结果（可非字符串）
+ * - 混写 `前缀 {{ expr }} 后缀` → 逐段替换为字符串（v2.3 行操作文案等）
+ */
 export function parseExpression(exprString: unknown, contextScope: Record<string, any> = {}): any {
   if (typeof exprString !== 'string') return exprString;
 
-  // 匹配双大括号模式: {{ state.user.name || '默认' }}
-  const pattern = /^\s*\{\{\s*(.*?)\s*\}\}\s*$/;
-  const match = exprString.match(pattern);
-
-  if (!match) {
-    return exprString;
-  }
-
-  const rawExpression = match[1];
-
-  try {
-    const tokens = tokenize(rawExpression);
-    const evaluator = new ExpressionEvaluator(tokens, contextScope);
-    const result = evaluator.parse();
-    // 校验剩余 token 均为 EOF，拒绝尾部垃圾输入
-    const remaining = evaluator['peek']();
-    if (remaining.type !== 'eof') {
-      throw new Error(`Unexpected token after expression: "${remaining.value}"`);
+  // 整串双大括号
+  const fullPattern = /^\s*\{\{\s*(.*?)\s*\}\}\s*$/;
+  const fullMatch = exprString.match(fullPattern);
+  if (fullMatch) {
+    try {
+      return evaluateRawExpression(fullMatch[1], contextScope);
+    } catch (e) {
+      console.warn(`[Expression Evaluator] Failed to evaluate expression: "${fullMatch[1]}"`, e);
+      return exprString;
     }
-    return result;
-  } catch (e) {
-    console.warn(`[Expression Evaluator] Failed to evaluate expression: "${rawExpression}"`, e);
-    return exprString; // 异常时回退原始文本
   }
+
+  // 混写插值：保留非表达式片段，逐段求值 {{ ... }}
+  if (!exprString.includes('{{')) return exprString;
+  return exprString.replace(/\{\{\s*(.*?)\s*\}\}/g, (whole, raw: string) => {
+    try {
+      const result = evaluateRawExpression(raw, contextScope);
+      return result === undefined || result === null ? '' : String(result);
+    } catch (e) {
+      console.warn(`[Expression Evaluator] Failed to evaluate embedded expression: "${raw}"`, e);
+      return whole;
+    }
+  });
 }
 
 /**

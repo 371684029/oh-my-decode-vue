@@ -67,6 +67,13 @@ describe('parseExpression 正常求值', () => {
     expect(parseExpression('包含 {{ 半截 }')).toBe('包含 {{ 半截 }');
     expect(parseExpression(123)).toBe(123);
   });
+
+  test('混写插值替换嵌入的 {{ }}', () => {
+    expect(parseExpression('查看 · {{ event.row.name }}', { event: { row: { name: '李四' } } })).toBe('查看 · 李四');
+    expect(
+      parseExpression("{{ '查看 · ' + (event.row.name || '当前行') }}", { event: { row: { name: '张三' } } })
+    ).toBe('查看 · 张三');
+  });
 });
 
 describe('parseExpression 安全防护', () => {
