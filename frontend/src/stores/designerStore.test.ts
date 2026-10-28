@@ -27,6 +27,9 @@ describe('designerStore 节点操作', () => {
     expect(node.type).toBe('el-button');
     expect(node.layout.w).toBe(2);
     expect(store.selectedNodeId).toBe(node.id);
+    // v2.2：选中与属性栏解耦，选中不强制开栏；开栏走显式 openInspector
+    expect(store.isDrawerOpen).toBe(false);
+    store.openInspector();
     expect(store.isDrawerOpen).toBe(true);
     expect(store.canUndo).toBe(true);
     const canvas = store.pageSchema.layers?.find((layer) => layer.type === 'canvas');

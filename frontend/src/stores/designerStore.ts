@@ -211,8 +211,9 @@ export const useDesignerStore = defineStore('designer', {
         this.layoutGesture = true;
         this.layoutBefore = JSON.stringify(this.pageSchema);
       }
+      // 安全网：久无 move/resize 事件时收起；拖拽中事件会不断刷新，避免 50ms 闪断
       if (this.layoutTimer) clearTimeout(this.layoutTimer);
-      this.layoutTimer = setTimeout(() => this.endLayoutGesture(), 50);
+      this.layoutTimer = setTimeout(() => this.endLayoutGesture(), 600);
     },
     endLayoutGesture() {
       if (this.layoutTimer) {
@@ -232,7 +233,7 @@ export const useDesignerStore = defineStore('designer', {
       this.suppressHistory = false;
       this.selectedNodeId = keepId && this.selectedNode ? keepId : null;
       this.selectedNodeIds = this.selectedNodeId ? [this.selectedNodeId] : [];
-      this.isDrawerOpen = !!this.selectedNodeId;
+      // v2.2：选中与属性栏解耦，恢复选中不强制开栏
     },
     undo() {
       this.flushPendingHistory();
@@ -254,8 +255,15 @@ export const useDesignerStore = defineStore('designer', {
     },
     selectNode(id: string | null) {
       this.selectedNodeId = id;
-      this.isDrawerOpen = !!id;
       this.selectedNodeIds = id ? [id] : [];
+    },
+    /** 显式打开属性栏（不改变选中） */
+    openInspector() {
+      this.isDrawerOpen = true;
+    },
+    /** 关闭属性栏，不清空选中 */
+    closeInspector() {
+      this.isDrawerOpen = false;
     },
     /** 多选切换（additive = ctrl/shift 追加模式） */
     toggleNodeSelected(id: string, additive: boolean) {
@@ -269,7 +277,6 @@ export const useDesignerStore = defineStore('designer', {
         this.selectedNodeIds = [...this.selectedNodeIds, id];
       }
       this.selectedNodeId = this.selectedNodeIds[this.selectedNodeIds.length - 1] ?? null;
-      this.isDrawerOpen = !!this.selectedNodeId;
     },
     addNodeFromMaterial(material: MaterialItem, x = 0, y = 0) {
       this.recordHistory();
