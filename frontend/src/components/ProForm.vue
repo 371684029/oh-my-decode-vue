@@ -6,21 +6,26 @@
       :size="node.props.size || 'default'"
       :inline="node.props.layout === 'inline'"
     >
-      <el-row :gutter="16">
-        <el-col v-for="item in items" :key="item.field" :span="node.props.layout === 'inline' ? undefined : 12">
+      <el-row :gutter="node.props.gutter ?? 16" :style="rowStyle">
+        <el-col
+          v-for="item in items"
+          :key="item.field"
+          :span="node.props.layout === 'inline' ? undefined : Number(item.span ?? 12)"
+        >
           <el-form-item :label="item.label" :required="item.required" :error="fieldErrors[item.field]">
             <!-- Input -->
             <el-input
               v-if="item.component === 'input'"
               v-model="formData[item.field]"
               :placeholder="item.placeholder"
+              :style="controlStyle(item)"
             />
             <!-- Select -->
             <el-select
               v-else-if="item.component === 'select'"
               v-model="formData[item.field]"
               :placeholder="item.placeholder"
-              style="width: 100%"
+              :style="controlStyle(item, true)"
             >
               <el-option v-for="opt in item.options || []" :key="opt.value" :label="opt.label" :value="opt.value" />
             </el-select>
@@ -30,7 +35,7 @@
               v-model="formData[item.field]"
               type="date"
               :placeholder="item.placeholder"
-              style="width: 100%"
+              :style="controlStyle(item, true)"
             />
             <!-- Switch -->
             <el-switch v-else-if="item.component === 'switch'" v-model="formData[item.field]" />
@@ -48,7 +53,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted } from 'vue';
 import type { ComponentNode } from '../types/designer';
-import { ElMessage } from 'element-plus';
+import { notifyUser } from '../utils/notifyUser';
 import { ApiExecutor, executeActions, nodeEventBus } from '../utils/dataSource';
 import { submitDesignerForm } from '../utils/formValidation';
 import { findNode } from '../utils/schemaTree';
@@ -66,10 +71,20 @@ const executor = new ApiExecutor();
 
 const items = computed(() => props.node.config?.items || []);
 
+const rowStyle = computed(() => {
+  const gap = props.node.props?.itemGap;
+  return gap != null && gap !== '' ? { rowGap: typeof gap === 'number' ? `${gap}px` : String(gap) } : undefined;
+});
+
+const controlStyle = (item: any, fullDefault = false) => {
+  if (item.width) return { width: item.width };
+  return fullDefault ? { width: '100%' } : undefined;
+};
+
 const handleSubmit = async () => {
   const designerStore = useDesignerStore();
   const result = await submitDesignerForm(props.node.events, items.value, formData.value, {
-    notify: (type, message) => ElMessage({ type, message }),
+    notify: (type, message) => notifyUser(type, message),
     runActions: (actions) =>
       executeActions(actions, {
         scope: designerStore.pageSchema.state,
@@ -81,7 +96,7 @@ const handleSubmit = async () => {
           const layer = designerStore.pageSchema.layers?.find((item) => item.id === layerId);
           if (layer) layer.visible = visible;
         },
-        notify: (type, message) => ElMessage({ type, message })
+        notify: (type, message) => notifyUser(type, message)
       })
   });
   fieldErrors.value = {};
@@ -108,7 +123,7 @@ const loadData = async () => {
       formData.value = { ...data };
     }
   } catch (err: any) {
-    ElMessage.error('表单数据加载失败: ' + (err.message || err));
+    notifyUser('error', '表单数据加载失败: ' + (err.message || err));
   } finally {
     loading.value = false;
   }
