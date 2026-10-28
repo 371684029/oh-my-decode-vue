@@ -190,6 +190,7 @@ import { Loading } from '@element-plus/icons-vue';
 import { applyMockBindings, renderApiMarkdown, planSchemaSave } from './utils/frontendApi';
 import type { PageSchema } from './types/designer';
 import { nodeEventBus } from './utils/dataSource';
+import { registerModalClose, registerModalOpen, shouldRunCanvasHotkeyFromDom } from './utils/shortcutContext';
 
 const designerStore = useDesignerStore();
 const elementLocale = zhCn;
@@ -335,12 +336,9 @@ const performAutoSave = async () => {
 };
 
 const handleKeydown = (e: KeyboardEvent) => {
-  // 如果正在 input / textarea / contenteditable 中打字，则跳过快捷键
-  const activeEl = document.activeElement;
-  if (
-    activeEl &&
-    (activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA' || (activeEl as HTMLElement).isContentEditable)
-  ) {
+  // v2.4.0 P2-1: 画布级快捷键只在画布聚焦且无弹窗/抽屉/输入焦点时响应
+  // （替代旧的 INPUT/TEXTAREA/contenteditable 判断，现同时覆盖 dialog/drawer/属性抽屉）
+  if (!shouldRunCanvasHotkeyFromDom(document.activeElement)) {
     return;
   }
 
@@ -405,6 +403,28 @@ const handleKeydown = (e: KeyboardEvent) => {
     }
   }
 };
+
+// v2.4.0 P2-1: App 内弹窗(含弹窗图层)开关时同步 activeModalCount,
+// 供画布级快捷键门禁使用; 组件内部弹窗(物料管理等)由 keydown 里的 DOM 兜底覆盖
+watch(
+  () =>
+    [
+      loadDialogVisible.value,
+      logsDialogVisible.value,
+      exportDialogVisible.value,
+      apiDocVisible.value,
+      logDiffDialogVisible.value
+    ].filter(Boolean).length + dialogLayers.value.filter((layer) => layer.visible).length,
+  (next, prev) => {
+    const delta = next - (prev ?? 0);
+    for (let i = 0; i < delta; i += 1) {
+      registerModalOpen();
+    }
+    for (let i = 0; i > delta; i -= 1) {
+      registerModalClose();
+    }
+  }
+);
 
 onMounted(() => {
   // Set 3-minute interval timer (3 * 60 * 1000 ms)
