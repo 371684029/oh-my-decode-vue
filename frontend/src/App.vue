@@ -187,7 +187,8 @@ import CustomHtmlLayerNode from './components/CustomHtmlLayerNode.vue';
 import { ElConfigProvider, ElMessage, ElMessageBox } from 'element-plus';
 import zhCn from 'element-plus/es/locale/lang/zh-cn';
 import { Loading } from '@element-plus/icons-vue';
-import { applyMockBindings, renderApiMarkdown } from './utils/frontendApi';
+import { applyMockBindings, renderApiMarkdown, planSchemaSave } from './utils/frontendApi';
+import type { PageSchema } from './types/designer';
 import { nodeEventBus } from './utils/dataSource';
 
 const designerStore = useDesignerStore();
@@ -290,11 +291,39 @@ const handleViewLogDiff = (log: any) => {
 const isAutoSaving = ref(false);
 let autoSaveTimer: ReturnType<typeof setInterval> | null = null;
 
+// 增量保存基线：上次成功落盘的 Schema 快照（v2.4.0 P1-1 增量自动保存）
+const lastSavedSchema = ref<PageSchema | null>(null);
+
+const snapshotSchema = (): PageSchema => JSON.parse(JSON.stringify(designerStore.pageSchema)) as PageSchema;
+
+/** 保存当前页面：优先 PATCH 增量；命中回退条件（无快照 / id 变化 / patch 不比全量小）或 PATCH 失败一次时改走全量 POST */
+const saveCurrentSchema = async (): Promise<boolean> => {
+  const current = designerStore.pageSchema;
+  const plan = planSchemaSave(lastSavedSchema.value, current);
+  if (plan.mode === 'patch') {
+    try {
+      const res = await http.patch(`/schemas/${plan.id}`, { ops: plan.ops });
+      if (res.data.success) {
+        lastSavedSchema.value = snapshotSchema();
+        return true;
+      }
+    } catch {
+      // PATCH 失败一次：回退下方全量 POST
+    }
+  }
+  const res = await http.post('/schemas', current);
+  if (res.data.success) {
+    lastSavedSchema.value = snapshotSchema();
+    return true;
+  }
+  return false;
+};
+
 const performAutoSave = async () => {
   if (isAutoSaving.value) return;
   isAutoSaving.value = true;
   try {
-    await http.post('/schemas', designerStore.pageSchema);
+    await saveCurrentSchema();
   } catch (err: any) {
     console.error('Auto save failed:', err);
   } finally {
@@ -399,8 +428,8 @@ onUnmounted(() => {
 
 const handleSaveSchema = async () => {
   try {
-    const res = await http.post('/schemas', designerStore.pageSchema);
-    if (res.data.success) {
+    const saved = await saveCurrentSchema();
+    if (saved) {
       ElMessage.success('Schema 已成功写入后端 .json 文件并持久化留痕 SQLite！');
     }
   } catch (err: any) {
@@ -425,6 +454,7 @@ const handleSelectSchema = async (schema: any) => {
     const res = await http.get(`/schemas/${schema.id}`, { params: { type: schema.type || 'page' } });
     if (!res.data.success) return;
     designerStore.setPageSchema(res.data.data);
+    lastSavedSchema.value = JSON.parse(JSON.stringify(res.data.data)) as PageSchema;
     loadDialogVisible.value = false;
     ElMessage.success(`已成功载入配置: ${res.data.data.title}`);
   } catch (err: any) {
@@ -465,6 +495,7 @@ const handleRestoreSchema = async (schema: any) => {
     const res = await http.post(`/schemas/${schema.id}/restore`, { index: backups[0].index }, { params: { type } });
     if (res.data.success) {
       designerStore.setPageSchema(res.data.data);
+      lastSavedSchema.value = JSON.parse(JSON.stringify(res.data.data)) as PageSchema;
       loadDialogVisible.value = false;
       ElMessage.success('已恢复上一份');
     }

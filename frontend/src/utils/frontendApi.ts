@@ -1,4 +1,6 @@
 import type { ApiBinding, ComponentNode, PageSchema } from '../types/designer';
+import type { JsonPatchOp } from './jsonPatch';
+import { createPatch } from './jsonPatch';
 import { TABLE_PLACEHOLDER_ROWS } from './tablePlaceholder';
 
 const MOCK_PREFIX = '/api/mock/';
@@ -163,4 +165,24 @@ export function renderApiMarkdown(schema: PageSchema): string {
     '',
     ...sections
   ].join('\n');
+}
+
+/** 增量保存决策（v2.4.0 P1-1）：PATCH 增量 或 全量 POST */
+export type SchemaSavePlan =
+  | { mode: 'full' }
+  | { mode: 'patch'; id: string; ops: JsonPatchOp[] };
+
+/**
+ * 基于上次成功落盘的快照决定本次保存的提交方式。
+ * 回退全量 POST 的三种情况：从未保存过、页面 id 变了（换了载入的页面）、
+ * patch JSON 并不比全量 Schema 小（小页面 / 大范围改动时不划算）。
+ * PATCH 请求失败后的全量重试由调用方处理。
+ */
+export function planSchemaSave(lastSaved: PageSchema | null, current: PageSchema): SchemaSavePlan {
+  if (!lastSaved || lastSaved.id !== current.id) return { mode: 'full' };
+  const ops = createPatch(lastSaved, current);
+  const patchBytes = JSON.stringify(ops).length;
+  const fullBytes = JSON.stringify(current).length;
+  if (patchBytes >= fullBytes) return { mode: 'full' };
+  return { mode: 'patch', id: current.id, ops };
 }
