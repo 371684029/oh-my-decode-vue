@@ -1,0 +1,16 @@
+/**
+ * designer.css — 设计器全局样式（不经 SFC scoped）
+ *
+ * 职责：只放「必须全局生效」的样式——
+ *   1. Element Plus 函数式组件（ElMessage / ElMessageBox / ElNotification）的层级对齐；
+ *   2. 跨组件共享的设计器级覆盖项。
+ * 组件内部样式一律留在各自 SFC 的 <style scoped> 里，不要往这里搬。
+ */
+
+/* 函数式组件挂在 body 下，默认 z-index 2000 会被设计器顶栏 / 右键菜单（z-4000）盖住 */
+.el-message,
+.el-message-box,
+.el-notification,
+.el-overlay {
+  z-index: 5000;
+}
