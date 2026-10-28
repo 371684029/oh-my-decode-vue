@@ -148,7 +148,7 @@ export function renderNodeClickHandler(eventNodes: ComponentNode[], optionsApi =
     })
   );
   if (blocks.length === 0) return '';
-  if (optionsApi) return `handleNodeClick(nodeId, eventKey, $event) {\n${blocks.join('\n')}\n  },`;
+  if (optionsApi) return `handleNodeClick(nodeId, eventKey, $event) {\n${blocks.join('\n')}\n},`;
   return `const handleNodeClick = async (nodeId: string, eventKey: string, $event: any) => {\n${blocks.join('\n')}\n};`;
 }
 
@@ -176,7 +176,7 @@ export function renderSubmitGuards(formNodes: ComponentNode[], optionsApi: boole
       );
     }
   }
-  return lines.join('\n  ');
+  return lines.join('\n');
 }
 
 /** 单条动作语句；optionsApi=true 时变量经 this. 访问 */

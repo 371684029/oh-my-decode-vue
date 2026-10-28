@@ -17,6 +17,7 @@ import {
   renderPageTemplateBody,
   renderPageStyle
 } from './renderNode';
+import { indentBlock, finalizeArtifact } from './format';
 import {
   enabledEventEntries,
   renderNodeClickHandler,
@@ -131,7 +132,7 @@ function renderScriptSetup(schema: PageSchema): string {
     lines.push(`const handleSubmit = async (formId: string) => {`);
     lines.push(`  const form = lookupForm(formId);\n  if (!form) return;`);
     const guards = renderSubmitGuards(formNodes, false);
-    if (guards) lines.push(`  ${guards}`);
+    if (guards) lines.push(indentBlock(guards, 2));
     if (clickHandler) lines.push(`  await handleNodeClick(formId, 'submit', form.value);`);
     lines.push(`  console.log('Form Submitted:', form.value);`);
     lines.push(`  ElMessage.success('表单提交成功');`);
@@ -172,7 +173,7 @@ export function generateVueSFC(schema: PageSchema): string {
   const templateBody = renderPageTemplateBody(schema, 2);
   const scriptBody = renderScriptSetup(schema);
 
-  return `<template>
+  return finalizeArtifact(`<template>
   <div class="lowcode-page-${safeClassToken(schema.id)}">
 ${templateBody}  </div>
 </template>
@@ -184,18 +185,18 @@ import { ElMessage } from 'element-plus';
 ${scriptBody}
 onMounted(() => {
   loadInitialData();
-${extraLifecycleScripts || '  console.log("低代码页面及多图层组件已成功挂载!");\n'}
+${extraLifecycleScripts || '  console.log("低代码页面及多图层组件已成功挂载!");'}
 });
 
 onUnmounted(() => {
-${extraUnmountScripts || '  console.log("低代码页面组件已卸载!");\n'}
+${extraUnmountScripts || '  console.log("低代码页面组件已卸载!");'}
 });
 </script>
 
 <style scoped>
-${renderPageStyle(schema)}
+${renderPageStyle(schema).trimEnd()}
 </style>
-`;
+`);
 }
 
 /**

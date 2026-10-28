@@ -1,5 +1,6 @@
 import type { PageSchema } from '../../types/designer';
 import { safeClassToken } from './shared';
+import { finalizeArtifact } from './format';
 
 // ============================================================
 // 目标 2: W3C Web Component (.js)
@@ -15,7 +16,7 @@ import { safeClassToken } from './shared';
 export function generateWebComponent(schema: PageSchema): string {
   const tagName = `custom-page-${safeClassToken(schema.id) || 'page'}`;
 
-  return `/**
+  return finalizeArtifact(`/**
  * Web Component 包装脚本
  * 标签名: <${tagName}></${tagName}>
  * 说明:
@@ -74,5 +75,5 @@ export function registerLightDomElement(tagName = '${tagName}-light') {
 }
 
 export default CustomPageElement;
-`;
+`);
 }

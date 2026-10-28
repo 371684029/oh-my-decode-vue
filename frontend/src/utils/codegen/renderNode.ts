@@ -16,6 +16,7 @@ import {
   getMaterialSnapshot,
   safeClassToken
 } from './shared';
+import { reindentHtmlFragment } from './format';
 
 // ============================================================
 // 共享节点渲染层：ComponentNode → 模板文本（Vue / HTML 目标复用）
@@ -42,7 +43,7 @@ export function renderNodeMarkup(node: ComponentNode, indentLevel = 3): string {
   if (node.materialRef) {
     const snapshot = getMaterialSnapshot(node.id);
     if (!snapshot || snapshot.length === 0) {
-      return `${indent}<div style="padding:8px;border:1px dashed #e6a23c;border-radius:4px;color:#b88230">${escapeHtml(node.label)}（物料 ${escapeHtml(node.materialRef.id)}@${escapeHtml(node.materialRef.version)} 未解析）</div>`;
+      return `${indent}<div style="padding:8px;border:1px dashed #e6a23c;border-radius:4px;color:#b88230">${escapeHtml(node.label)}（物料 ${escapeHtml(node.materialRef.id)}@${escapeHtml(node.materialRef.version)} 未解析）</div>\n`;
     }
     return snapshot.map((n) => renderNodeToTemplate(n, indentLevel)).join('\n');
   }
@@ -307,7 +308,7 @@ export function collectLayerStateDecls(schema: PageSchema): { dialogVisible: str
   return { dialogVisible, loadingVisible };
 }
 
-/** 渲染主体模板（节点 + 图层），供三种目标复用 */
+/** 渲染主体模板（节点 + 图层），供三种目标复用；输出经格式化管线归一缩进 */
 export function renderPageTemplateBody(schema: PageSchema, baseIndent = 2): string {
   let templateBody = '';
   (schema.children || []).forEach((child) => {
@@ -320,7 +321,7 @@ export function renderPageTemplateBody(schema: PageSchema, baseIndent = 2): stri
     templateBody = '    <div class="empty-page">页面暂无内容，请在设计器中拖入物料组件</div>\n';
   }
 
-  return templateBody + extraLayersTemplate;
+  return reindentHtmlFragment(templateBody + extraLayersTemplate, baseIndent);
 }
 
 /** 生成页面级样式（供三种目标复用） */

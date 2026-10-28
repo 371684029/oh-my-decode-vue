@@ -8,7 +8,6 @@ import {
   allEditableNodes,
   embedJsString,
   escapeHtml,
-  indentLines,
   safeComment,
   safeClassToken,
   tablePageSize,
@@ -17,6 +16,7 @@ import {
   identOf
 } from './shared';
 import { renderLayers, renderPageTemplateBody, renderPageStyle } from './renderNode';
+import { indentBlock, finalizeArtifact } from './format';
 import {
   enabledEventEntries,
   renderNodeClickHandler,
@@ -125,7 +125,7 @@ function renderOptionsData(schema: PageSchema): string {
       fields.push(`customHtmlSrcdoc_${identOf(layer.id)}: ${embedJsString(buildCustomHtmlSrcdoc(layer))},`);
     });
 
-  return fields.join('\n          ');
+  return fields.join('\n');
 }
 
 /** options API: methods 内容（加载 + 事件动作链 + 表单/行动作） */
@@ -157,36 +157,36 @@ function renderOptionsMethods(schema: PageSchema): string {
       )
     );
     const delegated = guards.length
-      ? `    if (${guards.join(' || ')}) {\n      return this.handleNodeClick(nodeId, eventKey, { row, eventKey });\n    }\n`
+      ? `  if (${guards.join(' || ')}) {\n    return this.handleNodeClick(nodeId, eventKey, { row, eventKey });\n  }\n`
       : '';
     methods.push(`handleRowAction(nodeId, eventKey, row) {
 ${delegated}${rowActionFallbackStatements('ElementPlus.ElMessage', false)
-      .map((s) => `    ${s}`)
+      .map((s) => `  ${s}`)
       .join('\n')}
-  },`);
+},`);
   }
 
   if (formNodes.length > 0) {
-    methods.push(`lookupForm(formId) {\n${renderFormLookup(formNodes, true)}\n  },`);
+    methods.push(`lookupForm(formId) {\n${renderFormLookup(formNodes, true)}\n},`);
     const guards = renderSubmitGuards(formNodes, true);
-    const submitCall = clickHandler ? `await this.handleNodeClick(formId, 'submit', form);\n    ` : '';
+    const submitCall = clickHandler ? `  await this.handleNodeClick(formId, 'submit', form);\n` : '';
     methods.push(`async handleSubmit(formId) {
-    const form = this.lookupForm(formId);
-    if (!form) return;
-    ${guards ? `${guards}\n    ` : ''}${submitCall}console.log('Form Submitted:', form);
-    ElementPlus.ElMessage.success('表单提交成功');
-  },`);
+  const form = this.lookupForm(formId);
+  if (!form) return;
+${guards ? `${indentBlock(guards, 2)}\n` : ''}${submitCall}  console.log('Form Submitted:', form);
+  ElementPlus.ElMessage.success('表单提交成功');
+},`);
     methods.push(`handleReset(formId) {
-    const form = this.lookupForm(formId);
-    if (!form) return;
-    Object.keys(form).forEach((key) => {
-      form[key] = undefined;
-    });
-    ElementPlus.ElMessage.info('表单已重置');
-  },`);
+  const form = this.lookupForm(formId);
+  if (!form) return;
+  Object.keys(form).forEach((key) => {
+    form[key] = undefined;
+  });
+  ElementPlus.ElMessage.info('表单已重置');
+},`);
   }
 
-  return methods.join('\n  ');
+  return methods.join('\n');
 }
 
 /**
@@ -201,7 +201,9 @@ export function generateHTML(schema: PageSchema): string {
   const formNodes = children.filter((n) => n.type === 'pro-form');
   // HTML 使用 options API（CDN 渲染），模板 ref 需通过 this.$refs 访问
   const { extraLifecycleScripts, extraUnmountScripts } = renderLayers(schema, 'options');
-  const templateBody = renderPageTemplateBody(schema, 4);
+  // DOM 内模板（页面 div 在 3 级）与 script 内模板字面量（页面 div 在 6 级）各自归一缩进
+  const templateBodyDom = renderPageTemplateBody(schema, 3);
+  const templateBodyTpl = renderPageTemplateBody(schema, 6);
 
   const dataFields = renderOptionsData(schema);
   const methodsBody = renderOptionsMethods(schema);
@@ -216,14 +218,14 @@ export function generateHTML(schema: PageSchema): string {
   ].join('\n');
   const mountBody = [autoFetchCalls, extraLifecycleScripts].filter(Boolean).join('\n');
 
-  const mountedScript = `    mounted() {
-${indentLines(mountBody, 2) || '      console.log("低代码页面已挂载!");'}
-    },
-    beforeUnmount() {
-${indentLines(extraUnmountScripts, 2) || '      console.log("低代码页面已卸载!");'}
-    },`;
+  const mountedScript = `      mounted() {
+${indentBlock(mountBody, 8) || '        console.log("低代码页面已挂载!");'}
+      },
+      beforeUnmount() {
+${indentBlock(extraUnmountScripts, 8) || '        console.log("低代码页面已卸载!");'}
+      },`;
 
-  return `<!DOCTYPE html>
+  return finalizeArtifact(`<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
   <meta charset="UTF-8">
@@ -232,10 +234,7 @@ ${indentLines(extraUnmountScripts, 2) || '      console.log("低代码页面已�
   <!-- Element Plus CSS -->
   <link rel="stylesheet" href="https://unpkg.com/element-plus/dist/index.css">
   <style>
-${renderPageStyle(schema)
-  .split('\n')
-  .map((l) => '    ' + l)
-  .join('\n')}
+${indentBlock(renderPageStyle(schema).trimEnd(), 4)}
     body {
       margin: 0;
       padding: 0;
@@ -259,7 +258,7 @@ ${renderPageStyle(schema)
       <p>页面 ID: ${escapeHtml(schema.id)} | 生成版本: v${escapeHtml(schema.meta.version)}</p>
     </div>
     <div class="lowcode-page-${safeClassToken(schema.id)}">
-${templateBody}    </div>
+${templateBodyDom}    </div>
   </div>
 
   <!-- Vue 3 CDN (完整版，含模板编译器) & Element Plus CDN -->
@@ -267,7 +266,7 @@ ${templateBody}    </div>
   <script src="https://unpkg.com/element-plus"></script>
   <script>
     const { createApp } = Vue;
-    ${FETCH_CHECKED_SOURCE}
+${indentBlock(FETCH_CHECKED_SOURCE, 4)}
 
     const App = {
       template: \`
@@ -277,17 +276,17 @@ ${templateBody}    </div>
             <p>页面 ID: ${escapeHtml(schema.id)} | 生成版本: v${escapeHtml(schema.meta.version)}</p>
           </div>
           <div class="lowcode-page-${safeClassToken(schema.id)}">
-${templateBody}          </div>
+${templateBodyTpl}          </div>
         </div>
       \`,
       data() {
         return {
-${dataFields}
+${indentBlock(dataFields, 10)}
         };
       },
 ${mountedScript}
       methods: {
-${methodsBody}
+${indentBlock(methodsBody, 8)}
       }
     };
 
@@ -295,5 +294,5 @@ ${methodsBody}
   </script>
 </body>
 </html>
-`;
+`);
 }
