@@ -302,6 +302,7 @@ npm run format      # Prettier 全仓格式化
 | **GET**    | `/api/schemas`             | 获取页面/组件 JSON 列表                                                                       | `?type=page` 或 `?type=component` |
 | **GET**    | `/api/schemas/:id`         | 读取指定 ID 的 Schema 内容                                                                    | `?type=page`                      |
 | **POST**   | `/api/schemas`             | 保存 Schema 至本地 `.json` 文件并记录 SQLite 日志（落盘前 Zod 结构强校验 + 脚本字段长度上限） | Body: `PageSchema` JSON 对象      |
+| **PATCH**  | `/api/schemas/:id`         | 增量保存：对已存 Schema 应用 RFC 6902 JSON Patch，Zod 校验后落盘并记录审计差异                | Body: `{ "ops": JsonPatchOp[] }`  |
 | **DELETE** | `/api/schemas/:id`         | 删除 Schema 配置文件并记录 SQLite 日志                                                        | `?type=page`                      |
 | **GET**    | `/api/logs`                | 查询 SQLite 操作审计日志                                                                      | `?pageId=xxx` (可选)              |
 | **GET**    | `/api/schemas/:id/backups` | 列出该 Schema 的备份代数                                                                      | `?type=page`                      |
