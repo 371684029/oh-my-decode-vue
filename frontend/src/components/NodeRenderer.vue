@@ -8,6 +8,13 @@
     <!-- 自有高端组件 -->
     <ProTable v-else-if="node.type === 'pro-table'" :node="node" />
     <ProForm v-else-if="node.type === 'pro-form'" :node="node" />
+    <div
+      v-else-if="node.type === 'pro-spacer'"
+      class="pro-spacer"
+      :class="{ 'pro-spacer--design': np(node).designOnlyOutline !== false }"
+      :style="{ minHeight: np(node).height || '24px', width: '100%' }"
+      aria-hidden="true"
+    />
 
     <el-card v-else-if="node.type === 'pro-container'" class="pro-container-box">
       <template #header>
@@ -91,6 +98,8 @@
       {{ np(node).text }}
     </el-divider>
 
+    <GenericElNode v-else-if="node.type.startsWith('el-')" :node="node" />
+
     <!-- 未知类型兜底 -->
     <div v-else :id="node.id" style="padding: 8px; border: 1px dashed #dcdfe6; border-radius: 4px">
       {{ node.label }}（未登记渲染器）
@@ -111,7 +120,8 @@ import ProTable from './ProTable.vue';
 import ProForm from './ProForm.vue';
 import ErrorBoundary from './ErrorBoundary.vue';
 import MaterialBlackBox from './MaterialBlackBox.vue';
-import { ElMessage } from 'element-plus';
+import GenericElNode from './GenericElNode.vue';
+import { notifyUser } from '../utils/notifyUser';
 
 const props = defineProps<{
   node: ComponentNode;
@@ -145,7 +155,7 @@ const triggerNodeEvent = async (node: ComponentNode, eventName: string, event: a
       const layer = designerStore.pageSchema.layers?.find((l) => l.id === layerId);
       if (layer) layer.visible = visible;
     },
-    notify: (type, message) => ElMessage({ type, message })
+    notify: (type, message) => notifyUser(type, message)
   });
 };
 
@@ -182,5 +192,19 @@ const onDropIntoContainer = (event: DragEvent) => {
 .container-child-tools {
   display: flex;
   justify-content: flex-end;
+}
+.pro-spacer {
+  width: 100%;
+  box-sizing: border-box;
+}
+.pro-spacer--design {
+  outline: 1px dashed #c0c4cc;
+  background: repeating-linear-gradient(
+    -45deg,
+    transparent,
+    transparent 6px,
+    rgba(192, 196, 204, 0.2) 6px,
+    rgba(192, 196, 204, 0.2) 12px
+  );
 }
 </style>
