@@ -289,7 +289,37 @@ export const useDesignerStore = defineStore('designer', {
         attrs: JSON.parse(JSON.stringify(material.defaultAttrs || {})),
         config: material.defaultConfig ? JSON.parse(JSON.stringify(material.defaultConfig)) : undefined,
         style: {},
-        events: {}
+        events:
+          material.type === 'pro-table'
+            ? {
+                view: {
+                  enabled: true,
+                  actions: [
+                    {
+                      id: 'default-view-msg',
+                      type: 'show_message',
+                      payload: {
+                        messageType: 'info',
+                        messageText: "查看 · {{ event.row.name || event.row.title || event.row.id || '当前行' }}"
+                      }
+                    }
+                  ]
+                },
+                delete: {
+                  enabled: true,
+                  actions: [
+                    {
+                      id: 'default-delete-msg',
+                      type: 'show_message',
+                      payload: {
+                        messageType: 'warning',
+                        messageText: "删除 · {{ event.row.name || event.row.title || event.row.id || '当前行' }}"
+                      }
+                    }
+                  ]
+                }
+              }
+            : {}
       };
       this.activeChildren.push(newNode);
       this.selectNode(id);

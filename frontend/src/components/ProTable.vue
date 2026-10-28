@@ -49,10 +49,11 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted } from 'vue';
 import type { ComponentNode } from '../types/designer';
-import { ElMessage } from 'element-plus';
 import { ApiExecutor, executeActions, nodeEventBus } from '../utils/dataSource';
 import { findNode } from '../utils/schemaTree';
 import { TABLE_PLACEHOLDER_ROWS } from '../utils/tablePlaceholder';
+import { formatRowActionMessage } from '../utils/rowActionMessage';
+import { notifyUser } from '../utils/notifyUser';
 import { useDesignerStore } from '../stores/designerStore';
 
 const props = defineProps<{
@@ -88,7 +89,7 @@ const loadData = async () => {
     rows.value = Array.isArray(data) ? data : [];
     if (total !== undefined) totalCount.value = Number(total) || 0;
   } catch (err: any) {
-    ElMessage.error('数据加载失败: ' + (err.message || err));
+    notifyUser('error', '数据加载失败: ' + (err.message || err));
     rows.value = [];
   } finally {
     loading.value = false;
@@ -116,11 +117,12 @@ const handleAction = async (key: string, row: any) => {
         const layer = designerStore.pageSchema.layers?.find((item) => item.id === layerId);
         if (layer) layer.visible = visible;
       },
-      notify: (type, message) => ElMessage({ type, message })
+      notify: (type, message) => notifyUser(type, message)
     });
     return;
   }
-  ElMessage.info(`触发按钮 [${key}], 选中行: ${row.name}`);
+  const tip = formatRowActionMessage(key, row, actions.value);
+  notifyUser(tip.type, tip.message);
 };
 
 let unsubscribe: (() => void) | undefined;
