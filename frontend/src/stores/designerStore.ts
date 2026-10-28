@@ -3,23 +3,31 @@ import type { PageSchema, ComponentNode, MaterialItem, MaterialManifest } from '
 import { findNode } from '../utils/schemaTree';
 import { applyPatch, createPatch, type JsonPatchOp } from '../utils/jsonPatch';
 
-type HistoryEntry = { kind: 'snap'; data: string } | { kind: 'patch'; ops: JsonPatchOp[] };
+/**
+ * 撤销历史条目（v2.4.0 patch 式）：只存正向 patch（before→after）与反向 patch（after→before），
+ * 不存全量 Schema 快照。undo 对当前状态应用 inverse、redo 应用 ops，因此条目可独立撤销/重做。
+ * pending 标记 = recordHistory 落下的未结算占位步（变更尚未发生，before 暂存于 historyPendingBefore），
+ * 在下一次结算点（recordHistory / flush / 手势开始 / undo / redo）diff 出 ops；无变化则弹出。
+ */
+type HistoryEntry = { ops: JsonPatchOp[]; inverse: JsonPatchOp[]; pending?: true };
 
-function materializeHistory(entries: HistoryEntry[]): PageSchema {
-  let index = entries.length - 1;
-  while (index > 0 && entries[index].kind !== 'snap') index--;
-  const base = entries[index];
-  if (!base || base.kind !== 'snap') throw new Error('历史栈缺少快照');
-  let doc = JSON.parse(base.data) as PageSchema;
-  for (let cursor = index + 1; cursor < entries.length; cursor++) {
-    const entry = entries[cursor];
-    doc = entry.kind === 'snap' ? (JSON.parse(entry.data) as PageSchema) : applyPatch(doc, entry.ops);
-  }
+/**
+ * 主画布图层 children 与 schema.children 同源（shareBaseCanvas）。
+ * 历史 diff 前清空该副本，避免同一子树在 patch 里出现两份路径；恢复后由 shareBaseCanvas 重新链接。
+ */
+function stripSharedCanvasLayer(doc: PageSchema): void {
+  const base = doc.layers?.find((layer) => layer.type === 'canvas');
+  if (base) base.children = [];
+}
+
+function toHistoryDoc(schema: PageSchema): PageSchema {
+  const doc = JSON.parse(JSON.stringify(schema)) as PageSchema;
+  stripSharedCanvasLayer(doc);
   return doc;
 }
 
 function entrySize(entry: HistoryEntry): number {
-  return entry.kind === 'snap' ? entry.data.length : JSON.stringify(entry.ops).length;
+  return JSON.stringify(entry.ops).length + JSON.stringify(entry.inverse).length;
 }
 
 /**
@@ -120,6 +128,10 @@ export const useDesignerStore = defineStore('designer', {
     suppressHistory: false,
     historyPending: null as string | null,
     historyTimer: null as ReturnType<typeof setTimeout> | null,
+    /** recordHistory 占位步的 before 快照（全仓同一时刻至多一份，结算即释放） */
+    historyPendingBefore: null as string | null,
+    /** 最近一次结算的 before 快照，用于丢弃重复入栈的同源变更 */
+    historyLastBefore: null as string | null,
     /** 拖拽/缩放过程中不入栈，松手时记一步 */
     layoutGesture: false,
     layoutBefore: null as string | null,
@@ -156,8 +168,28 @@ export const useDesignerStore = defineStore('designer', {
       }
       const snap = this.historyPending;
       this.historyPending = null;
+      this.finalizePendingEntry();
       if (!snap || snap === JSON.stringify(this.pageSchema)) return;
       this.pushSnapshot(snap);
+    },
+    /** 结算 recordHistory 占位步：diff(before→当前) 为 patch 条目；无变化则弹出占位 */
+    finalizePendingEntry() {
+      const beforeSnap = this.historyPendingBefore;
+      if (beforeSnap === null) return;
+      this.historyPendingBefore = null;
+      const stack = this.historyPast;
+      const top = stack[stack.length - 1];
+      if (!top?.pending) return;
+      const before = JSON.parse(beforeSnap) as PageSchema;
+      stripSharedCanvasLayer(before);
+      const current = toHistoryDoc(this.pageSchema);
+      const ops = createPatch(before, current);
+      this.historyLastBefore = beforeSnap;
+      if (ops.length === 0) {
+        stack.pop();
+      } else {
+        stack[stack.length - 1] = { ops, inverse: createPatch(current, before) };
+      }
     },
     /** 属性等直接改字段的操作：记下变更前快照，短时间多次输入合并成一步 */
     noteSchemaChange(previous: string) {
@@ -181,32 +213,36 @@ export const useDesignerStore = defineStore('designer', {
       }
     },
     dropOldest(stack: HistoryEntry[]) {
-      if (stack.length >= 2 && stack[0].kind === 'snap' && stack[1].kind === 'patch') {
-        const state = materializeHistory(stack.slice(0, 2));
-        stack.splice(0, 2, { kind: 'snap', data: JSON.stringify(state) });
-        return;
-      }
       stack.shift();
     },
+    /** 把「snapshot → 当前」作为一步压入栈（patch 表达）；同源重复变更与空 diff 跳过 */
     pushEntry(stack: HistoryEntry[], snapshot: string) {
-      if (stack.length > 0 && JSON.stringify(materializeHistory(stack)) === snapshot) return;
-      if (stack.length === 0 || stack.length % 10 === 0) {
-        stack.push({ kind: 'snap', data: snapshot });
-      } else {
-        const prev = materializeHistory(stack);
-        stack.push({ kind: 'patch', ops: createPatch(prev, JSON.parse(snapshot)) });
-      }
+      this.finalizePendingEntry();
+      if (snapshot === this.historyLastBefore) return;
+      const before = JSON.parse(snapshot) as PageSchema;
+      stripSharedCanvasLayer(before);
+      const current = toHistoryDoc(this.pageSchema);
+      const ops = createPatch(before, current);
+      if (ops.length === 0) return;
+      stack.push({ ops, inverse: createPatch(current, before) });
+      this.historyLastBefore = snapshot;
       this.trimHistory(stack);
     },
     pushSnapshot(snapshot: string) {
       this.pushEntry(this.historyPast, snapshot);
       this.historyFuture = [];
     },
+    /** 变更前调用：压入一个未结算占位步（变更发生后由结算点 diff 出 patch） */
     recordHistory() {
       this.flushPendingHistory();
-      this.pushSnapshot(JSON.stringify(this.pageSchema));
+      this.historyFuture = [];
+      this.historyPast.push({ ops: [], inverse: [], pending: true });
+      this.historyPendingBefore = JSON.stringify(this.pageSchema);
+      this.trimHistory(this.historyPast);
     },
     beginLayoutGesture() {
+      // 先结算在途占位步，保证手势条目独立成步
+      this.finalizePendingEntry();
       if (!this.layoutGesture) {
         this.layoutGesture = true;
         this.layoutBefore = JSON.stringify(this.pageSchema);
@@ -237,20 +273,20 @@ export const useDesignerStore = defineStore('designer', {
     },
     undo() {
       this.flushPendingHistory();
-      if (this.historyPast.length === 0) return;
-      const currentSnapshot = JSON.stringify(this.pageSchema);
-      const restored = materializeHistory(this.historyPast);
-      this.historyPast.pop();
-      this.pushEntry(this.historyFuture, currentSnapshot);
+      const entry = this.historyPast.pop();
+      if (!entry) return;
+      this.historyFuture.push(entry);
+      this.historyLastBefore = null;
+      const restored = applyPatch(toHistoryDoc(this.pageSchema), entry.inverse);
       this.restoreSchema(restored);
     },
     redo() {
       this.flushPendingHistory();
-      if (this.historyFuture.length === 0) return;
-      const currentSnapshot = JSON.stringify(this.pageSchema);
-      const restored = materializeHistory(this.historyFuture);
-      this.historyFuture.pop();
-      this.pushEntry(this.historyPast, currentSnapshot);
+      const entry = this.historyFuture.pop();
+      if (!entry) return;
+      this.historyPast.push(entry);
+      this.historyLastBefore = null;
+      const restored = applyPatch(toHistoryDoc(this.pageSchema), entry.ops);
       this.restoreSchema(restored);
     },
     selectNode(id: string | null) {

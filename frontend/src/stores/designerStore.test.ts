@@ -184,6 +184,80 @@ describe('designerStore 节点操作', () => {
     expect(store.historyPast.length).toBe(historyBefore + 1);
     expect(store.pageSchema.children[0].layout.x).toBe(5);
   });
+
+  test('undo/redo 混合操作后往返恢复到每一步状态', () => {
+    const store = useDesignerStore();
+    const initial = JSON.parse(JSON.stringify(store.pageSchema));
+    store.addNodeFromMaterial(material, 0, 0);
+    const id = store.pageSchema.children[0].id;
+    const afterAdd = JSON.parse(JSON.stringify(store.pageSchema));
+
+    store.recordHistory();
+    store.pageSchema.children[0].label = '改名';
+    const afterLabel = JSON.parse(JSON.stringify(store.pageSchema));
+
+    store.updateNodeLayout([{ i: id, x: 3, y: 1, w: 2, h: 2 }]);
+    const afterMove = JSON.parse(JSON.stringify(store.pageSchema));
+
+    store.removeNode(id);
+    const afterRemove = JSON.parse(JSON.stringify(store.pageSchema));
+
+    store.undo();
+    expect(store.pageSchema).toEqual(afterMove);
+    store.undo();
+    expect(store.pageSchema).toEqual(afterLabel);
+    store.undo();
+    expect(store.pageSchema).toEqual(afterAdd);
+    store.undo();
+    expect(store.pageSchema).toEqual(initial);
+
+    store.redo();
+    expect(store.pageSchema).toEqual(afterAdd);
+    store.redo();
+    expect(store.pageSchema).toEqual(afterLabel);
+    store.redo();
+    expect(store.pageSchema).toEqual(afterMove);
+    store.redo();
+    expect(store.pageSchema).toEqual(afterRemove);
+  });
+
+  test('一次拖拽手势只产生一步历史（多次 move 合并）', () => {
+    const store = useDesignerStore();
+    store.addNodeFromMaterial(material);
+    const id = store.pageSchema.children[0].id;
+    store.flushPendingHistory();
+    const before = store.historyPast.length;
+
+    store.beginLayoutGesture();
+    for (let x = 1; x <= 5; x++) {
+      store.updateNodeLayout([{ i: id, x, y: 0, w: 2, h: 2 }], { history: false });
+    }
+    expect(store.historyPast.length).toBe(before);
+    store.endLayoutGesture();
+    expect(store.historyPast.length).toBe(before + 1);
+
+    store.undo();
+    expect(store.pageSchema.children[0].layout.x).toBe(0);
+  });
+
+  test('历史条目只存 patch（ops/inverse），不存全量快照', () => {
+    const store = useDesignerStore();
+    store.addNodeFromMaterial(material);
+    for (let i = 0; i < 5; i++) {
+      store.recordHistory();
+      store.pageSchema.children[0].label = `按钮-${i}`;
+      store.flushPendingHistory();
+    }
+    const snapshotSize = JSON.stringify(store.pageSchema).length;
+    expect(store.historyPast.length).toBe(6);
+    for (const entry of store.historyPast) {
+      expect(Object.keys(entry).sort()).toEqual(['inverse', 'ops']);
+      expect(Array.isArray(entry.ops)).toBe(true);
+      expect(Array.isArray(entry.inverse)).toBe(true);
+    }
+    // 6 步历史总量 < 3 份全量快照：patch 平均单步不足半个快照
+    expect(JSON.stringify(store.historyPast).length).toBeLessThan(snapshotSize * 3);
+  });
 });
 
 describe('designerStore 图层管理', () => {
