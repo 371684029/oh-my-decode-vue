@@ -548,3 +548,770 @@ describe('物料与出码登记一致', () => {
     }
   });
 });
+
+// ============================================================
+// v2.4.0 重构前字节级基线锁定（P0-1 拆分出码引擎）
+// 以下断言在重构前生成并固化：覆盖 pro-form（input/select/switch/date +
+// 逐项 span/width）、pro-table（列/分页/行操作）、pro-spacer、通用 el-*、
+// 黑盒 materialRef 占位、事件动作链与弹窗图层。重构后输出必须逐字节一致。
+// ============================================================
+
+/** 覆盖全部出码分支的锁定 Schema（勿随意改动：改动即破坏基线语义） */
+function buildLockSchema(): PageSchema {
+  return {
+    id: 'page_lock_001',
+    title: '锁定页',
+    type: 'page',
+    meta: { author: 'lock', description: 'byte lock', version: '1.0.0' },
+    state: { name: '张三', flag: false },
+    children: [
+      {
+        id: 'form_lock',
+        type: 'pro-form',
+        label: '锁定表单',
+        layout: { x: 0, y: 0, w: 12, h: 5, i: 'form_lock' },
+        props: { labelWidth: '120px' },
+        attrs: {},
+        style: {},
+        events: {
+          submit: { enabled: true, actions: [{ id: 'fs1', type: 'show_message', payload: { messageText: '表单已提交' } }] }
+        },
+        config: {
+          items: [
+            { field: 'username', label: '用户名', component: 'input', required: true, span: 24, width: '200px' },
+            { field: 'role', label: '角色', component: 'select', span: 8, options: [{ label: '管理员', value: 'admin' }] },
+            { field: 'enabled', label: '启用', component: 'switch' },
+            { field: 'birthday', label: '生日', component: 'date' }
+          ]
+        }
+      },
+      {
+        id: 'tbl_lock',
+        type: 'pro-table',
+        label: '锁定表格',
+        layout: { x: 0, y: 5, w: 12, h: 6, i: 'tbl_lock' },
+        props: { border: true },
+        attrs: {},
+        style: {},
+        events: {},
+        apiBinding: {
+          url: '/api/lock',
+          method: 'GET',
+          params: { q: '{{ state.name }}' },
+          responsePath: 'data.list',
+          totalProp: 'data.total'
+        },
+        config: {
+          columns: [
+            { prop: 'id', label: 'ID', width: '80', sortable: true, align: 'center' },
+            { prop: 'name', label: '名称' }
+          ],
+          pagination: { enabled: true, pageSize: 20 },
+          actions: [{ label: '详情', type: 'primary', eventKey: 'view' }]
+        }
+      },
+      {
+        id: 'sp_lock',
+        type: 'pro-spacer',
+        label: '间隔',
+        layout: { x: 0, y: 11, w: 12, h: 1, i: 'sp_lock' },
+        props: { height: '32px' },
+        attrs: {},
+        style: {},
+        events: {}
+      },
+      {
+        id: 'prog_lock',
+        type: 'el-progress',
+        label: '进度',
+        layout: { x: 0, y: 12, w: 6, h: 2, i: 'prog_lock' },
+        props: { text: '进度文本' },
+        attrs: { 'stroke-width': 8 },
+        style: {},
+        events: {}
+      },
+      {
+        id: 'mat_lock',
+        type: 'custom-locked-box',
+        label: '锁定物料',
+        layout: { x: 6, y: 12, w: 6, h: 2, i: 'mat_lock' },
+        props: {},
+        attrs: {},
+        style: {},
+        events: {},
+        materialRef: { id: 'custom-locked-box', version: '1.2.0' }
+      },
+      {
+        id: 'btn_lock',
+        type: 'el-button',
+        label: '按钮',
+        layout: { x: 0, y: 14, w: 2, h: 2, i: 'btn_lock' },
+        props: { text: '触发', type: 'primary' },
+        attrs: {},
+        style: {},
+        events: {
+          click: {
+            enabled: true,
+            actions: [
+              { id: 'a1', type: 'set_state', payload: { name: '李四' } },
+              { id: 'a2', type: 'show_message', when: '{{ state.flag === true }}', payload: { messageText: '条件消息' } },
+              { id: 'a3', type: 'open_dialog', target: 'layer_lock', payload: { from: 'btn' } },
+              { id: 'a4', type: 'reload_data', target: 'tbl_lock' }
+            ]
+          }
+        }
+      }
+    ],
+    layers: [
+      {
+        id: 'layer_lock',
+        name: '锁定弹窗',
+        type: 'dialog',
+        visible: true,
+        zIndex: 20,
+        props: { title: '锁定弹窗标题', width: '40%' },
+        children: [
+          {
+            id: 'dlg_btn',
+            type: 'el-button',
+            label: '弹窗按钮',
+            layout: { x: 0, y: 0, w: 2, h: 2, i: 'dlg_btn' },
+            props: { text: '弹窗按钮文本' },
+            attrs: {},
+            style: {},
+            events: {}
+          }
+        ]
+      }
+    ]
+  };
+}
+
+describe('v2.4.0 重构前字节级基线锁定', () => {
+  test('generateVueSFC 完整输出逐字节一致', () => {
+    expect(generateVueSFC(buildLockSchema())).toBe(`<template>
+  <div class="lowcode-page-page-lock-001">
+    <!-- 高端表单 Component -->
+    <el-form :model="formData_form_lock" label-width="120px">
+      <el-row :gutter="16">
+      <el-col :span="24">
+        <el-form-item label="用户名" prop="username" required>
+          <el-input v-model='formData_form_lock["username"]' placeholder="请输入用户名" style="width: 200px" />
+        </el-form-item>
+      </el-col>
+      <el-col :span="8">
+        <el-form-item label="角色" prop="role">
+          <el-select v-model='formData_form_lock["role"]' placeholder="请选择角色" style="width: 100%">
+            <el-option label="管理员" value="admin" />
+          </el-select>
+        </el-form-item>
+      </el-col>
+      <el-col :span="12">
+        <el-form-item label="启用" prop="enabled">
+          <el-switch v-model='formData_form_lock["enabled"]' />
+        </el-form-item>
+      </el-col>
+      <el-col :span="12">
+        <el-form-item label="生日" prop="birthday">
+          <el-date-picker v-model='formData_form_lock["birthday"]' type="date" placeholder="请选择日期" style="width: 100%" />
+        </el-form-item>
+      </el-col>
+      </el-row>
+      <el-form-item>
+        <el-button type="primary" @click="handleSubmit('form_lock')">提交</el-button>
+        <el-button @click="handleReset('form_lock')">重置</el-button>
+      </el-form-item>
+    </el-form>
+    <!-- 高端表格 Component -->
+    <el-card shadow="always">
+      <el-table :data="tableData_tbl_lock" :border="true" style="width: 100%">
+      <el-table-column prop="id" label="ID" width="80" align="center" sortable />
+      <el-table-column prop="name" label="名称" />
+        <el-table-column label="操作" align="center" width="160">
+          <template #default="scope">
+            <el-button link type="primary" size="small" @click="handleRowAction('tbl_lock', 'view', scope.row)">详情</el-button>
+          </template>
+        </el-table-column>
+      </el-table>
+      <el-pagination
+        v-model:current-page="currentPage_tbl_lock"
+        :page-size="20"
+        layout="total, prev, pager, next"
+        :total="totalCount_tbl_lock"
+        size="small"
+        style="margin-top: 10px; justify-content: flex-end"
+        @current-change="onPage_tbl_lock"
+      />
+    </el-card>
+    <div class="pro-spacer" style="min-height: 32px; width: 100%" aria-hidden="true"></div>
+    <el-progress text="进度文本" :stroke-width="8">进度文本</el-progress>
+    <div style="padding:8px;border:1px dashed #e6a23c;border-radius:4px;color:#b88230">锁定物料（物料 custom-locked-box@1.2.0 未解析）</div>    <el-button text="触发" type="primary" @click="handleNodeClick('btn_lock', 'click', $event)">触发</el-button>
+    <!-- 弹窗图层: 锁定弹窗 -->
+    <el-dialog v-model="dialogVisible_layer_lock" title="锁定弹窗标题" width="40%">
+      <el-button text="弹窗按钮文本">弹窗按钮文本</el-button>
+    </el-dialog>
+
+  </div>
+</template>
+
+<script setup lang="ts">
+import { ref, reactive, onMounted, onUnmounted } from 'vue';
+import { ElMessage } from 'element-plus';
+
+async function fetchChecked(url, init) {
+  const maxHops = 3;
+  const redirects = new Set([301, 302, 303, 307, 308]);
+  const blockedHost = (hostname) => {
+    const host = String(hostname || '').toLowerCase().replace(/\\.$/, '').replace(/^\\[|\\]$/g, '');
+    if (host === 'metadata.google.internal') return true;
+    if (/^0x[0-9a-f]+$/i.test(host) || /^\\d+$/.test(host)) return true;
+    const ipv4 = /^(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})$/.exec(host);
+    if (ipv4 && Number(ipv4[1]) === 169 && Number(ipv4[2]) === 254) return true;
+    if (host.includes(':') && /^fe[89ab]/i.test(host)) return true;
+    return false;
+  };
+  const rawHost = (value) => {
+    const match = /^[a-z][a-z\\d+.-]*:\\/\\/([^/?#]*)/i.exec(value);
+    if (!match) return '';
+    let authority = match[1];
+    const at = authority.lastIndexOf('@');
+    if (at >= 0) authority = authority.slice(at + 1);
+    if (authority.startsWith('[')) {
+      const end = authority.indexOf(']');
+      return end >= 0 ? authority.slice(1, end) : authority;
+    }
+    return authority.replace(/:\\d+$/, '');
+  };
+  const assertUrl = (value) => {
+    if (value.startsWith('/') && !value.startsWith('//')) return;
+    if (blockedHost(rawHost(value))) throw new Error('不允许访问该地址');
+    const parsed = new URL(value);
+    if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') throw new Error('数据源仅允许 http 或 https');
+    if (blockedHost(parsed.hostname)) throw new Error('不允许访问该地址');
+  };
+  let current = url;
+  for (let hop = 0; hop <= maxHops; hop++) {
+    assertUrl(current);
+    const res = await fetch(current, Object.assign({}, init, { redirect: 'manual' }));
+    if (res.type === 'opaqueredirect' || redirects.has(res.status)) {
+      if (hop === maxHops) throw new Error('重定向次数过多');
+      const location = res.headers.get('location');
+      if (!location) throw new Error('重定向缺少 Location');
+      current = new URL(location, current).toString();
+      continue;
+    }
+    return res;
+  }
+  throw new Error('重定向次数过多');
+}
+
+// 页面全局状态（表达式绑定作用域）
+const state = reactive<Record<string, any>>({
+  "name": "张三",
+  "flag": false
+});
+
+// 数据源: /api/lock
+const tableData_tbl_lock = ref<any[]>([]);
+const totalCount_tbl_lock = ref(0);
+const currentPage_tbl_lock = ref(1);
+const loadData_tbl_lock = async () => {
+  try {
+    const params = { page: currentPage_tbl_lock.value, size: 20, ...({ "q": (state.name) }) };
+    const qs = new URLSearchParams();
+    Object.entries(params).forEach(([k, v]) => { if (v !== undefined && v !== null && v !== '') qs.append(k, String(v)); });
+    const q = qs.toString();
+    const base = "/api/lock";
+    const url = q ? (base.includes('?') ? base + '&' + q : base + '?' + q) : base;
+    const res = await fetchChecked(url, { method: 'GET', headers: { 'Content-Type': 'application/json' }, signal: AbortSignal.timeout(10000) });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const json = await res.json();
+    const list = json.data.list;
+    tableData_tbl_lock.value = Array.isArray(list) ? list : [];
+    const total = json.data.total;
+    if (total !== undefined) totalCount_tbl_lock.value = Number(total) || 0;
+  } catch (err) {
+    console.error('数据加载失败:', err);
+  }
+};
+const onPage_tbl_lock = (page: number) => { currentPage_tbl_lock.value = page; state.page = page; loadData_tbl_lock(); };
+
+const formData_form_lock = ref<Record<string, any>>({});
+
+const handleNodeClick = async (nodeId: string, eventKey: string, $event: any) => {
+  if (nodeId === "form_lock" && eventKey === "submit") {
+    ElMessage({ type: "success", message: "表单已提交" });
+  }
+  if (nodeId === "btn_lock" && eventKey === "click") {
+    state["name"] = "李四";
+    if (state.flag === true) {
+      ElMessage({ type: "success", message: "条件消息" });
+    }
+    state["from"] = "btn";
+    dialogVisible_layer_lock.value = true;
+    await loadData_tbl_lock();
+  }
+};
+
+const handleRowAction = async (nodeId: string, eventKey: string, row: any) => {
+  if ((nodeId === "form_lock" && eventKey === "submit") || (nodeId === "btn_lock" && eventKey === "click")) {
+    await handleNodeClick(nodeId, eventKey, { row, eventKey });
+    return;
+  }
+  const preferred = [row?.name, row?.title, row?.label, row?.id];
+  let rowLabel = '当前行';
+  for (const v of preferred) { if (v !== undefined && v !== null && String(v).trim() !== '') { rowLabel = String(v); break; } }
+  if (rowLabel === '当前行' && row && typeof row === 'object') { for (const v of Object.values(row)) { if (v !== undefined && v !== null && typeof v !== 'object' && String(v).trim() !== '') { rowLabel = String(v); break; } } }
+  const actionLabel = ({ view: '查看', delete: '删除', edit: '编辑' } as Record<string, string>)[eventKey] || eventKey;
+  ElMessage({ type: eventKey === 'delete' ? 'warning' : 'info', message: actionLabel + ' · ' + rowLabel });
+};
+
+const lookupForm = (formId: string) => {
+  if (formId === "form_lock") return formData_form_lock;
+  return null;
+};
+const handleSubmit = async (formId: string) => {
+  const form = lookupForm(formId);
+  if (!form) return;
+  if (formId === "form_lock" && (form.value["username"] == null || String(form.value["username"]).trim() === '')) { ElMessage.warning("请填写用户名"); return; }
+  await handleNodeClick(formId, 'submit', form.value);
+  console.log('Form Submitted:', form.value);
+  ElMessage.success('表单提交成功');
+};
+
+const handleReset = (formId: string) => {
+  const form = lookupForm(formId);
+  if (!form) return;
+  Object.keys(form.value).forEach((key) => { form.value[key] = undefined; });
+  ElMessage.info('表单已重置');
+};
+
+const dialogVisible_layer_lock = ref(true);
+
+const loadInitialData = () => {
+  loadData_tbl_lock();
+};
+
+onMounted(() => {
+  loadInitialData();
+  console.log("低代码页面及多图层组件已成功挂载!");
+
+});
+
+onUnmounted(() => {
+  console.log("低代码页面组件已卸载!");
+
+});
+</script>
+
+<style scoped>
+.lowcode-page-page-lock-001 {
+  padding: 24px;
+  background-color: #f5f7fa;
+  min-height: 100vh;
+}
+.empty-page {
+  text-align: center;
+  color: #909399;
+  padding: 60px 0;
+}
+.loading-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 3000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: rgba(255, 255, 255, 0.85);
+  color: #409eff;
+  font-weight: 600;
+}
+.custom-html-wrapper {
+  margin: 12px 0;
+}
+
+</style>
+`);
+  });
+
+  test('generateHTML 完整输出逐字节一致', () => {
+    expect(generateHTML(buildLockSchema())).toBe(`<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>锁定页</title>
+  <!-- Element Plus CSS -->
+  <link rel="stylesheet" href="https://unpkg.com/element-plus/dist/index.css">
+  <style>
+    .lowcode-page-page-lock-001 {
+      padding: 24px;
+      background-color: #f5f7fa;
+      min-height: 100vh;
+    }
+    .empty-page {
+      text-align: center;
+      color: #909399;
+      padding: 60px 0;
+    }
+    .loading-overlay {
+      position: fixed;
+      inset: 0;
+      z-index: 3000;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background-color: rgba(255, 255, 255, 0.85);
+      color: #409eff;
+      font-weight: 600;
+    }
+    .custom-html-wrapper {
+      margin: 12px 0;
+    }
+    
+    body {
+      margin: 0;
+      padding: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background-color: #f5f7fa;
+    }
+    .page-header {
+      text-align: center;
+      padding: 16px;
+      background: #ffffff;
+      border-bottom: 1px solid #ebeef5;
+    }
+    .page-header h2 { margin: 0; color: #303133; }
+    .page-header p { margin: 4px 0 0; color: #909399; font-size: 12px; }
+  </style>
+</head>
+<body>
+  <div id="app">
+    <div class="page-header">
+      <h2>锁定页</h2>
+      <p>页面 ID: page_lock_001 | 生成版本: v1.0.0</p>
+    </div>
+    <div class="lowcode-page-page-lock-001">
+        <!-- 高端表单 Component -->
+        <el-form :model="formData_form_lock" label-width="120px">
+          <el-row :gutter="16">
+          <el-col :span="24">
+            <el-form-item label="用户名" prop="username" required>
+              <el-input v-model='formData_form_lock["username"]' placeholder="请输入用户名" style="width: 200px" />
+            </el-form-item>
+          </el-col>
+          <el-col :span="8">
+            <el-form-item label="角色" prop="role">
+              <el-select v-model='formData_form_lock["role"]' placeholder="请选择角色" style="width: 100%">
+                <el-option label="管理员" value="admin" />
+              </el-select>
+            </el-form-item>
+          </el-col>
+          <el-col :span="12">
+            <el-form-item label="启用" prop="enabled">
+              <el-switch v-model='formData_form_lock["enabled"]' />
+            </el-form-item>
+          </el-col>
+          <el-col :span="12">
+            <el-form-item label="生日" prop="birthday">
+              <el-date-picker v-model='formData_form_lock["birthday"]' type="date" placeholder="请选择日期" style="width: 100%" />
+            </el-form-item>
+          </el-col>
+          </el-row>
+          <el-form-item>
+            <el-button type="primary" @click="handleSubmit('form_lock')">提交</el-button>
+            <el-button @click="handleReset('form_lock')">重置</el-button>
+          </el-form-item>
+        </el-form>
+        <!-- 高端表格 Component -->
+        <el-card shadow="always">
+          <el-table :data="tableData_tbl_lock" :border="true" style="width: 100%">
+          <el-table-column prop="id" label="ID" width="80" align="center" sortable />
+          <el-table-column prop="name" label="名称" />
+            <el-table-column label="操作" align="center" width="160">
+              <template #default="scope">
+                <el-button link type="primary" size="small" @click="handleRowAction('tbl_lock', 'view', scope.row)">详情</el-button>
+              </template>
+            </el-table-column>
+          </el-table>
+          <el-pagination
+            v-model:current-page="currentPage_tbl_lock"
+            :page-size="20"
+            layout="total, prev, pager, next"
+            :total="totalCount_tbl_lock"
+            size="small"
+            style="margin-top: 10px; justify-content: flex-end"
+            @current-change="onPage_tbl_lock"
+          />
+        </el-card>
+        <div class="pro-spacer" style="min-height: 32px; width: 100%" aria-hidden="true"></div>
+        <el-progress text="进度文本" :stroke-width="8">进度文本</el-progress>
+        <div style="padding:8px;border:1px dashed #e6a23c;border-radius:4px;color:#b88230">锁定物料（物料 custom-locked-box@1.2.0 未解析）</div>        <el-button text="触发" type="primary" @click="handleNodeClick('btn_lock', 'click', $event)">触发</el-button>
+    <!-- 弹窗图层: 锁定弹窗 -->
+    <el-dialog v-model="dialogVisible_layer_lock" title="锁定弹窗标题" width="40%">
+      <el-button text="弹窗按钮文本">弹窗按钮文本</el-button>
+    </el-dialog>
+
+    </div>
+  </div>
+
+  <!-- Vue 3 CDN (完整版，含模板编译器) & Element Plus CDN -->
+  <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+  <script src="https://unpkg.com/element-plus"></script>
+  <script>
+    const { createApp } = Vue;
+    async function fetchChecked(url, init) {
+  const maxHops = 3;
+  const redirects = new Set([301, 302, 303, 307, 308]);
+  const blockedHost = (hostname) => {
+    const host = String(hostname || '').toLowerCase().replace(/\\.$/, '').replace(/^\\[|\\]$/g, '');
+    if (host === 'metadata.google.internal') return true;
+    if (/^0x[0-9a-f]+$/i.test(host) || /^\\d+$/.test(host)) return true;
+    const ipv4 = /^(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})$/.exec(host);
+    if (ipv4 && Number(ipv4[1]) === 169 && Number(ipv4[2]) === 254) return true;
+    if (host.includes(':') && /^fe[89ab]/i.test(host)) return true;
+    return false;
+  };
+  const rawHost = (value) => {
+    const match = /^[a-z][a-z\\d+.-]*:\\/\\/([^/?#]*)/i.exec(value);
+    if (!match) return '';
+    let authority = match[1];
+    const at = authority.lastIndexOf('@');
+    if (at >= 0) authority = authority.slice(at + 1);
+    if (authority.startsWith('[')) {
+      const end = authority.indexOf(']');
+      return end >= 0 ? authority.slice(1, end) : authority;
+    }
+    return authority.replace(/:\\d+$/, '');
+  };
+  const assertUrl = (value) => {
+    if (value.startsWith('/') && !value.startsWith('//')) return;
+    if (blockedHost(rawHost(value))) throw new Error('不允许访问该地址');
+    const parsed = new URL(value);
+    if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') throw new Error('数据源仅允许 http 或 https');
+    if (blockedHost(parsed.hostname)) throw new Error('不允许访问该地址');
+  };
+  let current = url;
+  for (let hop = 0; hop <= maxHops; hop++) {
+    assertUrl(current);
+    const res = await fetch(current, Object.assign({}, init, { redirect: 'manual' }));
+    if (res.type === 'opaqueredirect' || redirects.has(res.status)) {
+      if (hop === maxHops) throw new Error('重定向次数过多');
+      const location = res.headers.get('location');
+      if (!location) throw new Error('重定向缺少 Location');
+      current = new URL(location, current).toString();
+      continue;
+    }
+    return res;
+  }
+  throw new Error('重定向次数过多');
+}
+
+    const App = {
+      template: \`
+        <div>
+          <div class="page-header">
+            <h2>锁定页</h2>
+            <p>页面 ID: page_lock_001 | 生成版本: v1.0.0</p>
+          </div>
+          <div class="lowcode-page-page-lock-001">
+        <!-- 高端表单 Component -->
+        <el-form :model="formData_form_lock" label-width="120px">
+          <el-row :gutter="16">
+          <el-col :span="24">
+            <el-form-item label="用户名" prop="username" required>
+              <el-input v-model='formData_form_lock["username"]' placeholder="请输入用户名" style="width: 200px" />
+            </el-form-item>
+          </el-col>
+          <el-col :span="8">
+            <el-form-item label="角色" prop="role">
+              <el-select v-model='formData_form_lock["role"]' placeholder="请选择角色" style="width: 100%">
+                <el-option label="管理员" value="admin" />
+              </el-select>
+            </el-form-item>
+          </el-col>
+          <el-col :span="12">
+            <el-form-item label="启用" prop="enabled">
+              <el-switch v-model='formData_form_lock["enabled"]' />
+            </el-form-item>
+          </el-col>
+          <el-col :span="12">
+            <el-form-item label="生日" prop="birthday">
+              <el-date-picker v-model='formData_form_lock["birthday"]' type="date" placeholder="请选择日期" style="width: 100%" />
+            </el-form-item>
+          </el-col>
+          </el-row>
+          <el-form-item>
+            <el-button type="primary" @click="handleSubmit('form_lock')">提交</el-button>
+            <el-button @click="handleReset('form_lock')">重置</el-button>
+          </el-form-item>
+        </el-form>
+        <!-- 高端表格 Component -->
+        <el-card shadow="always">
+          <el-table :data="tableData_tbl_lock" :border="true" style="width: 100%">
+          <el-table-column prop="id" label="ID" width="80" align="center" sortable />
+          <el-table-column prop="name" label="名称" />
+            <el-table-column label="操作" align="center" width="160">
+              <template #default="scope">
+                <el-button link type="primary" size="small" @click="handleRowAction('tbl_lock', 'view', scope.row)">详情</el-button>
+              </template>
+            </el-table-column>
+          </el-table>
+          <el-pagination
+            v-model:current-page="currentPage_tbl_lock"
+            :page-size="20"
+            layout="total, prev, pager, next"
+            :total="totalCount_tbl_lock"
+            size="small"
+            style="margin-top: 10px; justify-content: flex-end"
+            @current-change="onPage_tbl_lock"
+          />
+        </el-card>
+        <div class="pro-spacer" style="min-height: 32px; width: 100%" aria-hidden="true"></div>
+        <el-progress text="进度文本" :stroke-width="8">进度文本</el-progress>
+        <div style="padding:8px;border:1px dashed #e6a23c;border-radius:4px;color:#b88230">锁定物料（物料 custom-locked-box@1.2.0 未解析）</div>        <el-button text="触发" type="primary" @click="handleNodeClick('btn_lock', 'click', $event)">触发</el-button>
+    <!-- 弹窗图层: 锁定弹窗 -->
+    <el-dialog v-model="dialogVisible_layer_lock" title="锁定弹窗标题" width="40%">
+      <el-button text="弹窗按钮文本">弹窗按钮文本</el-button>
+    </el-dialog>
+
+          </div>
+        </div>
+      \`,
+      data() {
+        return {
+state: { "name": "张三", "flag": false },
+          tableData_tbl_lock: [], // 数据源: /api/lock
+          totalCount_tbl_lock: 0,
+          currentPage_tbl_lock: 1,
+          formData_form_lock: {},
+          dialogVisible_layer_lock: true,
+        };
+      },
+    mounted() {
+  this.loadData_tbl_lock();
+    },
+    beforeUnmount() {
+      console.log("低代码页面已卸载!");
+    },
+      methods: {
+async loadData_tbl_lock() {
+  try {
+    const params = { page: this.currentPage_tbl_lock, size: 20, ...({ "q": (state.name) }) };
+    const qs = new URLSearchParams();
+    Object.entries(params).forEach(([k, v]) => { if (v !== undefined && v !== null && v !== '') qs.append(k, String(v)); });
+    const q = qs.toString();
+    const base = "/api/lock";
+    const url = q ? (base.includes('?') ? base + '&' + q : base + '?' + q) : base;
+    const res = await fetchChecked(url, { method: 'GET', headers: { 'Content-Type': 'application/json' }, signal: AbortSignal.timeout(10000) });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const json = await res.json();
+    const list = json.data.list;
+    this.tableData_tbl_lock = Array.isArray(list) ? list : [];
+    const total = json.data.total;
+    if (total !== undefined) this.totalCount_tbl_lock = Number(total) || 0;
+  } catch (err) {
+    console.error('数据加载失败:', err);
+  }
+}
+  onPage_tbl_lock(page) { this.currentPage_tbl_lock = page; this.state.page = page; this.loadData_tbl_lock(); },
+  handleNodeClick(nodeId, eventKey, $event) {
+  if (nodeId === "form_lock" && eventKey === "submit") {
+    ElMessage({ type: "success", message: "表单已提交" });
+  }
+  if (nodeId === "btn_lock" && eventKey === "click") {
+    this.state["name"] = "李四";
+    if (state.flag === true) {
+      ElMessage({ type: "success", message: "条件消息" });
+    }
+    this.state["from"] = "btn";
+    this.dialogVisible_layer_lock = true;
+    await this.loadData_tbl_lock();
+  }
+  },
+  handleRowAction(nodeId, eventKey, row) {
+    if ((nodeId === "form_lock" && eventKey === "submit") || (nodeId === "btn_lock" && eventKey === "click")) {
+      return this.handleNodeClick(nodeId, eventKey, { row, eventKey });
+    }
+    const preferred = [row?.name, row?.title, row?.label, row?.id];
+    let rowLabel = '当前行';
+    for (const v of preferred) { if (v !== undefined && v !== null && String(v).trim() !== '') { rowLabel = String(v); break; } }
+    if (rowLabel === '当前行' && row && typeof row === 'object') { for (const v of Object.values(row)) { if (v !== undefined && v !== null && typeof v !== 'object' && String(v).trim() !== '') { rowLabel = String(v); break; } } }
+    const actionLabel = ({ view: '查看', delete: '删除', edit: '编辑' })[eventKey] || eventKey;
+    ElementPlus.ElMessage({ type: eventKey === 'delete' ? 'warning' : 'info', message: actionLabel + ' · ' + rowLabel });
+  },
+  lookupForm(formId) {
+  if (formId === "form_lock") return this.formData_form_lock;
+  return null;
+  },
+  async handleSubmit(formId) {
+    const form = this.lookupForm(formId);
+    if (!form) return;
+    if (formId === "form_lock" && (form["username"] == null || String(form["username"]).trim() === '')) { ElementPlus.ElMessage.warning("请填写用户名"); return; }
+    await this.handleNodeClick(formId, 'submit', form);
+    console.log('Form Submitted:', form);
+    ElementPlus.ElMessage.success('表单提交成功');
+  },
+  handleReset(formId) {
+    const form = this.lookupForm(formId);
+    if (!form) return;
+    Object.keys(form).forEach((key) => {
+      form[key] = undefined;
+    });
+    ElementPlus.ElMessage.info('表单已重置');
+  },
+      }
+    };
+
+    createApp(App).use(ElementPlus).mount('#app');
+  </script>
+</body>
+</html>
+`);
+  });
+
+  test('generateWebComponent 完整输出逐字节一致', () => {
+    expect(generateWebComponent(buildLockSchema())).toBe(`/**
+ * Web Component 包装脚本
+ * 标签名: <custom-page-page-lock-001></custom-page-page-lock-001>
+ * 说明:
+ *   - 完整渲染 (非演示级)：通过 Vue createApp 将 PageTemplate 挂载到
+ *     自定义元素 (light DOM)，Element Plus 全局样式正常生效。
+ *   - 使用前提：宿主项目需安装 vue / element-plus，且本文件与配套的
+ *     PageTemplate.vue 放置于同一目录。
+ *   - 跨框架复用：React / Angular / jQuery / 原生 HTML 均可直接引用该标签。
+ */
+import { createApp, h } from 'vue';
+import ElementPlus from 'element-plus';
+import 'element-plus/dist/index.css';
+import PageTemplate from './PageTemplate.vue';
+
+class custom_page_page_lock_001 extends HTMLElement {
+  private _app: ReturnType<typeof createApp> | null = null;
+
+  connectedCallback() {
+    const app = createApp({
+      render: () => h(PageTemplate, { key: Date.now() })
+    });
+    app.use(ElementPlus);
+    this._app = app;
+    app.mount(this);
+  }
+
+  disconnectedCallback() {
+    if (this._app) {
+      this._app.unmount();
+      this._app = null;
+    }
+  }
+}
+
+if (!customElements.get('custom-page-page-lock-001')) {
+  customElements.define('custom-page-page-lock-001', custom_page_page_lock_001);
+  console.log('Web Component <custom-page-page-lock-001> 成功注册!');
+}
+
+export default custom_page_page_lock_001;
+`);
+  });
+});
