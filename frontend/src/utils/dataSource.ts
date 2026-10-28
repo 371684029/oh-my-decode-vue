@@ -317,9 +317,17 @@ async function executeAction(action: ActionNode, ctx: ActionContext): Promise<vo
       if (!action.target) throw new Error('Loading 动作缺少目标图层');
       ctx.setLayerVisible(action.target, action.payload?.visible ?? true);
       break;
-    case 'show_message':
-      ctx.notify(action.payload?.messageType ?? 'info', action.payload?.messageText ?? '操作完成');
+    case 'show_message': {
+      const payload = resolveTemplatedValue(
+        {
+          messageType: action.payload?.messageType ?? 'info',
+          messageText: action.payload?.messageText ?? '操作完成'
+        },
+        { ...ctx.scope, event: ctx.event, $event: ctx.event }
+      );
+      ctx.notify(payload?.messageType ?? 'info', String(payload?.messageText ?? '操作完成'));
       break;
+    }
     default:
       break;
   }

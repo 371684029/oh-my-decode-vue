@@ -223,6 +223,29 @@ describe('executeActions 事件动作链', () => {
     expect(notify).toHaveBeenCalledWith('success', '操作完成');
   });
 
+  test('show_message 支持混写插值文案', async () => {
+    const notify = vi.fn();
+    await executeActions(
+      [
+        {
+          id: 'a1',
+          type: 'show_message',
+          payload: { messageType: 'info', messageText: '查看 · {{ event.row.name }}' }
+        }
+      ],
+      {
+        scope: {},
+        event: { row: { name: '李四' } },
+        getNode: () => undefined,
+        getLayer: () => undefined,
+        reloadNode: () => {},
+        setLayerVisible: () => {},
+        notify
+      }
+    );
+    expect(notify).toHaveBeenCalledWith('info', '查看 · 李四');
+  });
+
   test('open_dialog 写入 payload，并丢弃原型链键', async () => {
     const scope: Record<string, any> = {};
     const setLayerVisible = vi.fn();
