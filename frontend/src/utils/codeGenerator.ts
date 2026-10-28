@@ -9,6 +9,7 @@ import { TABLE_PLACEHOLDER_ROWS } from './tablePlaceholder';
 import { buildCustomHtmlSrcdoc } from './customHtmlDocument';
 import { resolveMaterial } from './materialResolver';
 import { mapOutputEvents } from './materialInject';
+import { rowActionFallbackStatements } from './rowActionMessage';
 
 /**
  * 黑盒物料解析结果映射：node.id → 已注入 inputs / 对齐 outputs 的快照子树。
@@ -341,58 +342,80 @@ function renderNodeMarkup(node: ComponentNode, indentLevel = 3): string {
     case 'pro-form': {
       const items = node.config?.items || [];
       const itemIndent = ' '.repeat((indentLevel + 1) * 2);
+      const colIndent = ' '.repeat((indentLevel + 2) * 2);
       const formName = `formData_${identOf(node.id)}`;
-      const formAttrs = attributesExcept(node.props || {}, node.attrs || {}, ['labelWidth', 'layout', 'size']);
+      const formAttrs = attributesExcept(node.props || {}, node.attrs || {}, [
+        'labelWidth',
+        'layout',
+        'size',
+        'itemGap',
+        'gutter'
+      ]);
       const inline = node.props.layout === 'inline' ? ' inline' : '';
       const size = node.props.size ? ` size="${escapeHtml(String(node.props.size))}"` : '';
       const labelWidth = escapeHtml(String(node.props.labelWidth || '100px'));
+      const gutter = Number(node.props.gutter ?? 16);
+      const itemGap = node.props.itemGap;
+      const rowStyle =
+        itemGap != null && itemGap !== ''
+          ? ` style="row-gap: ${escapeHtml(typeof itemGap === 'number' ? `${itemGap}px` : String(itemGap))}"`
+          : '';
       let itemsTemplate = '';
 
       items.forEach((item: any) => {
         const itemType = item.component || item.type;
         const field = item.field || item.name;
         const required = item.required ? ' required' : '';
-
+        const span = Number(item.span ?? 12);
+        const widthStyle = item.width
+          ? ` style="width: ${escapeHtml(String(item.width))}"`
+          : itemType === 'select' || itemType === 'date'
+            ? ' style="width: 100%"'
+            : '';
+        let control = '';
         if (itemType === 'input') {
-          itemsTemplate +=
-            `${itemIndent}<el-form-item label="${escapeHtml(item.label)}" prop="${escapeHtml(field)}"${required}>\n` +
-            `${itemIndent}  <el-input v-model='${formName}[${JSON.stringify(field)}]' placeholder="${formPlaceholder(item, `请输入${item.label || ''}`)}" />\n` +
-            `${itemIndent}</el-form-item>\n`;
+          control = `<el-input v-model='${formName}[${JSON.stringify(field)}]' placeholder="${formPlaceholder(item, `请输入${item.label || ''}`)}"${widthStyle} />`;
         } else if (itemType === 'select') {
           const options = Array.isArray(item.options) ? item.options : [];
           let optTemplate = '';
           options.forEach((opt: any) => {
-            optTemplate += `${itemIndent}    <el-option label="${escapeHtml(opt.label)}" value="${escapeHtml(opt.value)}" />\n`;
+            optTemplate += `${colIndent}    <el-option label="${escapeHtml(opt.label)}" value="${escapeHtml(opt.value)}" />\n`;
           });
-          itemsTemplate +=
-            `${itemIndent}<el-form-item label="${escapeHtml(item.label)}" prop="${escapeHtml(field)}"${required}>\n` +
-            `${itemIndent}  <el-select v-model='${formName}[${JSON.stringify(field)}]' placeholder="${formPlaceholder(item, `请选择${item.label || ''}`)}">\n` +
+          control =
+            `<el-select v-model='${formName}[${JSON.stringify(field)}]' placeholder="${formPlaceholder(item, `请选择${item.label || ''}`)}"${widthStyle || ' style="width: 100%"'}>\n` +
             optTemplate +
-            `${itemIndent}  </el-select>\n` +
-            `${itemIndent}</el-form-item>\n`;
+            `${colIndent}  </el-select>`;
         } else if (itemType === 'switch') {
-          itemsTemplate +=
-            `${itemIndent}<el-form-item label="${escapeHtml(item.label)}" prop="${escapeHtml(field)}">\n` +
-            `${itemIndent}  <el-switch v-model='${formName}[${JSON.stringify(field)}]' />\n` +
-            `${itemIndent}</el-form-item>\n`;
+          control = `<el-switch v-model='${formName}[${JSON.stringify(field)}]' />`;
         } else if (itemType === 'date') {
-          itemsTemplate +=
-            `${itemIndent}<el-form-item label="${escapeHtml(item.label)}" prop="${escapeHtml(field)}"${required}>\n` +
-            `${itemIndent}  <el-date-picker v-model='${formName}[${JSON.stringify(field)}]' type="date" placeholder="${formPlaceholder(item, '请选择日期')}" style="width: 100%" />\n` +
-            `${itemIndent}</el-form-item>\n`;
+          control = `<el-date-picker v-model='${formName}[${JSON.stringify(field)}]' type="date" placeholder="${formPlaceholder(item, '请选择日期')}"${widthStyle || ' style="width: 100%"'} />`;
         }
+        if (!control) return;
+        itemsTemplate +=
+          `${itemIndent}<el-col :span="${span}">\n` +
+          `${colIndent}<el-form-item label="${escapeHtml(item.label)}" prop="${escapeHtml(field)}"${required}>\n` +
+          `${colIndent}  ${control}\n` +
+          `${colIndent}</el-form-item>\n` +
+          `${itemIndent}</el-col>\n`;
       });
 
       return (
         `${indent}<!-- 高端表单 Component -->\n` +
         `${indent}<el-form :model="${formName}"${formAttrs}${inline} label-width="${labelWidth}"${size}>\n` +
+        `${indent}  <el-row :gutter="${gutter}"${rowStyle}>\n` +
         itemsTemplate +
+        `${indent}  </el-row>\n` +
         `${indent}  <el-form-item>\n` +
         `${indent}    <el-button type="primary" @click="handleSubmit('${escapeHtml(node.id)}')">提交</el-button>\n` +
         `${indent}    <el-button @click="handleReset('${escapeHtml(node.id)}')">重置</el-button>\n` +
         `${indent}  </el-form-item>\n` +
         `${indent}</el-form>\n`
       );
+    }
+
+    case 'pro-spacer': {
+      const h = escapeHtml(String(node.props?.height || '24px'));
+      return `${indent}<div class="pro-spacer" style="min-height: ${h}; width: 100%" aria-hidden="true"></div>\n`;
     }
 
     case 'el-button': {
@@ -444,6 +467,14 @@ function renderNodeMarkup(node: ComponentNode, indentLevel = 3): string {
     }
 
     default:
+      if (node.type.startsWith('el-')) {
+        const tag = escapeHtml(node.type);
+        const text = node.props?.text ?? node.props?.label ?? node.props?.title ?? node.props?.content;
+        if (text != null && String(text).length > 0) {
+          return `${indent}<${tag}${attrStr}>${escapeHtml(String(text))}</${tag}>\n`;
+        }
+        return `${indent}<${tag}${attrStr} />\n`;
+      }
       if (isRenderedNodeType(node.type)) {
         return `${indent}<!-- 已登记类型缺少出码模板: ${escapeHtml(node.type)} -->\n${indent}<div id="${escapeHtml(node.id)}">${escapeHtml(node.label)}</div>\n`;
       }
@@ -871,8 +902,9 @@ function renderScriptSetup(schema: PageSchema): string {
       lines.push(`    return;`);
       lines.push(`  }`);
     }
-    lines.push(`  console.log('查看行数据:', row);`);
-    lines.push(`  ElMessage.info('查看: ' + (row.name || row.id));`);
+    for (const stmt of rowActionFallbackStatements('ElMessage', true)) {
+      lines.push(`  ${stmt}`);
+    }
     lines.push(`};`);
     lines.push('');
   }
@@ -1141,8 +1173,9 @@ function renderOptionsMethods(schema: PageSchema): string {
       ? `    if (${guards.join(' || ')}) {\n      return this.handleNodeClick(nodeId, eventKey, { row, eventKey });\n    }\n`
       : '';
     methods.push(`handleRowAction(nodeId, eventKey, row) {
-${delegated}    console.log('查看行数据:', row);
-    ElementPlus.ElMessage.info('查看: ' + (row.name || row.id));
+${delegated}${rowActionFallbackStatements('ElementPlus.ElMessage', false)
+      .map((s) => `    ${s}`)
+      .join('\n')}
   },`);
   }
 
