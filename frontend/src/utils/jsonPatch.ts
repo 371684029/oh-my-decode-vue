@@ -1,4 +1,4 @@
-/** RFC 6902 的一个子集：对象字段的 add / remove / replace，数组整体替换。 */
+/** RFC 6902 的一个子集：对象字段与数组元素的 add / remove / replace。 */
 
 export interface JsonPatchOp {
   op: 'add' | 'remove' | 'replace';
@@ -33,6 +33,17 @@ function sameJson(left: unknown, right: unknown): boolean {
 
 function diff(from: unknown, to: unknown, path: string, ops: JsonPatchOp[]): void {
   if (sameJson(from, to)) return;
+  if (Array.isArray(from) && Array.isArray(to)) {
+    // 逐下标 diff：共享前缀递归、尾部增补 add、尾部裁剪 remove（从高下标起删，保证 apply 时下标不漂移）
+    const shared = Math.min(from.length, to.length);
+    for (let i = 0; i < shared; i++) diff(from[i], to[i], `${path}/${i}`, ops);
+    if (to.length > shared) {
+      for (let i = shared; i < to.length; i++) ops.push({ op: 'add', path: `${path}/${i}`, value: to[i] });
+    } else if (from.length > shared) {
+      for (let i = from.length - 1; i >= shared; i--) ops.push({ op: 'remove', path: `${path}/${i}` });
+    }
+    return;
+  }
   if (Array.isArray(from) || Array.isArray(to) || !isPlainObject(from) || !isPlainObject(to)) {
     ops.push({ op: 'replace', path, value: to });
     return;
