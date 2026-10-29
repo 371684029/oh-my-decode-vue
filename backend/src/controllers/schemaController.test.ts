@@ -242,4 +242,51 @@ describe('patchSchema（PATCH /api/schemas/:id）', () => {
     );
     expect(details.incomingOps).toEqual(ops);
   });
+
+  test('#3 baseVersion 与已存版本不符返回 409，不落盘不写审计', async () => {
+    const id = 'page_patch_conflict';
+    await storageService.saveSchema(samplePage(id));
+    const res = createRes();
+    await schemaController.patchSchema(
+      createReq(
+        { ops: [{ op: 'replace', path: '/children/0/label', value: '新按钮' }], baseVersion: '0.9.0' },
+        id
+      ),
+      res
+    );
+    expect(res.statusCode).toBe(409);
+    expect(res.body).toMatchObject({ success: false, code: 'VERSION_CONFLICT' });
+    const stored = await storageService.getSchema(id);
+    expect(stored?.children[0].label).toBe('旧按钮');
+    expect(stored?.meta.version).toBe('1.0.0');
+    expect(vi.mocked(logDatabase.addLog)).not.toHaveBeenCalled();
+  });
+
+  test('baseVersion 匹配时照常应用并递增版本', async () => {
+    const id = 'page_patch_base_ok';
+    await storageService.saveSchema(samplePage(id));
+    const res = createRes();
+    await schemaController.patchSchema(
+      createReq(
+        { ops: [{ op: 'replace', path: '/children/0/label', value: '新按钮' }], baseVersion: '1.0.0' },
+        id
+      ),
+      res
+    );
+    expect(res.statusCode).toBe(200);
+    expect(res.body).toMatchObject({ success: true, data: { id, version: '1.0.1' } });
+  });
+
+  test('#4 空 ops 为无变更：不递增版本、不轮转备份、不写审计', async () => {
+    const id = 'page_patch_empty';
+    await storageService.saveSchema(samplePage(id));
+    const res = createRes();
+    await schemaController.patchSchema(createReq({ ops: [] }, id), res);
+    expect(res.statusCode).toBe(200);
+    expect(res.body).toMatchObject({ success: true, unchanged: true, data: { id, version: '1.0.0' } });
+    const stored = await storageService.getSchema(id);
+    expect(stored?.meta.version).toBe('1.0.0');
+    expect(stored?.meta.prevVersion).toBeUndefined();
+    expect(vi.mocked(logDatabase.addLog)).not.toHaveBeenCalled();
+  });
 });

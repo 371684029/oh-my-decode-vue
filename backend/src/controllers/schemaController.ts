@@ -79,6 +79,29 @@ export class SchemaController {
         return;
       }
 
+      // 空 Patch：无变更，不递增版本、不轮转备份（自测修复 #4 服务端兜底）
+      if (ops.length === 0) {
+        res.json({
+          success: true,
+          message: 'No changes to apply',
+          unchanged: true,
+          data: { id: existing.id, version: existing.meta.version }
+        });
+        return;
+      }
+
+      // 乐观并发（自测修复 #3）：客户端基线版本与已存版本不符 → 409，客户端回退全量 POST
+      const baseVersion = req.body?.baseVersion;
+      if (typeof baseVersion === 'string' && baseVersion !== existing.meta.version) {
+        res.status(409).json({
+          success: false,
+          code: 'VERSION_CONFLICT',
+          message: `Schema version conflict: base ${baseVersion} != stored ${existing.meta.version}`,
+          data: { id: existing.id, version: existing.meta.version }
+        });
+        return;
+      }
+
       let patched: PageSchema;
       try {
         patched = applyPatch(existing, ops);
