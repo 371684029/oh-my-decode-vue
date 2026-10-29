@@ -1,6 +1,6 @@
 {
   "name": "@lowcode/shared",
-  "version": "2.1.0",
+  "version": "2.4.0",
   "private": true,
   "description": "低代码平台共享类型与纯工具（类型定义、jsonPatch 等）",
   "types": "./src/index.ts",
