@@ -110,7 +110,8 @@ import ApiDocDialog from './components/app/ApiDocDialog.vue';
 import { ElConfigProvider, ElMessage } from 'element-plus';
 import zhCn from 'element-plus/es/locale/lang/zh-cn';
 import { Loading } from '@element-plus/icons-vue';
-import { applyMockBindings, renderApiMarkdown, planSchemaSave } from './utils/frontendApi';
+import { applyMockBindings, renderApiMarkdown } from './utils/frontendApi';
+import { saveSchemaWithFallback } from './utils/schemaSave';
 import type { PageSchema } from './types/designer';
 import { nodeEventBus } from './utils/dataSource';
 import { registerModalClose, registerModalOpen } from './utils/shortcutContext';
@@ -182,27 +183,27 @@ const lastSavedSchema = ref<PageSchema | null>(null);
 
 const snapshotSchema = (): PageSchema => JSON.parse(JSON.stringify(designerStore.pageSchema)) as PageSchema;
 
-/** 保存当前页面：优先 PATCH 增量；命中回退条件（无快照 / id 变化 / patch 不比全量小）或 PATCH 失败一次时改走全量 POST */
-const saveCurrentSchema = async (): Promise<boolean> => {
-  const current = designerStore.pageSchema;
-  const plan = planSchemaSave(lastSavedSchema.value, current);
-  if (plan.mode === 'patch') {
-    try {
-      const res = await http.patch(`/schemas/${plan.id}`, { ops: plan.ops });
-      if (res.data.success) {
-        lastSavedSchema.value = snapshotSchema();
-        return true;
-      }
-    } catch {
-      // PATCH 失败一次：回退下方全量 POST
+/**
+ * 保存当前页面（v2.4.0 自测修复 #2/#3/#4）：
+ * 提交「开始保存时」的快照并以其为增量基线——请求在途期间的编辑不吸收进基线；
+ * 无变更跳过；PATCH 携带 baseVersion，版本冲突或失败一次回退全量 POST。
+ */
+const saveCurrentSchema = async (): Promise<'saved' | 'skip'> => {
+  const submitted = snapshotSchema();
+  const { mode, baseline } = await saveSchemaWithFallback(submitted, lastSavedSchema.value, {
+    post: async (schema) => {
+      const res = await http.post('/schemas', schema);
+      if (!res.data?.success) throw new Error(res.data?.message || '保存失败');
+      return (res.data.data ?? {}) as { version?: string };
+    },
+    patch: async (id, ops, baseVersion) => {
+      const res = await http.patch(`/schemas/${id}`, { ops, baseVersion });
+      if (!res.data?.success) throw new Error(res.data?.message || '保存失败');
+      return (res.data.data ?? {}) as { version?: string };
     }
-  }
-  const res = await http.post('/schemas', current);
-  if (res.data.success) {
-    lastSavedSchema.value = snapshotSchema();
-    return true;
-  }
-  return false;
+  });
+  lastSavedSchema.value = baseline;
+  return mode === 'skip' ? 'skip' : 'saved';
 };
 
 const performAutoSave = async () => {
@@ -263,8 +264,10 @@ onUnmounted(() => {
 
 const handleSaveSchema = async () => {
   try {
-    const saved = await saveCurrentSchema();
-    if (saved) {
+    const result = await saveCurrentSchema();
+    if (result === 'skip') {
+      ElMessage.info('无变更，已跳过保存');
+    } else {
       ElMessage.success('Schema 已成功写入后端 .json 文件并持久化留痕 SQLite！');
     }
   } catch (err: any) {
