@@ -49,16 +49,19 @@ export function useCanvasGrid(preview: Ref<boolean>) {
     if (!Number.isFinite(next) || next < 4) return;
     const grid = ensureGridMeta();
     const prev = grid.cols;
+    if (prev === next) return;
+    // 变更前落历史步（v2.5.0 #7）：变更后调用会留下空 pending 步并无谓清空 redo
+    designerStore.recordHistory();
     remapLayouts(prev, next);
     grid.cols = next;
-    designerStore.recordHistory();
   };
 
   const onRowHeightChange = (val: number | undefined) => {
     if (val == null) return;
     const grid = ensureGridMeta();
-    grid.rowHeight = val;
+    if (grid.rowHeight === val) return;
     designerStore.recordHistory();
+    grid.rowHeight = val;
   };
 
   const onShowAlwaysChange = (val: boolean | string | number) => {
