@@ -167,22 +167,25 @@ export function renderApiMarkdown(schema: PageSchema): string {
   ].join('\n');
 }
 
-/** 增量保存决策（v2.4.0 P1-1）：PATCH 增量 或 全量 POST */
+/** 增量保存决策（v2.4.0 P1-1）：跳过 / PATCH 增量 / 全量 POST */
 export type SchemaSavePlan =
+  | { mode: 'skip' }
   | { mode: 'full' }
-  | { mode: 'patch'; id: string; ops: JsonPatchOp[] };
+  | { mode: 'patch'; id: string; ops: JsonPatchOp[]; baseVersion: string };
 
 /**
  * 基于上次成功落盘的快照决定本次保存的提交方式。
- * 回退全量 POST 的三种情况：从未保存过、页面 id 变了（换了载入的页面）、
- * patch JSON 并不比全量 Schema 小（小页面 / 大范围改动时不划算）。
- * PATCH 请求失败后的全量重试由调用方处理。
+ * - 无任何变更 → 跳过（不发请求、不递增版本、不轮转备份）
+ * - 回退全量 POST 的三种情况：从未保存过、页面 id 变了（换了载入的页面）、
+ *   patch JSON 并不比全量 Schema 小（小页面 / 大范围改动时不划算）
+ * - PATCH 携带 baseVersion 供服务端做乐观并发校验；PATCH 失败后的全量重试由调用方处理。
  */
 export function planSchemaSave(lastSaved: PageSchema | null, current: PageSchema): SchemaSavePlan {
   if (!lastSaved || lastSaved.id !== current.id) return { mode: 'full' };
   const ops = createPatch(lastSaved, current);
+  if (ops.length === 0) return { mode: 'skip' };
   const patchBytes = JSON.stringify(ops).length;
   const fullBytes = JSON.stringify(current).length;
   if (patchBytes >= fullBytes) return { mode: 'full' };
-  return { mode: 'patch', id: current.id, ops };
+  return { mode: 'patch', id: current.id, ops, baseVersion: lastSaved.meta.version };
 }

@@ -153,9 +153,9 @@ describe('planSchemaSave 增量保存决策', () => {
     expect(planSchemaSave(tiny, next)).toEqual({ mode: 'full' });
   });
 
-  test('无改动时仍是空 ops 的 PATCH（服务端照常版本递增）', () => {
+  test('无改动时跳过保存（不发请求、不递增版本）', () => {
     const page = bigPage();
     const plan = planSchemaSave(page, bigPage());
-    expect(plan).toEqual({ mode: 'patch', id: 'page_big', ops: [] });
+    expect(plan).toEqual({ mode: 'skip' });
   });
 });
