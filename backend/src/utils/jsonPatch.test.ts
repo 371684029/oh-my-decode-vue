@@ -1,5 +1,13 @@
 import { describe, expect, test } from 'vitest';
-import { applyPatch, buildSaveLogDetails, parsePatchOps, JsonPatchError } from './jsonPatch';
+import {
+  applyPatch,
+  buildSaveLogDetails,
+  createPatch,
+  invertPatch,
+  parsePatchOps,
+  JsonPatchError,
+  type JsonPatchOp
+} from './jsonPatch';
 
 describe('buildSaveLogDetails', () => {
   test('第二次保存带上 patch', () => {
@@ -107,5 +115,62 @@ describe('parsePatchOps', () => {
     expect(() => parsePatchOps({ ops: [] })).toThrow(JsonPatchError);
     expect(() => parsePatchOps('nope')).toThrow(JsonPatchError);
     expect(() => parsePatchOps(undefined)).toThrow(JsonPatchError);
+  });
+});
+
+describe('createPatch 逐下标数组 diff（v2.5.0 #5 统一语义）', () => {
+  test('数组尾部追加产出 add 下标，裁剪从高下标起 remove', () => {
+    expect(createPatch({ list: [1, 2] }, { list: [1, 2, 3] })).toEqual([{ op: 'add', path: '/list/2', value: 3 }]);
+    expect(createPatch({ list: [1, 2, 3] }, { list: [1] })).toEqual([
+      { op: 'remove', path: '/list/2' },
+      { op: 'remove', path: '/list/1' }
+    ]);
+  });
+
+  test('数组中段值变化产出细粒度 replace，不做整组替换', () => {
+    expect(createPatch({ rows: [{ label: '旧' }, { label: 'b' }] }, { rows: [{ label: '新' }, { label: 'b' }] })).toEqual(
+      [{ op: 'replace', path: '/rows/0/label', value: '新' }]
+    );
+  });
+
+  test('对象字段增删照常产出 add / remove', () => {
+    expect(createPatch({ a: 1 }, { a: 1, b: 2 })).toEqual([{ op: 'add', path: '/b', value: 2 }]);
+    expect(createPatch({ a: 1, b: 2 }, { a: 1 })).toEqual([{ op: 'remove', path: '/b' }]);
+  });
+});
+
+describe('invertPatch 撤销翻转（apply(apply(before, ops), inverse) ≅ before）', () => {
+  const before = {
+    title: '旧',
+    list: [1, 2],
+    rows: [{ label: 'a' }],
+    keep: '不动'
+  };
+
+  test('混合 ops（对象增删改 + 数组尾部增裁）往返还原', () => {
+    const ops: JsonPatchOp[] = [
+      { op: 'replace', path: '/title', value: '新' },
+      { op: 'add', path: '/list/2', value: 3 },
+      { op: 'remove', path: '/list/0' },
+      { op: 'add', path: '/extra', value: true },
+      { op: 'replace', path: '/rows/0/label', value: 'z' }
+    ];
+    const after = applyPatch(before, ops);
+    const inverse = invertPatch(before, ops);
+    expect(applyPatch(after, inverse)).toEqual(before);
+  });
+
+  test('add 覆盖已存在的键 → 反向是恢复旧值的 replace', () => {
+    const ops: JsonPatchOp[] = [{ op: 'add', path: '/title', value: '覆盖' }];
+    const inverse = invertPatch(before, ops);
+    expect(inverse).toEqual([{ op: 'replace', path: '/title', value: '旧' }]);
+    expect(applyPatch(applyPatch(before, ops), inverse)).toEqual(before);
+  });
+
+  test('数组 - 尾部追加 → 反向是显式下标 remove', () => {
+    const ops: JsonPatchOp[] = [{ op: 'add', path: '/list/-', value: 9 }];
+    const inverse = invertPatch(before, ops);
+    expect(inverse).toEqual([{ op: 'remove', path: '/list/2' }]);
+    expect(applyPatch(applyPatch(before, ops), inverse)).toEqual(before);
   });
 });

@@ -227,17 +227,13 @@ describe('patchSchema（PATCH /api/schemas/:id）', () => {
       incomingOps: unknown;
     };
     expect(details.initial).toBe(false);
-    // 标题是对象字段 → 细粒度 replace；children 是数组 → 整组 replace，但新值里带改动后的 label，差异可读
+    // 统一后的逐下标 diff：标题与行 label 各自一条细粒度 replace，逐项可读
     expect(details.patch).toEqual(
       expect.arrayContaining([expect.objectContaining({ op: 'replace', path: '/title', value: '审计标题' })])
     );
     expect(details.patch).toEqual(
       expect.arrayContaining([
-        expect.objectContaining({
-          op: 'replace',
-          path: '/children',
-          value: expect.arrayContaining([expect.objectContaining({ label: '审计按钮' })])
-        })
+        expect.objectContaining({ op: 'replace', path: '/children/0/label', value: '审计按钮' })
       ])
     );
     expect(details.incomingOps).toEqual(ops);

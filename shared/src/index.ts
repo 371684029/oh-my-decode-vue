@@ -230,3 +230,6 @@ export interface OperationLog {
   details?: string;
   created_at?: string;
 }
+
+// JSON Patch 统一实现（前端撤销/增量保存与后端落盘/审计共用）
+export * from './jsonPatch';
