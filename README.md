@@ -86,9 +86,10 @@
 | 物料版本管理（草稿 / 不可变发布 / 锁定 / 升级 / 回滚 / 差异 / fork） | v2.1      |
 | 本地持久化 + SQLite 审计 + 引用保护                                  | v1.x–v2.1 |
 
-### 核心优化点（正确性与结构债务，按 ROI 排序）
+### 核心优化点（正确性与结构债务，按 ROI 排序）✅ 全部完成（v2.4.0 / v2.5.0）
 
 > 这些是护城河自身的**内部债务**，不是新功能。优化它们 = 让核心功能更快、更稳、更好维护。
+> **6 项已全部落地**（见变更历史 v2.4.0「内功优化版」）：下表「现状」列保留改造前快照，供复盘对照。
 
 | #   | 优化点                       | 现状                                                                                                                                                                          | 目标                                                                                |
 | :-- | :--------------------------- | :---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | :---------------------------------------------------------------------------------- |
@@ -124,7 +125,7 @@
 - 🧊 标尺 / 吸附辅助线、右键上下文菜单、可视化联动规则、流程图编辑器
 - 🧊 全局主题 CSS 变量系统、i18n Key-Path 字典引擎、正则规则构建器、离线 Mock 沙箱
 
-**冻结期唯一开放的工作面**：「核心功能」表 7 项能力的正确性 + 「核心优化点」表 6 项改造。
+**冻结期唯一开放的工作面**：「核心功能」表 7 项能力的正确性与持续打磨（「核心优化点」6 项与「自测遗留」7 项已全部清零，见 v2.4.0 / v2.5.0 变更历史）。其余一切新能力走上面的准入检查。
 
 ### 新增功能的准入检查（每次扩展前自问）
 
@@ -218,13 +219,14 @@ low-code-platform/
 │   ├── implemented/        # 技术规范 (CAE/物料/组件 I/O/管道编排) 与优化报告
 │   └── roadmap/            # 各版本规划与路线图 (0.x ~ 4.0.0)
 ├── shared/                 # @lowcode/shared（共享类型 + jsonPatch 等纯工具，前后端共用）
-│   └── src/index.ts        # ComponentNode / PageSchema / MaterialManifest / MaterialVersion ...
+│   └── src/                # index.ts（共享类型）+ jsonPatch.ts（统一 JSON Patch 实现）
 ├── frontend/               # Vue 3 前端低代码设计器工程
 │   ├── src/
-│   │   ├── components/     # 设计器 UI (CanvasContainer, MaterialList, PropertyDrawer, MaterialManager ...)
+│   │   ├── components/     # 设计器 UI（CanvasContainer, MaterialList, PropertyDrawer ... + drawer/ app/ canvas/ 子面板）
 │   │   ├── registry/       # 内置物料种子 (materials.ts) + 运行时注册表 (materialRegistry.ts) + 节点类型 (nodeTypes.ts)
 │   │   ├── stores/         # Pinia 全局设计器 Store (designerStore.ts)
-│   │   ├── utils/          # 出码 (codeGenerator.ts) / 物料 (materialPacker, materialImport, materialResolver, materialInject) / 表达式 / 数据源
+│   │   ├── composables/    # useCanvasGrid / useDesignerHotkeys / useDrawerNode
+│   │   ├── utils/          # 出码门面 (codeGenerator.ts) + codegen/ 多目标生成器 / 物料 (materialPacker, materialImport, materialResolver, materialInject) / 表达式 / 数据源
 │   │   ├── types/          # 类型 re-export（统一来自 @lowcode/shared）
 │   │   ├── *.test.ts       # Vitest 单元测试（Store / 出码 / 物料循环 / 版本解析 ...）
 │   │   └── App.vue         # 主应用与 API 联调界面
@@ -289,7 +291,7 @@ npm run build
 ```bash
 npm run typecheck   # 前后端类型检查
 npm run lint        # ESLint（0 error / 0 warning 门槛）
-npm run test        # Vitest：前端 139 项 + 后端 44 项
+npm run test        # Vitest：前端 209 项 + 后端 67 项
 npm run format      # Prettier 全仓格式化
 ```
 
@@ -297,16 +299,16 @@ npm run format      # Prettier 全仓格式化
 
 ## 🔌 后端 RESTful API 接口定义
 
-| 请求方式   | 路径                       | 描述                                                                                          | 参数 / Body                       |
-| :--------- | :------------------------- | :-------------------------------------------------------------------------------------------- | :-------------------------------- |
-| **GET**    | `/api/schemas`             | 获取页面/组件 JSON 列表                                                                       | `?type=page` 或 `?type=component` |
-| **GET**    | `/api/schemas/:id`         | 读取指定 ID 的 Schema 内容                                                                    | `?type=page`                      |
-| **POST**   | `/api/schemas`             | 保存 Schema 至本地 `.json` 文件并记录 SQLite 日志（落盘前 Zod 结构强校验 + 脚本字段长度上限） | Body: `PageSchema` JSON 对象      |
-| **PATCH**  | `/api/schemas/:id`         | 增量保存：对已存 Schema 应用 RFC 6902 JSON Patch，Zod 校验后落盘并记录审计差异                | Body: `{ "ops": JsonPatchOp[] }`  |
-| **DELETE** | `/api/schemas/:id`         | 删除 Schema 配置文件并记录 SQLite 日志                                                        | `?type=page`                      |
-| **GET**    | `/api/logs`                | 查询 SQLite 操作审计日志                                                                      | `?pageId=xxx` (可选)              |
-| **GET**    | `/api/schemas/:id/backups` | 列出该 Schema 的备份代数                                                                      | `?type=page`                      |
-| **POST**   | `/api/schemas/:id/restore` | 从指定备份代恢复                                                                              | Body: `{ "index": 1 }`            |
+| 请求方式   | 路径                       | 描述                                                                                          | 参数 / Body                                                                                          |
+| :--------- | :------------------------- | :-------------------------------------------------------------------------------------------- | :--------------------------------------------------------------------------------------------------- |
+| **GET**    | `/api/schemas`             | 获取页面/组件 JSON 列表                                                                       | `?type=page` 或 `?type=component`                                                                    |
+| **GET**    | `/api/schemas/:id`         | 读取指定 ID 的 Schema 内容                                                                    | `?type=page`                                                                                         |
+| **POST**   | `/api/schemas`             | 保存 Schema 至本地 `.json` 文件并记录 SQLite 日志（落盘前 Zod 结构强校验 + 脚本字段长度上限） | Body: `PageSchema` JSON 对象                                                                         |
+| **PATCH**  | `/api/schemas/:id`         | 增量保存：对已存 Schema 应用 RFC 6902 JSON Patch，Zod 校验后落盘并记录审计差异                | Body: `{ "ops": JsonPatchOp[], "baseVersion"?: string }`（`baseVersion` 乐观并发校验，不符返回 409） |
+| **DELETE** | `/api/schemas/:id`         | 删除 Schema 配置文件并记录 SQLite 日志                                                        | `?type=page`                                                                                         |
+| **GET**    | `/api/logs`                | 查询 SQLite 操作审计日志                                                                      | `?pageId=xxx` (可选)                                                                                 |
+| **GET**    | `/api/schemas/:id/backups` | 列出该 Schema 的备份代数                                                                      | `?type=page`                                                                                         |
+| **POST**   | `/api/schemas/:id/restore` | 从指定备份代恢复                                                                              | Body: `{ "index": 1 }`                                                                               |
 
 ### 物料与版本管理 (v2.0 / v2.1)
 
