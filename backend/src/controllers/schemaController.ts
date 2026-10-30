@@ -1,10 +1,10 @@
 import { Request, Response } from 'express';
-import { storageService, toSafeFileId } from '../services/storageService';
+import { storageService } from '../services/storageService';
 import { logDatabase } from '../db/sqlite';
 import { PageSchema } from '../types/schema';
 import { pageSchemaValidator, formatZodErrors } from '../validation/schemaValidation';
 import { resolveOperator } from '../middleware/apiKeyAuth';
-import { buildSaveLogDetails, applyPatch, parsePatchOps, JsonPatchError, JsonPatchOp } from '../utils/jsonPatch';
+import { buildSaveLogDetails, parsePatchOps, JsonPatchError, JsonPatchOp } from '../utils/jsonPatch';
 import { parseRestoreIndex } from '../utils/restoreIndex';
 
 export class SchemaController {
@@ -56,8 +56,8 @@ export class SchemaController {
   }
 
   /**
-   * P1-1 增量保存：应用 RFC 6902 子集 patch 到已存 Schema，
-   * 落盘前与 POST 同一 Zod 校验，审计记录保存差异 + 客户端提交的 ops。
+   * P1-1 增量保存：应用 RFC 6902 子集 patch 到已存 Schema。
+   * v2.6.0: 读-校验-应用-写全部在写队列内完成（patchAndSave），消除并发 TOCTOU 竞态。
    */
   async patchSchema(req: Request, res: Response): Promise<void> {
     try {
@@ -73,14 +73,13 @@ export class SchemaController {
         return;
       }
 
-      const existing = await storageService.getSchema(id, type);
-      if (!existing) {
-        res.status(404).json({ success: false, message: 'Schema not found' });
-        return;
-      }
-
       // 空 Patch：无变更，不递增版本、不轮转备份（自测修复 #4 服务端兜底）
       if (ops.length === 0) {
+        const existing = await storageService.getSchema(id, type);
+        if (!existing) {
+          res.status(404).json({ success: false, message: 'Schema not found' });
+          return;
+        }
         res.json({
           success: true,
           message: 'No changes to apply',
@@ -90,45 +89,35 @@ export class SchemaController {
         return;
       }
 
-      // 乐观并发（自测修复 #3）：客户端基线版本与已存版本不符 → 409，客户端回退全量 POST
       const baseVersion = req.body?.baseVersion;
-      if (typeof baseVersion === 'string' && baseVersion !== existing.meta.version) {
-        res.status(409).json({
-          success: false,
-          code: 'VERSION_CONFLICT',
-          message: `Schema version conflict: base ${baseVersion} != stored ${existing.meta.version}`,
-          data: { id: existing.id, version: existing.meta.version }
-        });
+      const result = await storageService.patchAndSave(
+        id,
+        type,
+        ops,
+        typeof baseVersion === 'string' ? baseVersion : undefined,
+        (patched) => {
+          const parsed = pageSchemaValidator.safeParse(patched);
+          return parsed.success ? null : `Schema validation failed: ${formatZodErrors(parsed.error)}`;
+        }
+      );
+
+      if (!result.ok) {
+        if (result.code === 'NOT_FOUND') {
+          res.status(404).json({ success: false, message: result.message });
+        } else if (result.code === 'VERSION_CONFLICT') {
+          res.status(409).json({
+            success: false,
+            code: 'VERSION_CONFLICT',
+            message: result.message,
+            data: { id, version: result.version }
+          });
+        } else {
+          res.status(400).json({ success: false, message: result.message });
+        }
         return;
       }
 
-      let patched: PageSchema;
-      try {
-        patched = applyPatch(existing, ops);
-      } catch (err) {
-        const message = err instanceof JsonPatchError ? err.message : 'Failed to apply patch';
-        res.status(400).json({ success: false, message });
-        return;
-      }
-
-      // 身份字段不允许被 patch 改写：文件按 URL id + 已存 type 落盘
-      if (patched.id !== toSafeFileId(id) || patched.type !== existing.type) {
-        res.status(400).json({ success: false, message: 'Patch must not change schema id or type' });
-        return;
-      }
-
-      // 与 POST 同一校验器：patch 结果不合法直接 400，不落盘
-      const parsed = pageSchemaValidator.safeParse(patched);
-      if (!parsed.success) {
-        res.status(400).json({
-          success: false,
-          message: `Schema validation failed: ${formatZodErrors(parsed.error)}`
-        });
-        return;
-      }
-
-      const schema = parsed.data as PageSchema;
-      const { saved, previous } = await storageService.saveVersioned(schema);
+      const { saved, previous } = result;
 
       logDatabase.addLog({
         page_id: saved.id,

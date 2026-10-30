@@ -211,8 +211,14 @@ const performAutoSave = async () => {
   isAutoSaving.value = true;
   try {
     await saveCurrentSchema();
+    autoSaveFailedNotified = false;
   } catch (err: any) {
     console.error('Auto save failed:', err);
+    // v2.6.0: 自动保存失败时通知用户（节流，避免每次失败都刷屏）
+    if (!autoSaveFailedNotified) {
+      autoSaveFailedNotified = true;
+      ElMessage.warning('自动保存失败，请手动保存以避免丢失更改');
+    }
   } finally {
     // Hide loading indicator silently upon completion
     setTimeout(() => {
@@ -220,6 +226,8 @@ const performAutoSave = async () => {
     }, 600);
   }
 };
+
+let autoSaveFailedNotified = false;
 
 // v2.4.0 P2-1: App 内弹窗(含弹窗图层)开关时同步 activeModalCount,
 // 供画布级快捷键门禁使用; 组件内部弹窗(物料管理等)由 keydown 里的 DOM 兜底覆盖

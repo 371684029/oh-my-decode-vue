@@ -3,6 +3,8 @@ import path from 'path';
 import crypto from 'crypto';
 import { STORAGE_PAGES_DIR, STORAGE_COMPONENTS_DIR } from '../config';
 import { PageSchema } from '../types/schema';
+import { JsonPatchError, applyPatch } from '@lowcode/shared';
+import type { JsonPatchOp } from '@lowcode/shared';
 
 /** 备份保留代数 */
 const MAX_BACKUPS = 5;
@@ -118,6 +120,61 @@ export class StorageService {
       }
       await this.doSaveSchema(saved);
       return { saved, previous: existing };
+    });
+  }
+
+  /**
+   * 原子 Patch-and-save：读-校验-应用-写全部在写队列内完成，消除 TOCTOU 竞态。
+   * 两个并发 PATCH（同 baseVersion）串行执行，第二个在队列内读到最新版本后触发 409。
+   * validate 回调在落盘前执行；返回错误消息则中止保存。
+   */
+  patchAndSave(
+    id: string,
+    type: 'page' | 'component',
+    ops: JsonPatchOp[],
+    baseVersion: string | undefined,
+    validate?: (schema: PageSchema) => string | null
+  ): Promise<
+    | { ok: true; saved: PageSchema; previous: PageSchema | null }
+    | { ok: false; code: 'NOT_FOUND' | 'VERSION_CONFLICT' | 'PATCH_ERROR' | 'VALIDATION_ERROR'; message: string; version?: string }
+  > {
+    return this.enqueue(this.queueKey(id, type), async () => {
+      const existing = await this.getSchema(id, type);
+      if (!existing) {
+        return { ok: false, code: 'NOT_FOUND', message: 'Schema not found' };
+      }
+      if (typeof baseVersion === 'string' && baseVersion !== existing.meta.version) {
+        return {
+          ok: false,
+          code: 'VERSION_CONFLICT',
+          message: `Schema version conflict: base ${baseVersion} != stored ${existing.meta.version}`,
+          version: existing.meta.version
+        };
+      }
+      let patched: PageSchema;
+      try {
+        patched = applyPatch(existing, ops);
+      } catch (err) {
+        const message = err instanceof JsonPatchError ? err.message : 'Failed to apply patch';
+        return { ok: false, code: 'PATCH_ERROR', message };
+      }
+      if (patched.id !== toSafeFileId(id) || patched.type !== existing.type) {
+        return { ok: false, code: 'PATCH_ERROR', message: 'Patch must not change schema id or type' };
+      }
+      if (validate) {
+        const validationError = validate(patched);
+        if (validationError) {
+          return { ok: false, code: 'VALIDATION_ERROR', message: validationError };
+        }
+      }
+      const saved: PageSchema = {
+        ...patched,
+        meta: { ...(patched.meta ?? { author: '', description: '', version: '1.0.0' }) }
+      };
+      saved.meta.prevVersion = existing.meta.version;
+      saved.meta.version = bumpVersion(existing.meta.version);
+      await this.doSaveSchema(saved);
+      return { ok: true, saved, previous: existing };
     });
   }
 

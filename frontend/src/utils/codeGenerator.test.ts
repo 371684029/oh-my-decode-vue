@@ -789,7 +789,14 @@ async function fetchChecked(url, init) {
     if (/^0x[0-9a-f]+$/i.test(host) || /^\\d+$/.test(host)) return true;
     const ipv4 = /^(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})$/.exec(host);
     if (ipv4 && Number(ipv4[1]) === 169 && Number(ipv4[2]) === 254) return true;
-    if (host.includes(':') && /^fe[89ab]/i.test(host)) return true;
+    if (host.includes(':')) {
+      if (/^fe[89ab]/i.test(host)) return true;
+      const mapped = /::ffff:(\\d{1,3}(?:\\.\\d{1,3}){3})$/i.exec(host);
+      if (mapped) {
+        const m = /^(\\d{1,3})\\.(\\d{1,3})/.exec(mapped[1]);
+        if (m && Number(m[1]) === 169 && Number(m[2]) === 254) return true;
+      }
+    }
     return false;
   };
   const rawHost = (value) => {
@@ -1088,7 +1095,14 @@ onUnmounted(() => {
         if (/^0x[0-9a-f]+$/i.test(host) || /^\\d+$/.test(host)) return true;
         const ipv4 = /^(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})$/.exec(host);
         if (ipv4 && Number(ipv4[1]) === 169 && Number(ipv4[2]) === 254) return true;
-        if (host.includes(':') && /^fe[89ab]/i.test(host)) return true;
+        if (host.includes(':')) {
+          if (/^fe[89ab]/i.test(host)) return true;
+          const mapped = /::ffff:(\\d{1,3}(?:\\.\\d{1,3}){3})$/i.exec(host);
+          if (mapped) {
+            const m = /^(\\d{1,3})\\.(\\d{1,3})/.exec(mapped[1]);
+            if (m && Number(m[1]) === 169 && Number(m[2]) === 254) return true;
+          }
+        }
         return false;
       };
       const rawHost = (value) => {

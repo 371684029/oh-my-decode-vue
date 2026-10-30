@@ -285,4 +285,29 @@ describe('patchSchema（PATCH /api/schemas/:id）', () => {
     expect(stored?.meta.prevVersion).toBeUndefined();
     expect(vi.mocked(logDatabase.addLog)).not.toHaveBeenCalled();
   });
+
+  test('并发 PATCH 同 baseVersion：第二个在写队列内读到最新版本后触发 409，不丢失第一个的改动', async () => {
+    const id = 'page_patch_concurrent';
+    await storageService.saveSchema(samplePage(id));
+    const opsA = [{ op: 'replace' as const, path: '/children/0/label', value: '改动A' }];
+    const opsB = [{ op: 'replace' as const, path: '/children/0/config/text', value: '改动B' }];
+    const resA = createRes();
+    const resB = createRes();
+    // 并发发出两个同 baseVersion 的 PATCH
+    await Promise.all([
+      schemaController.patchSchema(createReq({ ops: opsA, baseVersion: '1.0.0' }, id), resA),
+      schemaController.patchSchema(createReq({ ops: opsB, baseVersion: '1.0.0' }, id), resB)
+    ]);
+    // 一个成功、一个 409（写队列串行化，第二个读到 v1.0.1）
+    const statuses = [resA.statusCode, resB.statusCode].sort();
+    expect(statuses).toEqual([200, 409]);
+    // 成功的那个改动保留，落盘版本已递增
+    const stored = await storageService.getSchema(id);
+    expect(stored?.meta.version).toBe('1.0.1');
+    if (resA.statusCode === 200) {
+      expect(stored?.children[0].label).toBe('改动A');
+    } else {
+      expect(stored?.children[0].config?.text).toBe('改动B');
+    }
+  });
 });
