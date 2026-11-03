@@ -138,12 +138,21 @@ function tokenize(input: string): Token[] {
 
 const FORBIDDEN_PROPS = new Set(['__proto__', 'prototype', 'constructor']);
 
+/**
+ * 运算符操作数视图（仅编译期生效）：受限解释器沿用 JS 动态强制转换语义，
+ * cast 在编译后擦除，生成的运行时代码与原生运算符逐字节一致，不改变任何求值行为。
+ * （严格模式下 unknown 不可直接参与算术/关系运算，此视图替代 any 逃逸。）
+ */
+function num(value: unknown): number {
+  return value as number;
+}
+
 class ExpressionEvaluator {
   private pos = 0;
   private tokens: Token[];
-  private scope: Record<string, any>;
+  private scope: Record<string, unknown>;
 
-  constructor(tokens: Token[], scope: Record<string, any>) {
+  constructor(tokens: Token[], scope: Record<string, unknown>) {
     this.tokens = tokens;
     this.scope = scope;
   }
@@ -172,21 +181,21 @@ class ExpressionEvaluator {
   }
 
   /** 安全读取属性，拦截原型链敏感键 */
-  private getProp(obj: any, key: any): any {
+  private getProp(obj: unknown, key: unknown): unknown {
     if (obj === null || obj === undefined) return undefined;
     const k = String(key);
     if (FORBIDDEN_PROPS.has(k)) {
       throw new Error(`Access to "${k}" is not allowed`);
     }
-    return (obj as Record<string, any>)[k];
+    return (obj as Record<string, unknown>)[k];
   }
 
   // ternary → or → and → equality → comparison → additive → multiplicative → unary → primary
-  parse(): any {
+  parse(): unknown {
     return this.parseTernary();
   }
 
-  private parseTernary(): any {
+  private parseTernary(): unknown {
     const cond = this.parseOr();
     if (this.match('?')) {
       const yes = this.parseTernary();
@@ -197,7 +206,7 @@ class ExpressionEvaluator {
     return cond;
   }
 
-  private parseOr(): any {
+  private parseOr(): unknown {
     let left = this.parseAnd();
     while (this.match('||')) {
       const right = this.parseAnd();
@@ -206,7 +215,7 @@ class ExpressionEvaluator {
     return left;
   }
 
-  private parseAnd(): any {
+  private parseAnd(): unknown {
     let left = this.parseEquality();
     while (this.match('&&')) {
       const right = this.parseEquality();
@@ -215,13 +224,13 @@ class ExpressionEvaluator {
     return left;
   }
 
-  private parseEquality(): any {
+  private parseEquality(): unknown {
     let left = this.parseComparison();
     while (true) {
       if (this.match('==')) {
-        left = left == this.parseComparison();
+        left = num(left) == num(this.parseComparison());
       } else if (this.match('!=')) {
-        left = left != this.parseComparison();
+        left = num(left) != num(this.parseComparison());
       } else if (this.match('===')) {
         left = left === this.parseComparison();
       } else if (this.match('!==')) {
@@ -233,17 +242,17 @@ class ExpressionEvaluator {
     return left;
   }
 
-  private parseComparison(): any {
+  private parseComparison(): unknown {
     let left = this.parseAdditive();
     while (true) {
       if (this.match('<')) {
-        left = left < this.parseAdditive();
+        left = num(left) < num(this.parseAdditive());
       } else if (this.match('<=')) {
-        left = left <= this.parseAdditive();
+        left = num(left) <= num(this.parseAdditive());
       } else if (this.match('>')) {
-        left = left > this.parseAdditive();
+        left = num(left) > num(this.parseAdditive());
       } else if (this.match('>=')) {
-        left = left >= this.parseAdditive();
+        left = num(left) >= num(this.parseAdditive());
       } else {
         break;
       }
@@ -251,13 +260,13 @@ class ExpressionEvaluator {
     return left;
   }
 
-  private parseAdditive(): any {
+  private parseAdditive(): unknown {
     let left = this.parseMultiplicative();
     while (true) {
       if (this.match('+')) {
-        left = left + this.parseMultiplicative();
+        left = num(left) + num(this.parseMultiplicative());
       } else if (this.match('-')) {
-        left = left - this.parseMultiplicative();
+        left = num(left) - num(this.parseMultiplicative());
       } else {
         break;
       }
@@ -265,15 +274,15 @@ class ExpressionEvaluator {
     return left;
   }
 
-  private parseMultiplicative(): any {
+  private parseMultiplicative(): unknown {
     let left = this.parseUnary();
     while (true) {
       if (this.match('*')) {
-        left = left * this.parseUnary();
+        left = num(left) * num(this.parseUnary());
       } else if (this.match('/')) {
-        left = left / this.parseUnary();
+        left = num(left) / num(this.parseUnary());
       } else if (this.match('%')) {
-        left = left % this.parseUnary();
+        left = num(left) % num(this.parseUnary());
       } else {
         break;
       }
@@ -281,10 +290,10 @@ class ExpressionEvaluator {
     return left;
   }
 
-  private parseUnary(): any {
+  private parseUnary(): unknown {
     if (this.match('!')) return !this.parseUnary();
-    if (this.match('-')) return -this.parseUnary();
-    if (this.match('+')) return +this.parseUnary();
+    if (this.match('-')) return -num(this.parseUnary());
+    if (this.match('+')) return +num(this.parseUnary());
     if (this.peek().value === 'typeof' && this.peek().type === 'ident') {
       this.pos++;
       return typeof this.parseUnary();
@@ -292,7 +301,7 @@ class ExpressionEvaluator {
     return this.parsePostfix();
   }
 
-  private parsePostfix(): any {
+  private parsePostfix(): unknown {
     let value = this.parsePrimary();
 
     // 属性访问链：.prop / ['expr'] / [expr]
@@ -315,7 +324,7 @@ class ExpressionEvaluator {
     return value;
   }
 
-  private parsePrimary(): any {
+  private parsePrimary(): unknown {
     const t = this.peek();
 
     if (t.type === 'number') {
@@ -351,7 +360,7 @@ class ExpressionEvaluator {
       return val;
     }
     if (this.match('[')) {
-      const arr: any[] = [];
+      const arr: unknown[] = [];
       if (!this.match(']')) {
         do {
           arr.push(this.parseTernary());
@@ -361,7 +370,7 @@ class ExpressionEvaluator {
       return arr;
     }
     if (this.match('{')) {
-      const obj: Record<string, any> = {};
+      const obj: Record<string, unknown> = {};
       if (!this.match('}')) {
         do {
           const keyToken = this.next();
@@ -393,7 +402,7 @@ class ExpressionEvaluator {
 /**
  * 安全求值 {{ ... }} 表达式，失败时回退原始文本
  */
-function evaluateRawExpression(rawExpression: string, contextScope: Record<string, any>): any {
+function evaluateRawExpression(rawExpression: string, contextScope: Record<string, unknown>): unknown {
   const tokens = tokenize(rawExpression);
   const evaluator = new ExpressionEvaluator(tokens, contextScope);
   const result = evaluator.parse();
@@ -409,7 +418,7 @@ function evaluateRawExpression(rawExpression: string, contextScope: Record<strin
  * - 整串 `{{ expr }}` → 求值结果（可非字符串）
  * - 混写 `前缀 {{ expr }} 后缀` → 逐段替换为字符串（v2.3 行操作文案等）
  */
-export function parseExpression(exprString: unknown, contextScope: Record<string, any> = {}): any {
+export function parseExpression(exprString: unknown, contextScope: Record<string, unknown> = {}): unknown {
   if (typeof exprString !== 'string') return exprString;
 
   // 整串双大括号
@@ -440,7 +449,7 @@ export function parseExpression(exprString: unknown, contextScope: Record<string
 /**
  * 判断当前属性字符串是否包含 {{ ... }} 表达式
  */
-export function isExpression(val: any): boolean {
+export function isExpression(val: unknown): boolean {
   if (typeof val !== 'string') return false;
   return /^\s*\{\{\s*.*?\s*\}\}\s*$/.test(val);
 }

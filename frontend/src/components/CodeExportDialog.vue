@@ -165,11 +165,19 @@ import { ElMessage } from 'element-plus';
 import hljs from 'highlight.js';
 import 'highlight.js/styles/github-dark.css';
 
+/** 已告警的语言集合：highlight 在 computed 内重复求值，按语言只提示一次避免刷屏 */
+const warnedHighlightLangs = new Set<string>();
+
 /** 代码语法高亮（hljs 会转义 HTML，返回内容安全，可 v-html） */
 const highlight = (code: string, lang: string): string => {
   try {
     return hljs.highlight(code, { language: lang }).value;
-  } catch {
+  } catch (error) {
+    // 高亮失败回退纯文本仍可读，但必须留痕（按语言只告警一次）
+    if (!warnedHighlightLangs.has(lang)) {
+      warnedHighlightLangs.add(lang);
+      console.warn(`[codegen] 语法高亮失败（语言: ${lang || '未指定'}），已回退纯文本:`, error);
+    }
     return code;
   }
 };

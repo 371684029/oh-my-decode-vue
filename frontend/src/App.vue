@@ -121,7 +121,9 @@ const designerStore = useDesignerStore();
 const elementLocale = zhCn;
 
 watch(
-  () => JSON.stringify(designerStore.pageSchema),
+  // 手势期间短路：getter 返回常量 ''，避免每次 move/resize 事件做 O(n) 全量 stringify；
+  // 手势结束（layoutGesture → false）时 getter 重新求值，一次性得到最终 schema
+  () => (designerStore.layoutGesture ? '' : JSON.stringify(designerStore.pageSchema)),
   (next, prev) => {
     if (designerStore.layoutGesture) return;
     if (prev && prev !== next) designerStore.noteSchemaChange(prev);

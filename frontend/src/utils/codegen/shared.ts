@@ -1,4 +1,5 @@
 import type { PageSchema, ComponentNode } from '../../types/designer';
+import { shortHash } from '@lowcode/shared';
 import { canInlineExpression } from '../expression';
 import { resolveMaterial } from '../materialResolver';
 import { mapOutputEvents } from '../materialInject';
@@ -77,15 +78,6 @@ export function indentLines(text: string, spaces = 2): string {
 export function safeIdent(value: string): string {
   const out = String(value).replace(/[^a-zA-Z0-9_$]/g, '_');
   return out && !/^[0-9]/.test(out) ? out : 'n' + out;
-}
-
-function shortHash(value: string): string {
-  let hash = 2166136261;
-  for (let i = 0; i < value.length; i++) {
-    hash ^= value.charCodeAt(i);
-    hash = Math.imul(hash, 16777619);
-  }
-  return (hash >>> 0).toString(16).padStart(8, '0').slice(0, 6);
 }
 
 /** 同一页内把 id 映射成互不冲突的标识符。生成开始前绑定。 */

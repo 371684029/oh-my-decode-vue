@@ -231,5 +231,18 @@ export interface OperationLog {
   created_at?: string;
 }
 
+/**
+ * FNV-1a 短哈希（前后端统一实现，输出 6 位 hex）。
+ * 用于出码标识符冲突消解、物料 type 稳定后缀、契约/结构签名等场景。
+ */
+export function shortHash(value: string): string {
+  let hash = 2166136261;
+  for (let i = 0; i < value.length; i++) {
+    hash ^= value.charCodeAt(i);
+    hash = Math.imul(hash, 16777619);
+  }
+  return (hash >>> 0).toString(16).padStart(8, '0').slice(0, 6);
+}
+
 // JSON Patch 统一实现（前端撤销/增量保存与后端落盘/审计共用）
 export * from './jsonPatch';

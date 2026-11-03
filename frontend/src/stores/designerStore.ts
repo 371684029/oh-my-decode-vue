@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia';
-import type { PageSchema, ComponentNode, MaterialItem, MaterialManifest } from '../types/designer';
+import type { PageSchema, ComponentNode, MaterialItem, MaterialManifest, LayerProps } from '../types/designer';
 import { findNode } from '../utils/schemaTree';
 import { applyPatch, createPatch, type JsonPatchOp } from '../utils/jsonPatch';
 
@@ -10,6 +10,15 @@ import { applyPatch, createPatch, type JsonPatchOp } from '../utils/jsonPatch';
  * 在下一次结算点（recordHistory / flush / 手势开始 / undo / redo）diff 出 ops；无变化则弹出。
  */
 type HistoryEntry = { ops: JsonPatchOp[]; inverse: JsonPatchOp[]; pending?: true };
+
+/** vue3-grid-layout-next 布局条目（库未导出类型，按 updateNodeLayout 实际使用字段定义） */
+interface GridLayoutItem {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  i: string;
+}
 
 /**
  * 主画布图层 children 与 schema.children 同源（shareBaseCanvas）。
@@ -441,7 +450,7 @@ export const useDesignerStore = defineStore('designer', {
       this.addNodeFromMaterial(material, x, y);
       return '';
     },
-    updateNodeLayout(layoutList: any[], options?: { history?: boolean }) {
+    updateNodeLayout(layoutList: GridLayoutItem[], options?: { history?: boolean }) {
       const record = options?.history !== false && !this.layoutGesture;
       let isChanged = false;
       layoutList.forEach((item) => {
@@ -562,7 +571,7 @@ export const useDesignerStore = defineStore('designer', {
       this.recordHistory();
       if (!this.pageSchema.layers) this.pageSchema.layers = [];
       const layerId = generateUniqueId('layer_' + type);
-      const defaultProps: any = {};
+      const defaultProps: LayerProps = {};
 
       if (type === 'custom-html') {
         defaultProps.htmlCode =
@@ -612,7 +621,7 @@ export const useDesignerStore = defineStore('designer', {
         layer.visible = !layer.visible;
       }
     },
-    updateLayerProps(id: string, newProps: Record<string, any>) {
+    updateLayerProps(id: string, newProps: Record<string, unknown>) {
       if (!this.pageSchema.layers) return;
       const layer = this.pageSchema.layers.find((l) => l.id === id);
       if (layer) {

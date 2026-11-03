@@ -1,4 +1,5 @@
 import type { MaterialContract, MaterialVersion } from '../types/schema';
+import { shortHash } from '@lowcode/shared';
 import { createPatch } from './jsonPatch';
 
 /**
@@ -9,16 +10,6 @@ import { createPatch } from './jsonPatch';
  * 3. 仅 replace（值级变化：文案、样式值、布局）→ patch
  * 4. 完全无差异 → none（禁止发布空版本）
  */
-
-/** FNV-1a 短哈希（与前端出码引擎一致） */
-function shortHash(value: string): string {
-  let hash = 2166136261;
-  for (let i = 0; i < value.length; i++) {
-    hash ^= value.charCodeAt(i);
-    hash = Math.imul(hash, 16777619);
-  }
-  return (hash >>> 0).toString(16).padStart(8, '0').slice(0, 6);
-}
 
 /** 契约签名：inputs/outputs 规范化（key 排序）后哈希 */
 export function contractSignature(contract: MaterialContract): string {
@@ -33,25 +24,40 @@ export function contractSignature(contract: MaterialContract): string {
   return shortHash(JSON.stringify(canon));
 }
 
+/**
+ * 版本判定用最小节点结构：只声明实际访问的字段（替代 any，v2.5 类型收口）。
+ * ComponentNode 结构上可赋值给本接口，生产调用方零改动。
+ */
+export interface VersionTreeNode {
+  id: string;
+  type?: string;
+  children?: VersionTreeNode[];
+  props?: Record<string, unknown>;
+  config?: Record<string, unknown>;
+  events?: Record<string, unknown>;
+  layout?: Record<string, unknown>;
+}
+
 /** id 归一化：节点 id / layout.i 替换为 $n0/$n1...（先序），避免重新打包导致的 id 漂移污染 diff */
-export function normalizeNodeIds(nodes: unknown[]): unknown[] {
+export function normalizeNodeIds(nodes: VersionTreeNode[]): VersionTreeNode[] {
   const map = new Map<string, string>();
   let counter = 0;
-  const assign = (list: any[]) => {
+  const assign = (list: VersionTreeNode[]) => {
     for (const n of list) {
       counter++;
       map.set(n.id, `$n${counter}`);
       if (Array.isArray(n.children)) assign(n.children);
     }
   };
-  assign(nodes as any[]);
-  const rewrite = (list: any[]): any[] =>
+  assign(nodes);
+  const rewrite = (list: VersionTreeNode[]): VersionTreeNode[] =>
     list.map((n) => {
-      const out: any = { ...n, id: map.get(n.id), layout: { ...n.layout, i: map.get(n.id) } };
+      const id = map.get(n.id) ?? n.id;
+      const out: VersionTreeNode = { ...n, id, layout: { ...n.layout, i: id } };
       if (Array.isArray(n.children)) out.children = rewrite(n.children);
       return out;
     });
-  return rewrite(nodes as any[]);
+  return rewrite(nodes);
 }
 
 export type VersionBump = 'major' | 'minor' | 'patch' | 'none';
@@ -67,15 +73,15 @@ export interface VersionClassifyResult {
  * 节点 type / props key 集 / config key 集 / events key 集 / children 递归。
  * 结构变化 = 组件增删、字段增删、事件增删 → minor；结构相同仅值变化 → patch。
  */
-export function structuralSignature(nodes: unknown[]): string {
-  const build = (n: any): unknown => ({
+export function structuralSignature(nodes: VersionTreeNode[]): string {
+  const build = (n: VersionTreeNode): unknown => ({
     t: n.type,
     p: Object.keys(n.props || {}).sort(),
     g: n.config ? Object.keys(n.config).sort() : null,
     e: Object.keys(n.events || {}).sort(),
     k: n.children && n.children.length ? n.children.map(build) : null
   });
-  return shortHash(JSON.stringify((nodes as any[]).map(build)));
+  return shortHash(JSON.stringify(nodes.map(build)));
 }
 
 /** 判定建议版本类型 */
