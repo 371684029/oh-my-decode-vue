@@ -174,3 +174,145 @@ describe('invertPatch 撤销翻转（apply(apply(before, ops), inverse) ≅ befo
     expect(applyPatch(applyPatch(before, ops), inverse)).toEqual(before);
   });
 });
+
+describe('applyPatch 边界语义（v2.7.0 M2 #5）', () => {
+  test('根路径 "" 的 add / replace 整文档替换，返回值与入参解耦', () => {
+    const value = { nested: { n: 1 }, list: [1] };
+    const replaced = applyPatch({ a: 1 } as unknown, [{ op: 'replace', path: '', value } as JsonPatchOp]);
+    expect(replaced).toEqual(value);
+    const added = applyPatch({ a: 1 } as unknown, [{ op: 'add', path: '', value: [1, 2] } as JsonPatchOp]);
+    expect(added).toEqual([1, 2]);
+
+    // 深拷贝：改写返回值不回渗 op.value
+    (replaced as { nested: { n: number } }).nested.n = 99;
+    expect(value.nested.n).toBe(1);
+    expect(replaced).not.toBe(value);
+  });
+
+  test('根路径 "" 的 remove 无意义，拒绝整文档删除', () => {
+    expect(() => applyPatch({ a: 1 } as unknown, [{ op: 'remove', path: '' } as JsonPatchOp])).toThrow(
+      /Cannot remove the whole document/
+    );
+  });
+
+  test('空 ops 返回深拷贝且不复用引用', () => {
+    const doc = { a: 1, nested: { b: 2 } };
+    const empty = applyPatch(doc, []);
+    expect(empty).toEqual(doc);
+    expect(empty).not.toBe(doc);
+    (empty as typeof doc).nested.b = 99;
+    expect(doc.nested.b).toBe(2);
+  });
+
+  test('末段落到标量：目标不是容器', () => {
+    expect(() => applyPatch({ a: 5 }, [{ op: 'replace', path: '/a/b', value: 1 }])).toThrow(
+      /Patch target is not a container: \/a\/b/
+    );
+    expect(() => applyPatch({ s: 'text' }, [{ op: 'add', path: '/s/x', value: 1 }])).toThrow(
+      /Patch target is not a container/
+    );
+  });
+
+  test('中段落到标量：路径穿越非容器', () => {
+    expect(() => applyPatch({ a: 5 }, [{ op: 'add', path: '/a/b/c', value: 1 }])).toThrow(
+      /Patch path traverses a non-container: \/a\/b\/c/
+    );
+    expect(() => applyPatch({ a: null }, [{ op: 'remove', path: '/a/b/c' }])).toThrow(
+      /traverses a non-container/
+    );
+  });
+
+  test('add 下标 > length 越界拒绝；=== length 视为尾部追加', () => {
+    expect(() => applyPatch({ list: [1, 2] }, [{ op: 'add', path: '/list/5', value: 9 }])).toThrow(
+      /Patch index out of bounds: \/list\/5/
+    );
+    // index === length 合法，等价于尾部追加
+    expect(applyPatch({ list: [1, 2] }, [{ op: 'add', path: '/list/2', value: 3 }])).toEqual({ list: [1, 2, 3] });
+  });
+
+  test('数组 replace 越界报「目标缺失」，与 add 的「下标越界」区分', () => {
+    expect(() => applyPatch({ list: [1, 2] }, [{ op: 'replace', path: '/list/5', value: 9 }])).toThrow(
+      /Patch replace target missing: \/list\/5/
+    );
+  });
+
+  test('"-" 误用于 remove / replace 均报目标缺失（仅 add 支持追加）', () => {
+    expect(() => applyPatch({ list: [1, 2] }, [{ op: 'remove', path: '/list/-' }])).toThrow(
+      /Patch remove target missing: \/list\/-/
+    );
+    expect(() => applyPatch({ list: [1, 2] }, [{ op: 'replace', path: '/list/-', value: 9 }])).toThrow(
+      /Patch replace target missing: \/list\/-/
+    );
+    // add 用 "-" 是合法尾部追加
+    expect(applyPatch({ list: [1, 2] }, [{ op: 'add', path: '/list/-', value: 3 }])).toEqual({ list: [1, 2, 3] });
+  });
+
+  test('前导零下标非法（RFC 6902 只接受 0 / [1-9][0-9]*）', () => {
+    expect(() => applyPatch({ list: [1, 2] }, [{ op: 'replace', path: '/list/01', value: 9 }])).toThrow(
+      /Invalid array index in patch path: \/list\/01/
+    );
+    expect(() => applyPatch({ list: [1, 2] }, [{ op: 'add', path: '/list/00', value: 9 }])).toThrow(
+      /Invalid array index/
+    );
+  });
+
+  test('对象 remove 缺失键与 replace 缺失键分别报错', () => {
+    expect(() => applyPatch({ a: 1 }, [{ op: 'remove', path: '/missing' }])).toThrow(
+      /Patch remove target missing: \/missing/
+    );
+    expect(() => applyPatch({ a: 1 }, [{ op: 'replace', path: '/missing', value: 2 }])).toThrow(
+      /Patch replace target missing: \/missing/
+    );
+  });
+});
+
+describe('invertPatch 错误路径（v2.7.0 M2 #5）', () => {
+  test('remove / replace 打在缺失路径上 → Patch path not found', () => {
+    expect(() => invertPatch({ a: 1 }, [{ op: 'remove', path: '/missing' }])).toThrow(
+      /Patch path not found: \/missing/
+    );
+    expect(() => invertPatch({ a: 1 }, [{ op: 'replace', path: '/missing', value: 2 }])).toThrow(
+      /Patch path not found: \/missing/
+    );
+  });
+
+  test('add 走 "/-" 但父级不是数组 → Invalid array append path', () => {
+    expect(() => invertPatch({ a: 5 }, [{ op: 'add', path: '/a/-', value: 1 }])).toThrow(
+      /Invalid array append path: \/a\/-/
+    );
+  });
+
+  test('根路径 add 的反向是恢复旧文档的 replace，往返还原', () => {
+    const before = { a: 1 };
+    const ops: JsonPatchOp[] = [{ op: 'add', path: '', value: { b: 2 } } as JsonPatchOp];
+    const inverse = invertPatch(before, ops);
+    expect(inverse).toEqual([{ op: 'replace', path: '', value: { a: 1 } }]);
+    expect(applyPatch(applyPatch(before, ops), inverse)).toEqual(before);
+  });
+
+  test('invertPatch 逐条用渐进文档求旧值，后续 op 看到前面 op 的结果', () => {
+    const before = { list: [1, 2, 3] };
+    const ops: JsonPatchOp[] = [
+      { op: 'remove', path: '/list/0' },
+      { op: 'remove', path: '/list/0' }
+    ];
+    const inverse = invertPatch(before, ops);
+    expect(inverse).toEqual([
+      { op: 'add', path: '/list/0', value: 2 },
+      { op: 'add', path: '/list/0', value: 1 }
+    ]);
+    expect(applyPatch(applyPatch(before, ops), inverse)).toEqual(before);
+  });
+});
+
+describe('parsePatchOps 根路径拒绝（v2.7.0 M2 #5）', () => {
+  test('applyPatch 接受根路径，parsePatchOps 在网络边界拒绝整文档覆盖', () => {
+    const ops = [{ op: 'replace', path: '', value: { hijacked: true } }] as JsonPatchOp[];
+    // 实现层支持根路径（RFC 6902 空指针）
+    expect(applyPatch({ a: 1 } as unknown, ops)).toEqual({ hijacked: true });
+    // 但网络输入防线不放行：外部 PATCH 不得整文档覆盖
+    expect(() => parsePatchOps(ops)).toThrow(JsonPatchError);
+    expect(() => parsePatchOps([{ op: 'add', path: '', value: [1] }])).toThrow(JsonPatchError);
+    expect(() => parsePatchOps([{ op: 'remove', path: '' }])).toThrow(JsonPatchError);
+  });
+});

@@ -100,3 +100,102 @@ describe('StorageService 备份路径', () => {
     expect(leftovers).toEqual([]);
   });
 });
+
+describe('StorageService 非保存路径（v2.7.0 M2 #9）', () => {
+  async function makeService(): Promise<{ service: StorageService; root: string }> {
+    const root = await fs.mkdtemp(path.join(os.tmpdir(), 'lowcode-storage-ro-'));
+    const pagesDir = path.join(root, 'pages');
+    const componentsDir = path.join(root, 'components');
+    await fs.mkdir(pagesDir);
+    await fs.mkdir(componentsDir);
+    return { service: new StorageService(pagesDir, componentsDir), root };
+  }
+
+  test('getSchema 命中返回完整 schema，未命中返回 null', async () => {
+    const { service } = await makeService();
+    expect(await service.getSchema('page_absent')).toBeNull();
+
+    await service.saveSchema(sampleSchema('page_hit'));
+    const stored = await service.getSchema('page_hit');
+    expect(stored).toMatchObject({ id: 'page_hit', title: '演示页', type: 'page' });
+    expect(stored?.meta).toMatchObject({ version: '1.0.0' });
+    expect(Array.isArray(stored?.children)).toBe(true);
+    expect(Array.isArray(stored?.layers)).toBe(true);
+  });
+
+  test('getSchema 按 type 分流：同名 page 与 component 互不串读', async () => {
+    const { service } = await makeService();
+    await service.saveSchema(sampleSchema('shared_read'));
+    await service.saveSchema({ ...sampleSchema('shared_read'), type: 'component' as const, title: '组件版' });
+
+    expect((await service.getSchema('shared_read', 'page'))?.title).toBe('演示页');
+    expect((await service.getSchema('shared_read', 'component'))?.title).toBe('组件版');
+  });
+
+  test('listSchemas 只返回同 type 的条目，空目录返回空数组', async () => {
+    const { service } = await makeService();
+    expect(await service.listSchemas('page')).toEqual([]);
+
+    await service.saveSchema(sampleSchema('list_a'));
+    await service.saveSchema(sampleSchema('list_b'));
+    await service.saveSchema({ ...sampleSchema('list_c'), type: 'component' as const });
+
+    const pages = await service.listSchemas('page');
+    expect(pages.map((s) => s.id).sort()).toEqual(['list_a', 'list_b']);
+    const components = await service.listSchemas('component');
+    expect(components.map((s) => s.id)).toEqual(['list_c']);
+  });
+
+  test('deleteSchema 删除后不可再读，重复删除返回 false', async () => {
+    const { service } = await makeService();
+    expect(await service.deleteSchema('page_gone')).toBe(false);
+
+    await service.saveSchema(sampleSchema('page_del'));
+    expect(await service.deleteSchema('page_del')).toBe(true);
+    expect(await service.getSchema('page_del')).toBeNull();
+    expect(await service.deleteSchema('page_del')).toBe(false);
+  });
+
+  test('deleteSchema 不误删同名异 type 的 schema', async () => {
+    const { service } = await makeService();
+    await service.saveSchema(sampleSchema('shared_del'));
+    await service.saveSchema({ ...sampleSchema('shared_del'), type: 'component' as const, title: '组件版' });
+
+    expect(await service.deleteSchema('shared_del', 'page')).toBe(true);
+    expect(await service.getSchema('shared_del', 'page')).toBeNull();
+    expect((await service.getSchema('shared_del', 'component'))?.title).toBe('组件版');
+  });
+
+  test('listBackups 按代数列出：.bak.1 最新 → .bak.N 最旧', async () => {
+    const { service } = await makeService();
+    expect(await service.listBackups('page_none')).toEqual([]);
+
+    await service.saveSchema({ ...sampleSchema('page_backup'), title: '第一版' });
+    await service.saveSchema({ ...sampleSchema('page_backup'), title: '第二版' });
+    await service.saveSchema({ ...sampleSchema('page_backup'), title: '第三版' });
+
+    const backups = await service.listBackups('page_backup');
+    // 三次保存 → 两次落备份：.bak.1 是保存前的最新内容（第二版），.bak.2 是更早的（第一版）
+    expect(backups.map((b) => b.index)).toEqual([1, 2]);
+    expect(backups.every((b) => b.filename.startsWith('page_backup.bak.'))).toBe(true);
+  });
+
+  test('restoreBackup 恢复指定代并落为当前 schema', async () => {
+    const { service } = await makeService();
+    await service.saveSchema({ ...sampleSchema('page_restore'), title: '第一版' });
+    await service.saveSchema({ ...sampleSchema('page_restore'), title: '第二版' });
+
+    // .bak.1 = 第一版（保存第二版前的内容）
+    const restored = await service.restoreBackup('page_restore', 'page', 1);
+    expect(restored?.title).toBe('第一版');
+    expect((await service.getSchema('page_restore'))?.title).toBe('第一版');
+  });
+
+  test('restoreBackup 代数不存在返回 null，不破坏当前 schema', async () => {
+    const { service } = await makeService();
+    await service.saveSchema({ ...sampleSchema('page_keep'), title: '现行版' });
+
+    expect(await service.restoreBackup('page_keep', 'page', 99)).toBeNull();
+    expect((await service.getSchema('page_keep'))?.title).toBe('现行版');
+  });
+});
