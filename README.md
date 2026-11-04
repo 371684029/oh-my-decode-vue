@@ -359,9 +359,11 @@ npm run format      # Prettier 全仓格式化
 
 ---
 
-## 🗓️ 待规划项与本轮收口 (v2.7.0 · 结构债务收口)
+## 🗓️ 待规划项与本轮收口 (v2.7.0 / v2.8.0 · 结构债务与类型收口)
 
-> **版本主题**：消除重复逻辑、收窄类型逃逸、优化性能热点、补齐核心测试。不动功能面，全部条目服务于「核心功能更稳、产物更可信、代码更好维护」。详见 [`2.7.0_PLAN.md`](docs/roadmap/2.7.0_PLAN.md)。
+> **版本主题**：消除重复逻辑、收窄类型逃逸、优化性能热点、补齐核心测试、超标文件拆层。不动功能面，全部条目服务于「核心功能更稳、产物更可信、代码更好维护」。
+>
+> 详见 [`2.7.0_PLAN.md`](docs/roadmap/2.7.0_PLAN.md)（结构债务收口）与 [`2.8.0_PLAN.md`](docs/roadmap/2.8.0_PLAN.md)（类型收口与结构分层）。
 
 ### 本轮已收口（v2.6.0 / v2.7.0）— 核心优化项
 
@@ -375,6 +377,16 @@ npm run format      # Prettier 全仓格式化
 | **P1** | watch 全量 stringify   | 手势期间短路 getter 返回常量，手势结束一次性求值，拖拽中不再 O(n) 全量序列化                                    | ✅ v2.7.0  |
 | **P1** | 静默 catch             | 物料解析拉取失败 / 出码语法高亮失败均留痕告警（高亮按语言只告警一次）                                           | ✅ v2.7.0  |
 | **P2** | 核心测试补齐           | jsonPatch 边界语义、designerStore 黑盒路径、materialController 引用门禁、版本升级与存储非保存路径               | ✅ v2.7.0  |
+
+### 本轮已收口（v2.8.0）— 类型收口与结构分层
+
+| 优先级 | 条目                   | 改造内容                                                                                                       | 状态        |
+| :----- | :--------------------- | :------------------------------------------------------------------------------------------------------------- | :---------- |
+| **P1** | `catch (err: any)` 逃逸 | 生产代码 47 处改 `catch (err: unknown)`；`@lowcode/shared` 新增 `errorMessage` / `errorText` / `errorStatus` / `isRecord`，前端兜底文案原样保留 | ✅ v2.8.0   |
+| **P1** | 表达式求值器单文件过载 | `expression.ts` 473 → `tokenizer` 134 + `evaluator` 302 + `index` 61；消除 `evaluator['peek']()` 括号绕 private | ✅ v2.8.0   |
+| **P1** | 巨型文件超标           | `designerStore` 648→381（拆 `designerSchema` / `designerState` / `designerNodeFactory`）、`MaterialManager` 500→342（拆 `useMaterialVersions` / `useMaterialIO`）、`expression` 473→三文件；**超 400 行文件数归零** | ✅ v2.8.0   |
+
+> 拆分纪律：只抽不带 `this` 的代码，action 体不动；三道护栏（独立性 / 尺寸 / action 计数 40→40）见 `2.8.0_PLAN.md`。
 
 ### 测试增量（v2.7.0）
 
@@ -612,5 +624,6 @@ npm run format      # Prettier 全仓格式化
 27. **[v2.3.0 设计器手势与交互反馈规划](docs/roadmap/2.3.0_PLAN.md)** / **[实施纪要](docs/roadmap/2.3.0_IMPLEMENTATION.md)**：节点网格 ±、右键菜单开属性、快捷键提示、Inspector Tab 重组、拖拽淡网格、行操作友好提示、jsonPatch/原子写去重。已落地（M1–M6）。
 28. **[v2.6.0 正确性加固规划](docs/roadmap/2.6.0_PLAN.md)**：PATCH 并发 TOCTOU 竞态、导出代码 SSRF 防护分歧、自动保存失败静默（P0），以及结构债务与测试缺口盘点。P0 已实现；P1/P2 滚入 v2.7.0。
 29. **[v2.7.0 结构债务收口规划](docs/roadmap/2.7.0_PLAN.md)**：shortHash 单一来源、`as any` 收窄、watch stringify 优化、静默 catch 留痕、核心测试补齐（jsonPatch 边界 / 黑盒路径 / 引用门禁）。已落地（M1–M2）。
-30. **[v3.0.0 物料生态与复杂编排规划](docs/roadmap/3.0.0_PLAN.md)**：物料市场、远程 SDK、Module Federation、管道编排、可视化逻辑流、GraphQL。远期。
-31. **[v4.0.0 远期企业级架构规划](docs/roadmap/4.0.0_PLAN.md)**：RBAC/SSO、分布式存储、CRDT 协同、CI/CD 灰度发布。远期。
+30. **[v2.8.0 类型收口与结构分层规划](docs/roadmap/2.8.0_PLAN.md)**：`catch (err: any)` 收口、表达式解析器分层、巨型文件拆分（designerStore / MaterialManager / expression）。已落地（M1 全部完成，M2 留待 v2.9.0）。
+31. **[v3.0.0 物料生态与复杂编排规划](docs/roadmap/3.0.0_PLAN.md)**：物料市场、远程 SDK、Module Federation、管道编排、可视化逻辑流、GraphQL。远期。
+32. **[v4.0.0 远期企业级架构规划](docs/roadmap/4.0.0_PLAN.md)**：RBAC/SSO、分布式存储、CRDT 协同、CI/CD 灰度发布。远期。
