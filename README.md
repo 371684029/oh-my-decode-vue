@@ -55,7 +55,7 @@
 - **Component - API - Event (CAE) 三角解耦模型**：REST 数据源、最小动作链、物料黑盒引用与版本契约已实现；GraphQL、Event Flow Orchestrator 归 **v3.0**。
 - **数据与事件管道编排 (Pipeline Orchestration)**：生命周期管道、页面路由跳转 — **v3.0**。
 - **物料市场 / 远程物料 SDK / Module Federation / 可视化逻辑流** — **v3.0**（[`3.0.0_PLAN.md`](docs/roadmap/3.0.0_PLAN.md)）。
-- **多人协同 / RBAC / SSO / 分布式存储 / CI/CD** — **v4.0**（[`4.0.0_PLAN.md`](docs/roadmap/4.0.0_PLAN.md)）。
+- **多人协同 / RBAC / SSO / 分布式存储 / CI/CD** — **v4.0**（`4.0.0_PLAN.md` 尚未编写）。
 
 ---
 
@@ -620,10 +620,10 @@ npm run format      # Prettier 全仓格式化
 23. **[v2.0.0 自我循环物料机制规划](docs/roadmap/2.0.0_PLAN.md)**：画布生成物料的自我循环闭环、映射规则、关系模型、自描述出码与导入管道。已实现。
 24. **[v2.1.0 物料版本管理与黑盒引用规划](docs/roadmap/2.1.0_PLAN.md)**：黑盒引用、版本发布/锁定/升级/回滚、引用保护与 fork。已实现。
 25. **[v2.1.0 版本管理实现解析](docs/roadmap/2.1.0_IMPLEMENTATION.md)**：版本管理的函数级实现方案（存储/判定/解析链/测试）。已实现。
-26. **[v2.2.0 设计器体验与物料覆盖规划](docs/roadmap/2.2.0_PLAN.md)** / **[实施纪要](docs/roadmap/2.2.0_IMPLEMENTATION.md)**：分栏 Inspector、真组件画布、可视可选网格、JSON 可编、Spacer、ProForm 逐项布局、Element Plus 可画布全量、v2.1 债务收口。已落地（M1–M3）。
+26. **v2.2.0 设计器体验与物料覆盖规划** / **实施纪要**（规划文档未留存，仅存条目）：分栏 Inspector、真组件画布、可视可选网格、JSON 可编、Spacer、ProForm 逐项布局、Element Plus 可画布全量、v2.1 债务收口。已落地（M1–M3）。
 27. **[v2.3.0 设计器手势与交互反馈规划](docs/roadmap/2.3.0_PLAN.md)** / **[实施纪要](docs/roadmap/2.3.0_IMPLEMENTATION.md)**：节点网格 ±、右键菜单开属性、快捷键提示、Inspector Tab 重组、拖拽淡网格、行操作友好提示、jsonPatch/原子写去重。已落地（M1–M6）。
 28. **[v2.6.0 正确性加固规划](docs/roadmap/2.6.0_PLAN.md)**：PATCH 并发 TOCTOU 竞态、导出代码 SSRF 防护分歧、自动保存失败静默（P0），以及结构债务与测试缺口盘点。P0 已实现；P1/P2 滚入 v2.7.0。
 29. **[v2.7.0 结构债务收口规划](docs/roadmap/2.7.0_PLAN.md)**：shortHash 单一来源、`as any` 收窄、watch stringify 优化、静默 catch 留痕、核心测试补齐（jsonPatch 边界 / 黑盒路径 / 引用门禁）。已落地（M1–M2）。
 30. **[v2.8.0 类型收口与结构分层规划](docs/roadmap/2.8.0_PLAN.md)**：`catch (err: any)` 收口、表达式解析器分层、巨型文件拆分（designerStore / MaterialManager / expression）。已落地（M1 全部完成，M2 留待 v2.9.0）。
 31. **[v3.0.0 物料生态与复杂编排规划](docs/roadmap/3.0.0_PLAN.md)**：物料市场、远程 SDK、Module Federation、管道编排、可视化逻辑流、GraphQL。远期。
-32. **[v4.0.0 远期企业级架构规划](docs/roadmap/4.0.0_PLAN.md)**：RBAC/SSO、分布式存储、CRDT 协同、CI/CD 灰度发布。远期。
+32. **v4.0.0 远期企业级架构规划**（尚未编写）：RBAC/SSO、分布式存储、CRDT 协同、CI/CD 灰度发布。远期。
