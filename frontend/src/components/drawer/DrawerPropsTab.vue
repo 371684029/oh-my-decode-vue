@@ -167,6 +167,7 @@
 
 <script setup lang="ts">
 import { computed } from 'vue';
+import { errorMessage } from '@lowcode/shared';
 import { parseExpression } from '../../utils/expression';
 import { missingRequiredFields } from '../../registry/materialContract';
 import { validateComponentProps } from '../../utils/contractValidator';
@@ -178,8 +179,8 @@ const { designerStore, node } = useDrawerNode();
 const getExpressionPreview = (exprStr: string) => {
   try {
     return parseExpression(exprStr, designerStore.pageSchema.state || {});
-  } catch (err: any) {
-    return '求值出错: ' + err.message;
+  } catch (err: unknown) {
+    return '求值出错: ' + (errorMessage(err) ?? '未知错误');
   }
 };
 

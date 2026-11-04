@@ -48,6 +48,7 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted } from 'vue';
+import { errorText } from '@lowcode/shared';
 import type { ComponentNode } from '../types/designer';
 import { ApiExecutor, executeActions, nodeEventBus } from '../utils/dataSource';
 import { findNode } from '../utils/schemaTree';
@@ -88,8 +89,8 @@ const loadData = async () => {
     const { data, total } = await executor.fetchData(binding);
     rows.value = Array.isArray(data) ? data : [];
     if (total !== undefined) totalCount.value = Number(total) || 0;
-  } catch (err: any) {
-    notifyUser('error', '数据加载失败: ' + (err.message || err));
+  } catch (err: unknown) {
+    notifyUser('error', '数据加载失败: ' + errorText(err, '未知错误'));
     rows.value = [];
   } finally {
     loading.value = false;

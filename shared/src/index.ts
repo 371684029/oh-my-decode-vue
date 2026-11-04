@@ -244,5 +244,48 @@ export function shortHash(value: string): string {
   return (hash >>> 0).toString(16).padStart(8, '0').slice(0, 6);
 }
 
+/** 结构判断（非数组对象），用于在 unknown 上安全取字段 */
+export function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+/** 取 axios 风格错误的 HTTP 状态码（不是该形状时返回 undefined） */
+export function errorStatus(err: unknown): number | undefined {
+  if (isRecord(err) && isRecord(err.response) && typeof err.response.status === 'number') {
+    return err.response.status;
+  }
+  return undefined;
+}
+
+/**
+ * 从 unknown 错误提取可读信息（v2.8.0 收窄 `catch (err: any)`）。
+ *
+ * 取值优先级：
+ * 1. axios 风格的服务端业务错误 `err.response.data.message` —— 前端提示优先给用户看服务端原因
+ * 2. 字符串抛出物本身
+ * 3. `Error` 实例的 `.message`
+ * 4. 任意对象上的 `.message` 字符串
+ *
+ * 全部取不到时返回 `undefined`，由调用方决定兜底文案（见 {@link errorText}）。
+ */
+export function errorMessage(err: unknown): string | undefined {
+  if (isRecord(err) && isRecord(err.response) && isRecord(err.response.data)) {
+    const serverMessage = err.response.data.message;
+    if (typeof serverMessage === 'string' && serverMessage) return serverMessage;
+  }
+  if (typeof err === 'string') return err;
+  if (err instanceof Error) return err.message;
+  if (isRecord(err)) {
+    const message = err.message;
+    if (typeof message === 'string' && message) return message;
+  }
+  return undefined;
+}
+
+/** 同 {@link errorMessage}，取不到时返回调用方给定的兜底文案 */
+export function errorText(err: unknown, fallback: string): string {
+  return errorMessage(err) ?? fallback;
+}
+
 // JSON Patch 统一实现（前端撤销/增量保存与后端落盘/审计共用）
 export * from './jsonPatch';

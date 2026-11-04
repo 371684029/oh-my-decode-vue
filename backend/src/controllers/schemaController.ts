@@ -1,4 +1,5 @@
 import { Request, Response } from 'express';
+import { errorMessage } from '@lowcode/shared';
 import { storageService } from '../services/storageService';
 import { logDatabase } from '../db/sqlite';
 import { PageSchema } from '../types/schema';
@@ -50,8 +51,8 @@ export class SchemaController {
         message: 'Schema saved successfully',
         data: { id: saved.id, version: saved.meta.version }
       });
-    } catch (err: any) {
-      res.status(500).json({ success: false, message: err.message });
+    } catch (err: unknown) {
+      res.status(500).json({ success: false, message: errorMessage(err) ?? '服务器内部错误' });
     }
   }
 
@@ -159,8 +160,8 @@ export class SchemaController {
       }
 
       res.json({ success: true, data: schema });
-    } catch (err: any) {
-      res.status(500).json({ success: false, message: err.message });
+    } catch (err: unknown) {
+      res.status(500).json({ success: false, message: errorMessage(err) ?? '服务器内部错误' });
     }
   }
 
@@ -169,8 +170,8 @@ export class SchemaController {
       const type = (req.query.type as 'page' | 'component') || 'page';
       const list = await storageService.listSchemas(type);
       res.json({ success: true, data: list });
-    } catch (err: any) {
-      res.status(500).json({ success: false, message: err.message });
+    } catch (err: unknown) {
+      res.status(500).json({ success: false, message: errorMessage(err) ?? '服务器内部错误' });
     }
   }
 
@@ -193,8 +194,8 @@ export class SchemaController {
       });
 
       res.json({ success: true, message: 'Schema deleted successfully' });
-    } catch (err: any) {
-      res.status(500).json({ success: false, message: err.message });
+    } catch (err: unknown) {
+      res.status(500).json({ success: false, message: errorMessage(err) ?? '服务器内部错误' });
     }
   }
 
@@ -208,8 +209,8 @@ export class SchemaController {
         const logs = logDatabase.getAllLogs();
         res.json({ success: true, data: logs });
       }
-    } catch (err: any) {
-      res.status(500).json({ success: false, message: err.message });
+    } catch (err: unknown) {
+      res.status(500).json({ success: false, message: errorMessage(err) ?? '服务器内部错误' });
     }
   }
 
@@ -220,8 +221,8 @@ export class SchemaController {
       const type = (req.query.type as 'page' | 'component') || 'page';
       const backups = await storageService.listBackups(id, type);
       res.json({ success: true, data: backups });
-    } catch (err: any) {
-      res.status(500).json({ success: false, message: err.message });
+    } catch (err: unknown) {
+      res.status(500).json({ success: false, message: errorMessage(err) ?? '服务器内部错误' });
     }
   }
 
@@ -250,8 +251,8 @@ export class SchemaController {
         message: 'Schema restored from backup',
         data: restored
       });
-    } catch (err: any) {
-      res.status(500).json({ success: false, message: err.message });
+    } catch (err: unknown) {
+      res.status(500).json({ success: false, message: errorMessage(err) ?? '服务器内部错误' });
     }
   }
 }

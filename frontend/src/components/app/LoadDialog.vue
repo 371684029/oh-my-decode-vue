@@ -16,6 +16,7 @@
 
 <script setup lang="ts">
 import { http } from '../../utils/http';
+import { errorMessage } from '@lowcode/shared';
 import { useDesignerStore } from '../../stores/designerStore';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import type { PageSchema } from '../../types/designer';
@@ -49,8 +50,8 @@ const handleSelectSchema = async (schema: SavedSchemaRow) => {
     emit('loaded', res.data.data);
     emit('update:visible', false);
     ElMessage.success(`已成功载入配置: ${res.data.data.title}`);
-  } catch (err: any) {
-    ElMessage.error('载入失败: ' + (err.response?.data?.message || err.message));
+  } catch (err: unknown) {
+    ElMessage.error('载入失败: ' + (errorMessage(err) ?? '未知错误'));
   }
 };
 
@@ -70,8 +71,8 @@ const handleDeleteSchema = async (schema: SavedSchemaRow) => {
       emit('deleted', schema.id);
       ElMessage.success('已删除');
     }
-  } catch (err: any) {
-    ElMessage.error('删除失败: ' + (err.response?.data?.message || err.message));
+  } catch (err: unknown) {
+    ElMessage.error('删除失败: ' + (errorMessage(err) ?? '未知错误'));
   }
 };
 
@@ -91,8 +92,8 @@ const handleRestoreSchema = async (schema: SavedSchemaRow) => {
       emit('update:visible', false);
       ElMessage.success('已恢复上一份');
     }
-  } catch (err: any) {
-    ElMessage.error('恢复失败: ' + (err.response?.data?.message || err.message));
+  } catch (err: unknown) {
+    ElMessage.error('恢复失败: ' + (errorMessage(err) ?? '未知错误'));
   }
 };
 </script>

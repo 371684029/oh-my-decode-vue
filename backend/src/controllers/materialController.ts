@@ -1,4 +1,5 @@
 import { Request, Response } from 'express';
+import { errorMessage } from '@lowcode/shared';
 import { materialService } from '../services/materialService';
 import { materialVersionService } from '../services/materialVersionService';
 import { scanMaterialRefs } from '../services/materialRefScan';
@@ -19,8 +20,8 @@ export class MaterialController {
     try {
       const list = await materialService.listMaterials();
       res.json({ success: true, data: list });
-    } catch (err: any) {
-      res.status(500).json({ success: false, message: err.message });
+    } catch (err: unknown) {
+      res.status(500).json({ success: false, message: errorMessage(err) ?? '服务器内部错误' });
     }
   }
 
@@ -62,8 +63,8 @@ export class MaterialController {
       });
 
       res.json({ success: true, message: 'Material saved successfully', data: { type: manifest.type } });
-    } catch (err: any) {
-      res.status(500).json({ success: false, message: err.message });
+    } catch (err: unknown) {
+      res.status(500).json({ success: false, message: errorMessage(err) ?? '服务器内部错误' });
     }
   }
 
@@ -76,8 +77,8 @@ export class MaterialController {
         return;
       }
       res.json({ success: true, data: manifest });
-    } catch (err: any) {
-      res.status(500).json({ success: false, message: err.message });
+    } catch (err: unknown) {
+      res.status(500).json({ success: false, message: errorMessage(err) ?? '服务器内部错误' });
     }
   }
 
@@ -112,8 +113,8 @@ export class MaterialController {
       });
 
       res.json({ success: true, message: 'Material deleted successfully' });
-    } catch (err: any) {
-      res.status(500).json({ success: false, message: err.message });
+    } catch (err: unknown) {
+      res.status(500).json({ success: false, message: errorMessage(err) ?? '服务器内部错误' });
     }
   }
 
@@ -127,8 +128,8 @@ export class MaterialController {
       const { id } = req.params;
       const refs = await scanMaterialRefs(id);
       res.json({ success: true, data: refs });
-    } catch (err: any) {
-      res.status(500).json({ success: false, message: err.message });
+    } catch (err: unknown) {
+      res.status(500).json({ success: false, message: errorMessage(err) ?? '服务器内部错误' });
     }
   }
 
@@ -149,8 +150,8 @@ export class MaterialController {
         details: JSON.stringify({ version: parsed.data.version })
       });
       res.json({ success: true, message: 'Draft saved' });
-    } catch (err: any) {
-      res.status(500).json({ success: false, message: err.message });
+    } catch (err: unknown) {
+      res.status(500).json({ success: false, message: errorMessage(err) ?? '服务器内部错误' });
     }
   }
 
@@ -166,8 +167,8 @@ export class MaterialController {
         details: JSON.stringify({})
       });
       res.json({ success: true, message: 'Draft discarded' });
-    } catch (err: any) {
-      res.status(500).json({ success: false, message: err.message });
+    } catch (err: unknown) {
+      res.status(500).json({ success: false, message: errorMessage(err) ?? '服务器内部错误' });
     }
   }
 
@@ -189,8 +190,8 @@ export class MaterialController {
         details: JSON.stringify({ version: result.version, bump: result.bump, changelog: result.changelog })
       });
       res.json({ success: true, message: 'Version published', data: result });
-    } catch (err: any) {
-      res.status(500).json({ success: false, message: err.message });
+    } catch (err: unknown) {
+      res.status(500).json({ success: false, message: errorMessage(err) ?? '服务器内部错误' });
     }
   }
 
@@ -200,8 +201,8 @@ export class MaterialController {
       const { id } = req.params;
       const versions = await materialVersionService.listVersions(id);
       res.json({ success: true, data: versions });
-    } catch (err: any) {
-      res.status(500).json({ success: false, message: err.message });
+    } catch (err: unknown) {
+      res.status(500).json({ success: false, message: errorMessage(err) ?? '服务器内部错误' });
     }
   }
 
@@ -215,8 +216,8 @@ export class MaterialController {
         return;
       }
       res.json({ success: true, data: version });
-    } catch (err: any) {
-      res.status(500).json({ success: false, message: err.message });
+    } catch (err: unknown) {
+      res.status(500).json({ success: false, message: errorMessage(err) ?? '服务器内部错误' });
     }
   }
 
@@ -244,8 +245,8 @@ export class MaterialController {
           schemaDiff
         }
       });
-    } catch (err: any) {
-      res.status(500).json({ success: false, message: err.message });
+    } catch (err: unknown) {
+      res.status(500).json({ success: false, message: errorMessage(err) ?? '服务器内部错误' });
     }
   }
 
@@ -266,8 +267,8 @@ export class MaterialController {
         details: JSON.stringify({ version })
       });
       res.json({ success: true, message: 'Rolled back', data: result });
-    } catch (err: any) {
-      res.status(500).json({ success: false, message: err.message });
+    } catch (err: unknown) {
+      res.status(500).json({ success: false, message: errorMessage(err) ?? '服务器内部错误' });
     }
   }
 
@@ -294,8 +295,8 @@ export class MaterialController {
         details: JSON.stringify({ version: v })
       });
       res.json({ success: true, message: 'Version archived' });
-    } catch (err: any) {
-      res.status(500).json({ success: false, message: err.message });
+    } catch (err: unknown) {
+      res.status(500).json({ success: false, message: errorMessage(err) ?? '服务器内部错误' });
     }
   }
 
@@ -316,8 +317,8 @@ export class MaterialController {
         details: JSON.stringify({ fromVersion, newType })
       });
       res.json({ success: true, message: 'Material forked', data: manifest });
-    } catch (err: any) {
-      res.status(500).json({ success: false, message: err.message });
+    } catch (err: unknown) {
+      res.status(500).json({ success: false, message: errorMessage(err) ?? '服务器内部错误' });
     }
   }
 
@@ -337,8 +338,8 @@ export class MaterialController {
         details: JSON.stringify({ fromVersion, toVersion, pageCount: results.length })
       });
       res.json({ success: true, data: results });
-    } catch (err: any) {
-      res.status(500).json({ success: false, message: err.message });
+    } catch (err: unknown) {
+      res.status(500).json({ success: false, message: errorMessage(err) ?? '服务器内部错误' });
     }
   }
 }

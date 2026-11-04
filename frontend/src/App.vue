@@ -92,6 +92,7 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue';
+import { errorMessage } from '@lowcode/shared';
 import { http } from './utils/http';
 import { loadMaterialsFromBackend } from './registry/materialRegistry';
 import { useDesignerStore } from './stores/designerStore';
@@ -214,7 +215,7 @@ const performAutoSave = async () => {
   try {
     await saveCurrentSchema();
     autoSaveFailedNotified = false;
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error('Auto save failed:', err);
     // v2.6.0: 自动保存失败时通知用户（节流，避免每次失败都刷屏）
     if (!autoSaveFailedNotified) {
@@ -280,8 +281,8 @@ const handleSaveSchema = async () => {
     } else {
       ElMessage.success('Schema 已成功写入后端 .json 文件并持久化留痕 SQLite！');
     }
-  } catch (err: any) {
-    ElMessage.error('保存失败: ' + (err.response?.data?.message || err.message));
+  } catch (err: unknown) {
+    ElMessage.error('保存失败: ' + (errorMessage(err) ?? '未知错误'));
   }
 };
 
@@ -301,8 +302,8 @@ const handleOpenLoadDialog = async () => {
       savedSchemas.value = res.data.data;
       loadDialogVisible.value = true;
     }
-  } catch (err: any) {
-    ElMessage.error('获取列表失败: ' + err.message);
+  } catch (err: unknown) {
+    ElMessage.error('获取列表失败: ' + (errorMessage(err) ?? '未知错误'));
   }
 };
 
@@ -313,8 +314,8 @@ const handleOpenLogsDialog = async () => {
       logsList.value = res.data.data;
       logsDialogVisible.value = true;
     }
-  } catch (err: any) {
-    ElMessage.error('获取日志失败: ' + err.message);
+  } catch (err: unknown) {
+    ElMessage.error('获取日志失败: ' + (errorMessage(err) ?? '未知错误'));
   }
 };
 </script>

@@ -82,6 +82,7 @@
 
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue';
+import { errorText } from '@lowcode/shared';
 import type { MaterialVersion } from '../../types/designer';
 import { getOutputPayloadHints } from '../../utils/contractValidator';
 import { resolveMaterial } from '../../utils/materialResolver';
@@ -143,8 +144,8 @@ const showVersionDiff = async (target: string) => {
       { params: { base: ref0.version } }
     );
     versionDiff.value = resp.data?.data || null;
-  } catch (err: any) {
-    ElMessage.error(err?.response?.data?.message || '获取版本差异失败');
+  } catch (err: unknown) {
+    ElMessage.error(errorText(err, '获取版本差异失败'));
   }
 };
 

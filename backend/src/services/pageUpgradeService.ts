@@ -1,4 +1,5 @@
 import fs from 'fs/promises';
+import { errorText } from '@lowcode/shared';
 import path from 'path';
 import { STORAGE_PAGES_DIR } from '../config';
 import { storageService } from './storageService';
@@ -63,8 +64,8 @@ export async function upgradeMaterialInstances(opts: {
         await storageService.saveVersioned(schema);
         results.push({ pageId: schema.id, updated });
       }
-    } catch (err: any) {
-      results.push({ pageId: file.replace(/\.json$/, ''), updated: 0, failed: err?.message || '读取失败' });
+    } catch (err: unknown) {
+      results.push({ pageId: file.replace(/\.json$/, ''), updated: 0, failed: errorText(err, '读取失败') });
     }
   }
   return results;

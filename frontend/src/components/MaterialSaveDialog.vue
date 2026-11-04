@@ -39,6 +39,7 @@
 
 <script setup lang="ts">
 import { ref, computed } from 'vue';
+import { errorText } from '@lowcode/shared';
 import { ElMessage } from 'element-plus';
 import { useDesignerStore } from '../stores/designerStore';
 import { packNodesToManifest } from '../utils/materialPacker';
@@ -121,8 +122,8 @@ const handleSave = async () => {
         const resp = await http.post(`/materials/${encodeURIComponent(manifest.type)}/versions`, { draft });
         clearMaterialCache();
         ElMessage.success(`已发布新版本 v${resp.data?.data?.version}（${resp.data?.data?.changelog}）`);
-      } catch (err: any) {
-        ElMessage.error(err?.response?.data?.message || '发布新版本失败');
+      } catch (err: unknown) {
+        ElMessage.error(errorText(err, '发布新版本失败'));
       } finally {
         saving.value = false;
       }
@@ -149,8 +150,8 @@ const handleSave = async () => {
     }
     saving.value = false;
     emit('close');
-  } catch (err: any) {
-    ElMessage.error(err?.message || '打包失败');
+  } catch (err: unknown) {
+    ElMessage.error(errorText(err, '打包失败'));
   } finally {
     saving.value = false;
   }

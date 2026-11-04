@@ -50,6 +50,7 @@
 
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue';
+import { errorText } from '@lowcode/shared';
 import { ApiExecutor, nodeEventBus } from '../../utils/dataSource';
 import { mergeApiBinding } from '../../utils/apiBindingForm';
 import { ElMessage } from 'element-plus';
@@ -127,8 +128,8 @@ const handleTestRequest = async () => {
     const count = Array.isArray(data) ? data.length : data && typeof data === 'object' ? Object.keys(data).length : 0;
     ElMessage.success(`请求成功，返回${Array.isArray(data) ? '数组 ' + count + ' 条' : '对象 ' + count + ' 字段'}`);
     nodeEventBus.emitReload(node.value!.id);
-  } catch (err: any) {
-    ElMessage.error('请求失败: ' + (err.message || err));
+  } catch (err: unknown) {
+    ElMessage.error('请求失败: ' + errorText(err, '未知错误'));
   }
 };
 

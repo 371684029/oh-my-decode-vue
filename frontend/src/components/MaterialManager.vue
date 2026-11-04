@@ -146,6 +146,7 @@
 
 <script setup lang="ts">
 import { ref, computed } from 'vue';
+import { errorStatus, errorText, isRecord } from '@lowcode/shared';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import { ArrowDown } from '@element-plus/icons-vue';
 import { listCustomMaterials, registerMaterial, unregisterMaterial } from '../registry/materialRegistry';
@@ -196,8 +197,8 @@ const handleFileImport = async (file: { raw?: File }) => {
     if (source === 'degraded') {
       ElMessage.warning('该文件不含物料定义注释块，已降级为空快照物料（不可拖拽，需重新打包内容）');
     }
-  } catch (err: any) {
-    ElMessage.error(err?.message || '导入失败');
+  } catch (err: unknown) {
+    ElMessage.error(errorText(err, '导入失败'));
   }
 };
 
@@ -214,8 +215,8 @@ const handlePasteImport = async () => {
     }
     showPaste.value = false;
     pasteText.value = '';
-  } catch (err: any) {
-    ElMessage.error(err?.message || '导入失败');
+  } catch (err: unknown) {
+    ElMessage.error(errorText(err, '导入失败'));
   }
 };
 
@@ -283,8 +284,8 @@ const doRollback = async (version: string) => {
     await http.post(`/materials/${encodeURIComponent(versionTarget.value.type)}/rollback`, { version });
     ElMessage.success(`已回滚当前版本到 ${version}`);
     await loadVersionList();
-  } catch (err: any) {
-    ElMessage.error(err?.response?.data?.message || '回滚失败');
+  } catch (err: unknown) {
+    ElMessage.error(errorText(err, '回滚失败'));
   }
 };
 
@@ -294,8 +295,8 @@ const doArchive = async (version: string) => {
     await http.delete(`/materials/${encodeURIComponent(versionTarget.value.type)}/versions/${version}`);
     ElMessage.success(`已归档版本 ${version}`);
     await loadVersionList();
-  } catch (err: any) {
-    ElMessage.error(err?.response?.data?.message || '归档失败（被引用或为当前版本）');
+  } catch (err: unknown) {
+    ElMessage.error(errorText(err, '归档失败（被引用或为当前版本）'));
   }
 };
 
@@ -313,8 +314,8 @@ const doDiffPrevious = async (version: string) => {
       { params: { base } }
     );
     diffResult.value = resp.data?.data || null;
-  } catch (err: any) {
-    ElMessage.error(err?.response?.data?.message || '差异获取失败');
+  } catch (err: unknown) {
+    ElMessage.error(errorText(err, '差异获取失败'));
   }
 };
 
@@ -339,8 +340,8 @@ const openFork = async () => {
     });
     ElMessage.success(`已派生新物料 custom-${slug}`);
     versionTarget.value = null;
-  } catch (err: any) {
-    if (err !== 'cancel') ElMessage.error(err?.response?.data?.message || 'fork 失败');
+  } catch (err: unknown) {
+    if (err !== 'cancel') ElMessage.error(errorText(err, 'fork 失败'));
   }
 };
 
@@ -357,8 +358,8 @@ const doUpgrade = async () => {
     });
     upgradeReport.value = resp.data?.data || [];
     ElMessage.success('批量升级完成');
-  } catch (err: any) {
-    ElMessage.error(err?.response?.data?.message || '升级失败');
+  } catch (err: unknown) {
+    ElMessage.error(errorText(err, '升级失败'));
   }
 };
 
@@ -401,13 +402,20 @@ const handleDelete = async (manifest: MaterialManifest) => {
   // 先请求后端；成功后再移除本地，避免"本地已删、后端仍在"的不一致。
   try {
     await http.delete(`/materials/${encodeURIComponent(manifest.type)}`);
-  } catch (err: any) {
-    const status = err?.response?.status;
-    const refs = err?.response?.data?.data?.refs;
+  } catch (err: unknown) {
+    const status = errorStatus(err);
+    const response = isRecord(err) && isRecord(err.response) ? err.response : undefined;
+    const body = response && isRecord(response.data) ? response.data : undefined;
+    const nested = body && isRecord(body.data) ? body.data : undefined;
+    const refs = nested && isRecord(nested.refs) ? nested.refs : undefined;
     if (status === 409 && refs) {
       // 被引用：展示引用列表，用户确认后强制删除
       try {
-        const pageList = (refs.pages || []).map((p: any) => p.title).join('、');
+        const pages = Array.isArray(refs.pages) ? refs.pages : [];
+        const pageList = pages
+          .map((p) => (isRecord(p) ? String(p.title ?? '') : ''))
+          .filter(Boolean)
+          .join('、');
         await ElMessageBox.confirm(
           `该物料被 ${refs.count} 个实例引用（${pageList}）。删除后这些实例将渲染占位。仍要强制删除？`,
           '物料被引用',
@@ -418,12 +426,12 @@ const handleDelete = async (manifest: MaterialManifest) => {
       }
       try {
         await http.delete(`/materials/${encodeURIComponent(manifest.type)}?force=true`);
-      } catch (forceErr: any) {
-        ElMessage.error(forceErr?.response?.data?.message || '强制删除失败');
+      } catch (forceErr: unknown) {
+        ElMessage.error(errorText(forceErr, '强制删除失败'));
         return;
       }
     } else {
-      ElMessage.error(err?.response?.data?.message || '删除失败（后端不可达），物料仍在面板中');
+      ElMessage.error(errorText(err, '删除失败（后端不可达），物料仍在面板中'));
       return;
     }
   }

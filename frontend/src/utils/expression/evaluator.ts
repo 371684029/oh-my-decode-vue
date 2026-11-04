@@ -1,139 +1,13 @@
 /**
- * 动态 JS 表达式计算求解器 (Safe Expression Evaluator)
- * 核心范式：支持将字符串中的 {{ expression }} 转换为运行时真实值。
+ * 受限表达式求值器 (Safe Expression Evaluator) — v2.8.0 从 expression.ts 分层而来。
  *
- * 安全性：不依赖 `new Function` / `eval`，采用手写 tokenizer + 递归下降
- * 解释器，仅支持表达式语法（字面量、变量、属性访问、运算、三元、括号），
+ * 安全性：不依赖 `new Function` / `eval`，递归下降、parse 即求值。
+ * 仅支持表达式语法（字面量、变量、属性访问、运算、三元、括号），
  * 拒绝函数调用、赋值、原型链敏感属性访问（__proto__ / prototype / constructor）。
  */
 
-type TokenType = 'number' | 'string' | 'ident' | 'punc' | 'eof';
+import { EOF, tokenize, type Token } from './tokenizer';
 
-interface Token {
-  type: TokenType;
-  value: string | number;
-}
-
-const EOF: Token = { type: 'eof', value: '' };
-
-// ---------------------------------------------------------------------------
-// Tokenizer
-// ---------------------------------------------------------------------------
-
-function tokenize(input: string): Token[] {
-  const tokens: Token[] = [];
-  let i = 0;
-  const n = input.length;
-
-  const isDigit = (c: string) => c >= '0' && c <= '9';
-  const isIdentStart = (c: string) => /[A-Za-z_$]/.test(c);
-  const isIdentPart = (c: string) => /[A-Za-z0-9_$]/.test(c);
-
-  while (i < n) {
-    const c = input[i];
-
-    // 空白
-    if (/\s/.test(c)) {
-      i++;
-      continue;
-    }
-
-    // 数字
-    if (isDigit(c) || (c === '.' && isDigit(input[i + 1] ?? ''))) {
-      let j = i;
-      while (j < n && isDigit(input[j])) j++;
-      if (input[j] === '.') {
-        j++;
-        while (j < n && isDigit(input[j])) j++;
-      }
-      if (input[j] === 'e' || input[j] === 'E') {
-        j++;
-        if (input[j] === '+' || input[j] === '-') j++;
-        while (j < n && isDigit(input[j])) j++;
-      }
-      tokens.push({ type: 'number', value: parseFloat(input.slice(i, j)) });
-      i = j;
-      continue;
-    }
-
-    // 字符串（单引号 / 双引号，支持基础转义）
-    if (c === "'" || c === '"') {
-      const quote = c;
-      let j = i + 1;
-      let str = '';
-      while (j < n && input[j] !== quote) {
-        if (input[j] === '\\' && j + 1 < n) {
-          const esc = input[j + 1];
-          switch (esc) {
-            case 'n':
-              str += '\n';
-              break;
-            case 't':
-              str += '\t';
-              break;
-            case 'r':
-              str += '\r';
-              break;
-            case '\\':
-              str += '\\';
-              break;
-            case "'":
-              str += "'";
-              break;
-            case '"':
-              str += '"';
-              break;
-            default:
-              str += esc;
-          }
-          j += 2;
-        } else {
-          str += input[j];
-          j++;
-        }
-      }
-      if (j >= n) throw new Error('Unterminated string literal');
-      tokens.push({ type: 'string', value: str });
-      i = j + 1;
-      continue;
-    }
-
-    // 标识符 / 关键字
-    if (isIdentStart(c)) {
-      let j = i;
-      while (j < n && isIdentPart(input[j])) j++;
-      tokens.push({ type: 'ident', value: input.slice(i, j) });
-      i = j;
-      continue;
-    }
-
-    // 运算符与标点（贪心最长匹配：三字符 → 两字符 → 单字符）
-    const threeChar = input.slice(i, i + 3);
-    if (threeChar === '===' || threeChar === '!==') {
-      tokens.push({ type: 'punc', value: threeChar });
-      i += 3;
-      continue;
-    }
-    const twoChar = input.slice(i, i + 2);
-    if (['==', '!=', '<=', '>=', '&&', '||'].includes(twoChar)) {
-      tokens.push({ type: 'punc', value: twoChar });
-      i += 2;
-      continue;
-    }
-    if ('+-*/%<>!?:()[],.{}'.includes(c)) {
-      tokens.push({ type: 'punc', value: c });
-      i++;
-      continue;
-    }
-
-    throw new Error(`Unexpected character "${c}" at position ${i}`);
-  }
-
-  return tokens;
-}
-
-// ---------------------------------------------------------------------------
-// 受限求值器（递归下降，parse 即求值）
 // ---------------------------------------------------------------------------
 
 const FORBIDDEN_PROPS = new Set(['__proto__', 'prototype', 'constructor']);
@@ -157,7 +31,7 @@ class ExpressionEvaluator {
     this.scope = scope;
   }
 
-  private peek(): Token {
+  peek(): Token {
     return this.tokens[this.pos] ?? EOF;
   }
 
@@ -402,11 +276,11 @@ class ExpressionEvaluator {
 /**
  * 安全求值 {{ ... }} 表达式，失败时回退原始文本
  */
-function evaluateRawExpression(rawExpression: string, contextScope: Record<string, unknown>): unknown {
+export function evaluateRawExpression(rawExpression: string, contextScope: Record<string, unknown>): unknown {
   const tokens = tokenize(rawExpression);
   const evaluator = new ExpressionEvaluator(tokens, contextScope);
   const result = evaluator.parse();
-  const remaining = evaluator['peek']();
+  const remaining = evaluator.peek();
   if (remaining.type !== 'eof') {
     throw new Error(`Unexpected token after expression: "${remaining.value}"`);
   }
@@ -414,59 +288,14 @@ function evaluateRawExpression(rawExpression: string, contextScope: Record<strin
 }
 
 /**
- * 动态 JS 表达式计算求解器 (Safe Expression Evaluator)
- * - 整串 `{{ expr }}` → 求值结果（可非字符串）
- * - 混写 `前缀 {{ expr }} 后缀` → 逐段替换为字符串（v2.3 行操作文案等）
+ * 表达式能否被受限解释器完整解析（无残留 token）。
+ * 供出码层判断是否可以原样内联进生成的 JavaScript。
  */
-export function parseExpression(exprString: unknown, contextScope: Record<string, unknown> = {}): unknown {
-  if (typeof exprString !== 'string') return exprString;
-
-  // 整串双大括号
-  const fullPattern = /^\s*\{\{\s*(.*?)\s*\}\}\s*$/;
-  const fullMatch = exprString.match(fullPattern);
-  if (fullMatch) {
-    try {
-      return evaluateRawExpression(fullMatch[1], contextScope);
-    } catch (e) {
-      console.warn(`[Expression Evaluator] Failed to evaluate expression: "${fullMatch[1]}"`, e);
-      return exprString;
-    }
-  }
-
-  // 混写插值：保留非表达式片段，逐段求值 {{ ... }}
-  if (!exprString.includes('{{')) return exprString;
-  return exprString.replace(/\{\{\s*(.*?)\s*\}\}/g, (whole, raw: string) => {
-    try {
-      const result = evaluateRawExpression(raw, contextScope);
-      return result === undefined || result === null ? '' : String(result);
-    } catch (e) {
-      console.warn(`[Expression Evaluator] Failed to evaluate embedded expression: "${raw}"`, e);
-      return whole;
-    }
-  });
-}
-
-/**
- * 判断当前属性字符串是否包含 {{ ... }} 表达式
- */
-export function isExpression(val: unknown): boolean {
-  if (typeof val !== 'string') return false;
-  return /^\s*\{\{\s*.*?\s*\}\}\s*$/.test(val);
-}
-
-/**
- * 表达式能否原样内联进生成的 JavaScript。
- * 必须被受限解释器完整解析，且源码不含 `<`，避免打断 HTML 里的 script。
- */
-export function canInlineExpression(source: string): boolean {
-  if (typeof source !== 'string') return false;
-  const raw = source.trim();
-  if (!raw || /<\/|<\s*script/i.test(raw)) return false;
+export function parsesCleanly(source: string): boolean {
   try {
-    const tokens = tokenize(raw);
-    const evaluator = new ExpressionEvaluator(tokens, {});
+    const evaluator = new ExpressionEvaluator(tokenize(source), {});
     evaluator.parse();
-    return evaluator['peek']().type === 'eof';
+    return evaluator.peek().type === 'eof';
   } catch {
     return false;
   }

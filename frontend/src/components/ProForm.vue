@@ -52,6 +52,7 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted } from 'vue';
+import { errorText } from '@lowcode/shared';
 import type { ComponentNode } from '../types/designer';
 import { notifyUser } from '../utils/notifyUser';
 import { ApiExecutor, executeActions, nodeEventBus } from '../utils/dataSource';
@@ -122,8 +123,8 @@ const loadData = async () => {
     if (data && typeof data === 'object') {
       formData.value = { ...data };
     }
-  } catch (err: any) {
-    notifyUser('error', '表单数据加载失败: ' + (err.message || err));
+  } catch (err: unknown) {
+    notifyUser('error', '表单数据加载失败: ' + errorText(err, '未知错误'));
   } finally {
     loading.value = false;
   }
