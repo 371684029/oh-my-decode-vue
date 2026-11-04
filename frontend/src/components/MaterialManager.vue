@@ -150,9 +150,9 @@ import { errorStatus, errorText, isRecord } from '@lowcode/shared';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import { ArrowDown } from '@element-plus/icons-vue';
 import { listCustomMaterials, registerMaterial, unregisterMaterial } from '../registry/materialRegistry';
-import { parseMaterialSource } from '../utils/materialImport';
-import { generateMaterialBundle } from '../utils/codeGenerator';
 import { http } from '../utils/http';
+import { useMaterialVersions } from '../composables/useMaterialVersions';
+import { useMaterialIO } from '../composables/useMaterialIO';
 import type { MaterialCategory, MaterialManifest } from '../types/designer';
 
 defineProps<{ visible: boolean }>();
@@ -161,8 +161,6 @@ const emit = defineEmits<{ (e: 'close'): void }>();
 const items = computed(() => listCustomMaterials());
 /** el-table 行数据实为 MaterialManifest，做窄化转换 */
 const asManifest = (row: unknown): MaterialManifest => row as MaterialManifest;
-const showPaste = ref(false);
-const pasteText = ref('');
 const editForm = ref<null | { type: string; label: string; icon: string; category: MaterialCategory }>(null);
 
 const emitClose = () => {
@@ -172,73 +170,13 @@ const emitClose = () => {
 };
 
 /** 导入成功后注册 + 持久化 + 刷新 */
-const importManifest = async (manifest: MaterialManifest) => {
-  const reg = registerMaterial(manifest);
-  if (!reg.ok) {
-    ElMessage.warning(reg.reason);
-    return false;
-  }
-  try {
-    await http.post('/materials', manifest);
-    ElMessage.success(`已导入物料：${manifest.label}`);
-  } catch {
-    ElMessage.warning('物料已加入本地面板，但后端保存失败');
-  }
-  return true;
-};
-
-const handleFileImport = async (file: { raw?: File }) => {
-  const raw = file.raw;
-  if (!raw) return;
-  const text = await raw.text();
-  try {
-    const { manifest, source } = parseMaterialSource(text, raw.name);
-    await importManifest(manifest);
-    if (source === 'degraded') {
-      ElMessage.warning('该文件不含物料定义注释块，已降级为空快照物料（不可拖拽，需重新打包内容）');
-    }
-  } catch (err: unknown) {
-    ElMessage.error(errorText(err, '导入失败'));
-  }
-};
-
-const handlePasteImport = async () => {
-  if (!pasteText.value.trim()) {
-    ElMessage.warning('请先粘贴内容');
-    return;
-  }
-  try {
-    const { manifest, source } = parseMaterialSource(pasteText.value, 'pasted.vue');
-    await importManifest(manifest);
-    if (source === 'degraded') {
-      ElMessage.warning('该源码不含物料定义注释块，已降级为空快照物料');
-    }
-    showPaste.value = false;
-    pasteText.value = '';
-  } catch (err: unknown) {
-    ElMessage.error(errorText(err, '导入失败'));
-  }
-};
-
-const downloadText = (filename: string, content: string) => {
-  const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = filename;
-  a.click();
-  URL.revokeObjectURL(url);
-};
-
-const handleExport = (manifest: MaterialManifest, cmd: string) => {
-  const base = manifest.type.replace(/^custom-/, '');
-  if (cmd === 'vue' || cmd === 'html') {
-    const bundle = generateMaterialBundle(manifest);
-    downloadText(`${base}.${cmd === 'vue' ? 'vue' : 'html'}`, cmd === 'vue' ? bundle.vue : bundle.html);
-  } else {
-    downloadText(`${base}.material.json`, JSON.stringify(manifest, null, 2));
-  }
-};
+const {
+  showPaste,
+  pasteText,
+  handleFileImport,
+  handlePasteImport,
+  handleExport
+} = useMaterialIO();
 
 const openEdit = (manifest: MaterialManifest) => {
   editForm.value = {
@@ -252,116 +190,20 @@ const openEdit = (manifest: MaterialManifest) => {
 // ============================================================
 // 版本管理（v2.1.0）
 // ============================================================
-const versionTarget = ref<MaterialManifest | null>(null);
-const versionList = ref<Array<{ version: string; publishedAt: string; refCount: number }>>([]);
-const diffResult = ref<null | { base: string; target: string; bump: string; contractDiff: unknown[]; schemaDiff: unknown[] }>(null);
-const upgradeFrom = ref('');
-const upgradeTo = ref('');
-const upgradeReport = ref<Array<{ pageId: string; updated: number; failed?: string }>>([]);
-
-const loadVersionList = async () => {
-  if (!versionTarget.value) return;
-  try {
-    const resp = await http.get(`/materials/${encodeURIComponent(versionTarget.value.type)}/versions`);
-    versionList.value = resp.data?.data || [];
-  } catch {
-    versionList.value = [];
-  }
-};
-
-const openVersions = async (manifest: MaterialManifest) => {
-  versionTarget.value = manifest;
-  diffResult.value = null;
-  upgradeReport.value = [];
-  upgradeFrom.value = '';
-  upgradeTo.value = manifest.currentVersion || '';
-  await loadVersionList();
-};
-
-const doRollback = async (version: string) => {
-  if (!versionTarget.value) return;
-  try {
-    await http.post(`/materials/${encodeURIComponent(versionTarget.value.type)}/rollback`, { version });
-    ElMessage.success(`已回滚当前版本到 ${version}`);
-    await loadVersionList();
-  } catch (err: unknown) {
-    ElMessage.error(errorText(err, '回滚失败'));
-  }
-};
-
-const doArchive = async (version: string) => {
-  if (!versionTarget.value) return;
-  try {
-    await http.delete(`/materials/${encodeURIComponent(versionTarget.value.type)}/versions/${version}`);
-    ElMessage.success(`已归档版本 ${version}`);
-    await loadVersionList();
-  } catch (err: unknown) {
-    ElMessage.error(errorText(err, '归档失败（被引用或为当前版本）'));
-  }
-};
-
-const doDiffPrevious = async (version: string) => {
-  if (!versionTarget.value) return;
-  const idx = versionList.value.findIndex((v) => v.version === version);
-  const base = versionList.value[idx + 1]?.version;
-  if (!base) {
-    ElMessage.info('没有更早的版本可对比');
-    return;
-  }
-  try {
-    const resp = await http.get(
-      `/materials/${encodeURIComponent(versionTarget.value.type)}/versions/${version}/diff`,
-      { params: { base } }
-    );
-    diffResult.value = resp.data?.data || null;
-  } catch (err: unknown) {
-    ElMessage.error(errorText(err, '差异获取失败'));
-  }
-};
-
-const openFork = async () => {
-  if (!versionTarget.value) return;
-  try {
-    const { value } = await ElMessageBox.prompt('新物料名称（派生为 custom-<slug>）', '复制新增 (fork)', {
-      inputValue: `${versionTarget.value.label}-副本`
-    });
-    const label = String(value || '').trim();
-    if (!label) return;
-    const slug =
-      label
-        .toLowerCase()
-        .replace(/[^a-z0-9]+/g, '-')
-        .replace(/^-+|-+$/g, '') || 'material';
-    await http.post(`/materials/${encodeURIComponent(versionTarget.value.type)}/fork`, {
-      fromVersion: versionTarget.value.currentVersion || '1.0.0',
-      newType: `custom-${slug}`,
-      label,
-      icon: versionTarget.value.icon
-    });
-    ElMessage.success(`已派生新物料 custom-${slug}`);
-    versionTarget.value = null;
-  } catch (err: unknown) {
-    if (err !== 'cancel') ElMessage.error(errorText(err, 'fork 失败'));
-  }
-};
-
-const doUpgrade = async () => {
-  if (!versionTarget.value || !upgradeFrom.value || !upgradeTo.value) {
-    ElMessage.warning('请选择 from / to 版本');
-    return;
-  }
-  try {
-    const resp = await http.post('/pages/upgrade-material', {
-      materialId: versionTarget.value.type,
-      fromVersion: upgradeFrom.value,
-      toVersion: upgradeTo.value
-    });
-    upgradeReport.value = resp.data?.data || [];
-    ElMessage.success('批量升级完成');
-  } catch (err: unknown) {
-    ElMessage.error(errorText(err, '升级失败'));
-  }
-};
+const {
+  versionTarget,
+  versionList,
+  diffResult,
+  upgradeFrom,
+  upgradeTo,
+  upgradeReport,
+  openVersions,
+  doRollback,
+  doArchive,
+  doDiffPrevious,
+  openFork,
+  doUpgrade
+} = useMaterialVersions();
 
 const handleSaveEdit = async () => {
   const form = editForm.value;
