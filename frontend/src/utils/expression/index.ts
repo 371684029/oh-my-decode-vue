@@ -21,7 +21,7 @@ export function parseExpression(exprString: unknown, contextScope: Record<string
   if (fullMatch) {
     try {
       return evaluateRawExpression(fullMatch[1], contextScope);
-    } catch (e) {
+    } catch (e: unknown) {
       console.warn(`[Expression Evaluator] Failed to evaluate expression: "${fullMatch[1]}"`, e);
       return exprString;
     }
@@ -33,7 +33,7 @@ export function parseExpression(exprString: unknown, contextScope: Record<string
     try {
       const result = evaluateRawExpression(raw, contextScope);
       return result === undefined || result === null ? '' : String(result);
-    } catch (e) {
+    } catch (e: unknown) {
       console.warn(`[Expression Evaluator] Failed to evaluate embedded expression: "${raw}"`, e);
       return whole;
     }

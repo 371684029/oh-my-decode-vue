@@ -154,7 +154,7 @@ export class StorageService {
       let patched: PageSchema;
       try {
         patched = applyPatch(existing, ops);
-      } catch (err) {
+      } catch (err: unknown) {
         const message = err instanceof JsonPatchError ? err.message : 'Failed to apply patch';
         return { ok: false, code: 'PATCH_ERROR', message };
       }

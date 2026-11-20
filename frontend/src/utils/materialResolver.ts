@@ -50,7 +50,7 @@ export async function resolveEffectiveVersion(ref: MaterialRef): Promise<string 
       const list = (resp.data?.data || []) as Array<{ version: string }>;
       all = list.map((v) => v.version).sort(compareSemver);
       listCache.set(ref.id, all);
-    } catch (error) {
+    } catch (error: unknown) {
       // 版本列表拉取失败会静默降级为「无可用版本」，必须留痕以便定位网络/后端异常
       console.warn(`[materialResolver] 版本列表拉取失败，物料 ${ref.id} 回退为缺失占位:`, error);
       all = [];
@@ -74,7 +74,7 @@ export async function resolveMaterial(ref: MaterialRef): Promise<MaterialVersion
     const version = resp.data?.data as MaterialVersion;
     if (version) versionCache.set(key, version);
     return version ?? null;
-  } catch (error) {
+  } catch (error: unknown) {
     // 版本快照拉取失败返回 null（渲染占位），同样不能吞掉异常
     console.warn(`[materialResolver] 版本快照拉取失败 ${ref.id}@${effective}，回退渲染占位:`, error);
     return null;

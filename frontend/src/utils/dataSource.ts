@@ -279,7 +279,7 @@ export async function executeActions(actions: ActionNode[], ctx: ActionContext):
   for (const action of actions) {
     try {
       await executeAction(action, ctx);
-    } catch (err) {
+    } catch (err: unknown) {
       const message = err instanceof Error ? err.message : '动作执行失败';
       ctx.notify('error', message);
       break;

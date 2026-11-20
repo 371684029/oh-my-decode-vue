@@ -3,7 +3,7 @@
 | 属性 | 内容 |
 |------|------|
 | 状态 | **已采纳**；v2.8.0 起为范围裁决的单一事实源 |
-| 当前版本 | **v2.8.0**（`package.json`） |
+| 当前版本 | **v2.9.0**（`package.json`） |
 | 关联 | [README.md](../README.md)、[roadmap/2.9.0_PLAN.md](./roadmap/2.9.0_PLAN.md)、[spec-doc-conventions.md](./spec-doc-conventions.md) |
 | 参考纪律 | 文档分区与冻结表述对齐 [oh-my-co-work](https://github.com/371684029/oh-my-co-work) 的 `docs/README.md` 维护原则 |
 
@@ -12,12 +12,12 @@
 
 ---
 
-## 0. 当前开发策略（2026-11 起 · v2.8.0+）
+## 0. 当前开发策略（2026-11 起 · v2.9.0+）
 
 | 规则 | 说明 |
 |------|------|
 | **主攻** | **七大核心护城河**的正确性、安全性、可维护性；**不扩功能面** |
-| **允许版本** | v2.9.x 仅承接 [v2.8.0 规划 M2](./roadmap/2.8.0_PLAN.md) 类**结构/测试债务**（catch 口径、拆分模块单测） |
+| **允许版本** | v2.10+ 仅承接**结构/测试债务**（如 composable 单测）；v2.9.0 已收口，见 [2.9.0_PLAN.md](./roadmap/2.9.0_PLAN.md) |
 | **冻结** | v3.0 / v4.0 归属能力、锦上添花项、非目标项 —— **不写代码、不立项、不接受功能 PR** |
 | **例外** | 阻断核心路径的 **P0 bug**（崩溃、白屏、数据丢失、出码不可运行、保存静默丢数据）可在冻结区修 **最小补丁**，须在本文件或对应 plan 留痕 |
 | **解冻** | 必须走 [§8 解冻流程](#8-解冻流程)，并写入对应大版本 `plan` |
@@ -75,8 +75,8 @@
 
 | ID | 条目 | 说明 | 归属 |
 |----|------|------|------|
-| **M01** | 未标注 `catch` 收口 | 17 处 `catch (err)` 显式 `unknown`，与 v2.8.0 口径一致 | v2.9.0 |
-| **M02** | 拆分模块单测 | `designerSchema` / `designerState` / `designerNodeFactory`、`useMaterialVersions` / `useMaterialIO` | v2.9.0 |
+| **M01** | 未标注 `catch` 收口 | 生产代码 `catch` 显式 `unknown`（v2.9.0 ✅） | — |
+| **M02** | 拆分模块单测 | `designerSchema` / `designerState` / `designerNodeFactory` 单测（v2.9.0 ✅）；composable 延 v2.10 | v2.10 |
 | **M03** | 单文件 ≤400 行纪律 | 新代码不得重新堆出巨型文件；超标先拆再合 | 持续 |
 | **M04** | CI 同款质量门 | `typecheck` → `lint` → `test` → `build` 全绿才合入 | 持续 |
 

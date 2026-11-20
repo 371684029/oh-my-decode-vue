@@ -298,7 +298,7 @@ const handleDrop = (event: DragEvent) => {
     try {
       const material: MaterialItem = JSON.parse(data);
       designerStore.addMaterialSmart(material, 0, 1000);
-    } catch (e) {
+    } catch (e: unknown) {
       console.error('Failed to parse dropped material', e);
     }
   }

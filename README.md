@@ -1,6 +1,6 @@
 # 低代码前端可视化平台
 
-拖拽搭页面，再导出成能运行的前端代码。当前版本 **v2.8.0**。
+拖拽搭页面，再导出成能运行的前端代码。当前版本 **v2.9.0**。
 
 页面在设计器里是一份 JSON Schema。表格、表单和按钮都由这份 Schema 渲染。导出时，同一份 Schema 生成 Vue 单文件组件、独立 HTML，以及由这两种组件组成的语料库。平台不生成后端业务代码。页面 JSON 存在本地文件里，SQLite 只记操作日志。
 
@@ -315,7 +315,7 @@ npm run build
 ```bash
 npm run typecheck   # 前后端类型检查
 npm run lint        # ESLint（0 error / 0 warning 门槛）
-npm run test        # Vitest：前端 217 项 + 后端 104 项
+npm run test        # Vitest：前端 229 项 + 后端 104 项
 npm run format      # Prettier 全仓格式化
 ```
 
@@ -398,15 +398,24 @@ npm run format      # Prettier 全仓格式化
 | `materialController` 引用门禁 | **+7**  | refs 409（删除被引用物料 / 归档被引用版本）、`?force=true` 强删、无引用直删、`GET refs` 计数与页面明细、跨页累计、图层内实例计入                                                     |
 | 版本升级与存储                | **+14** | `pageUpgradeService` 批量升级（pin 改写 / follow 跳过 / 版本递增 / 图层内实例）6 项；`StorageService` 非保存路径（get / list / delete / type 分流 / backups / restore）8 项     |
 
-### 🔜 下一步待规划项（v2.9.0 — 均为核心维护性，不新增功能面）
+### 本轮已收口（v2.9.0）— 维护性
 
-详见 **[`docs/roadmap/2.9.0_PLAN.md`](docs/roadmap/2.9.0_PLAN.md)**（未标注 `catch` 收口、拆分模块单测）。
+| 优先级 | 条目 | 改造内容 | 状态 |
+| :----- | :----- | :------- | :--- |
+| **P1** | `catch` 未标注类型 | 生产代码全部 `catch (…: unknown)` | ✅ v2.9.0 |
+| **P1** | 拆分模块单测 | `designerSchema` / `designerState` / `designerNodeFactory` 独立测试 | ✅ v2.9.0 |
 
-> 「巨型文件拆分」「`catch (err: any)` 收口」「表达式解析器分层」三项已在 v2.8.0 全部完成。
+详见 **[`docs/roadmap/2.9.0_PLAN.md`](docs/roadmap/2.9.0_PLAN.md)**（自测清单与 T3 composable 延后说明）。
 
 ---
 
 ## 📝 版本变更历史 (Changelog)
+
+### 📌 v2.9.0 (2026-11) — 维护性与文档收口
+
+- **`catch` 口径统一**：生产路径中剩余未标注类型的 `catch` 全部改为 `unknown`（与 v2.8.0 已清零的 `catch (err: any)` 对齐）；出码字符串模板内 `catch (err)` 为生成 JavaScript，不计入 TypeScript 口径。
+- **拆分模块单测**：新增 `designerSchema.test.ts`、`designerState.test.ts`、`designerNodeFactory.test.ts`，覆盖主画布同源、历史剥离、id/target 重写与工厂默认值。
+- **文档**：[`docs/roadmap/2.9.0_PLAN.md`](docs/roadmap/2.9.0_PLAN.md) 含任务验收与 CI 自测表；删除 `designerState.ts` 重复注释。
 
 ### 📌 v2.8.0 (2026-11) — 类型收口与表达式分层
 
@@ -591,4 +600,4 @@ npm run format      # Prettier 全仓格式化
 | **[implemented/README.md](docs/implemented/README.md)** | 技术规范一览（CAE / 物料 / I/O / 管道） |
 | **[roadmap/README.md](docs/roadmap/README.md)** | **版本总表**（0.0.1 → 4.0，含 v2.9 维护） |
 
-当前维护线：**[v2.9.0_PLAN.md](docs/roadmap/2.9.0_PLAN.md)**（仅测试与 catch 口径，无新功能）。
+当前发布线：**v2.9.0**；维护记录见 **[v2.9.0_PLAN.md](docs/roadmap/2.9.0_PLAN.md)**。

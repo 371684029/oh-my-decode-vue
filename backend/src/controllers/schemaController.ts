@@ -68,7 +68,7 @@ export class SchemaController {
       let ops: JsonPatchOp[];
       try {
         ops = parsePatchOps(req.body?.ops);
-      } catch (err) {
+      } catch (err: unknown) {
         const message = err instanceof JsonPatchError ? err.message : 'Invalid request body';
         res.status(400).json({ success: false, message });
         return;
@@ -142,7 +142,7 @@ export class SchemaController {
         message: 'Schema patched successfully',
         data: { id: saved.id, version: saved.meta.version }
       });
-    } catch (err) {
+    } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Unexpected error';
       res.status(500).json({ success: false, message });
     }

@@ -69,7 +69,6 @@ export type DesignerState = ReturnType<typeof createInitialState>;
  */
 export const designerGetters = {
   /** 当前编辑目标（图层 children 或主画布 children）的响应式数组引用 */
-   /** 当前编辑目标（图层 children 或主画布 children）的响应式数组引用 */
   activeChildren(state: DesignerState): ComponentNode[] {
     if (state.editingLayerId) {
       const layer = state.pageSchema.layers?.find((l) => l.id === state.editingLayerId);

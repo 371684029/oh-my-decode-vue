@@ -165,7 +165,7 @@ const onDropIntoContainer = (event: DragEvent) => {
   try {
     const material = JSON.parse(data) as MaterialItem;
     designerStore.addChildToNode(props.node.id, material);
-  } catch (err) {
+  } catch (err: unknown) {
     console.error('Failed to drop material into container', err);
   }
 };

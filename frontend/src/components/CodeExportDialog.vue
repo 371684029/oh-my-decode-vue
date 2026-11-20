@@ -172,7 +172,7 @@ const warnedHighlightLangs = new Set<string>();
 const highlight = (code: string, lang: string): string => {
   try {
     return hljs.highlight(code, { language: lang }).value;
-  } catch (error) {
+  } catch (error: unknown) {
     // 高亮失败回退纯文本仍可读，但必须留痕（按语言只告警一次）
     if (!warnedHighlightLangs.has(lang)) {
       warnedHighlightLangs.add(lang);
