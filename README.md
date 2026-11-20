@@ -1,6 +1,6 @@
 # 低代码前端可视化平台
 
-拖拽搭页面，再导出成能运行的前端代码。当前版本 **v2.9.0**。
+拖拽搭页面，再导出成能运行的前端代码。当前版本 **v2.10.0**。
 
 页面在设计器里是一份 JSON Schema。表格、表单和按钮都由这份 Schema 渲染。导出时，同一份 Schema 生成 Vue 单文件组件、独立 HTML，以及由这两种组件组成的语料库。平台不生成后端业务代码。页面 JSON 存在本地文件里，SQLite 只记操作日志。
 
@@ -315,7 +315,7 @@ npm run build
 ```bash
 npm run typecheck   # 前后端类型检查
 npm run lint        # ESLint（0 error / 0 warning 门槛）
-npm run test        # Vitest：前端 236 项 + 后端 104 项
+npm run test        # Vitest：前端 242 项 + 后端 104 项
 npm run format      # Prettier 全仓格式化
 ```
 
@@ -398,18 +398,24 @@ npm run format      # Prettier 全仓格式化
 | `materialController` 引用门禁 | **+7**  | refs 409（删除被引用物料 / 归档被引用版本）、`?force=true` 强删、无引用直删、`GET refs` 计数与页面明细、跨页累计、图层内实例计入                                                     |
 | 版本升级与存储                | **+14** | `pageUpgradeService` 批量升级（pin 改写 / follow 跳过 / 版本递增 / 图层内实例）6 项；`StorageService` 非保存路径（get / list / delete / type 分流 / backups / restore）8 项     |
 
-### 本轮已收口（v2.9.0）— 维护性
+### 本轮已收口（v2.10.0）— 测试盲区
 
-| 优先级 | 条目 | 改造内容 | 状态 |
-| :----- | :----- | :------- | :--- |
-| **P1** | `catch` 未标注类型 | 生产代码全部 `catch (…: unknown)` | ✅ v2.9.0 |
-| **P1** | 拆分模块单测 | `designerSchema` / `designerState` / `designerNodeFactory` 独立测试 | ✅ v2.9.0 |
+| 优先级 | 条目 | 状态 |
+| :----- | :----- | :--- |
+| **P2** | `designerNodeFactory` 黑盒/快照/图层工厂 | ✅ v2.10.0 |
+| **P2** | `useDrawerNode` composable | ✅ v2.10.0 |
 
-详见 **[`docs/roadmap/2.9.0_PLAN.md`](docs/roadmap/2.9.0_PLAN.md)**（自测清单与 T3 composable 延后说明）。
+详见 **[`docs/roadmap/2.10.0_PLAN.md`](docs/roadmap/2.10.0_PLAN.md)**。
 
 ---
 
 ## 📝 版本变更历史 (Changelog)
+
+### 📌 v2.10.0 (2026-11) — 工厂与抽屉 composable 单测
+
+- **`designerNodeFactory` 扩测**：覆盖 `createBlackBoxNode`（materialRef + pin）、`instantiateCompositeSnapshot`（平移 + id 重写/空快照）、`createLayer`（dialog/loading/custom-html 可见性与默认 props）。
+- **`useDrawerNode` 单测**：`formatEventPath` 与 `selectedNode` 响应式联动。
+- **文档**：新增 [`2.10.0_PLAN.md`](docs/roadmap/2.10.0_PLAN.md)。
 
 ### 📌 v2.9.0 (2026-11) — 维护性与文档收口
 
@@ -600,4 +606,4 @@ npm run format      # Prettier 全仓格式化
 | **[implemented/README.md](docs/implemented/README.md)** | 技术规范一览（CAE / 物料 / I/O / 管道） |
 | **[roadmap/README.md](docs/roadmap/README.md)** | **版本总表**（0.0.1 → 4.0，含 v2.9 维护） |
 
-当前发布线：**v2.9.0**；维护记录见 **[v2.9.0_PLAN.md](docs/roadmap/2.9.0_PLAN.md)**。
+当前发布线：**v2.10.0**；维护记录见 **[v2.10.0_PLAN.md](docs/roadmap/2.10.0_PLAN.md)**。
