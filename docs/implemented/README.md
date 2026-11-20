@@ -18,6 +18,7 @@
 | [COMPONENT_IO_SPECIFICATION.md](./COMPONENT_IO_SPECIFICATION.md) | 已落地 | C02、C07 | 黑盒 inputs/outputs 契约与抽屉校验 |
 | [PIPELINE_ORCHESTRATION.md](./PIPELINE_ORCHESTRATION.md) | **远期规范 · 冻结** | — | v3.0 管道编排设计，v2.x 不实现 |
 | [0.2.0_OPTIMIZATIONS.md](./0.2.0_OPTIMIZATIONS.md) | 报告 · 大多已收口 | C05 维护 | v0.2 技术债；v2.4–v2.8 已逐项落地 |
+| [CORE_DEBT_ROUNDS.md](./CORE_DEBT_ROUNDS.md) | 报告 · 已收口 | C01–C07 维护 | 三轮 16 项结构债务复盘（自 README 迁出） |
 
 ---
 

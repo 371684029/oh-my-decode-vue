@@ -86,79 +86,11 @@
 | 物料版本管理（草稿 / 不可变发布 / 锁定 / 升级 / 回滚 / 差异 / fork） | v2.1      |
 | 本地持久化 + SQLite 审计 + 引用保护                                  | v1.x–v2.1 |
 
-### 核心优化点（正确性与结构债务，按 ROI 排序）
+### 结构债务与冻结（摘要）
 
-> 这些是护城河自身的**内部债务**，不是新功能。优化它们 = 让核心功能更快、更稳、更好维护。
-> 分三轮收口：**第一轮 6 项（v2.4.0 / v2.5.0）**、**第二轮 7 项（v2.6.0 / v2.7.0）**、**第三轮 3 项（v2.8.0）**。
-> 下表「现状」列保留改造前快照，供复盘对照。
-
-**第一轮（v2.4.0 / v2.5.0）— 出码与保存链路 ✅ 全部完成**
-
-| #   | 优化点                       | 现状                                                                                                                                                                          | 目标                                                                                |
-| :-- | :--------------------------- | :---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | :---------------------------------------------------------------------------------- |
-| 1   | **拆分出码引擎**             | `codeGenerator.ts` 单体 1371 行，三种出码目标（Vue / WC / HTML）字符串模板混排，缩进与格式化问题已被 [`0.2.0_OPTIMIZATIONS.md`](docs/implemented/0.2.0_OPTIMIZATIONS.md) 点名 | 按 target 拆为独立生成器 + 共享渲染层；输出经格式化，产物可读性对齐手写代码         |
-| 2   | **撤销/重做改 patch 式历史** | `historyPast / historyFuture` 存全量快照（`JSON.parse(JSON.stringify())`），长会话 GC 压力大                                                                                  | 结构共享或 Patch 记录；拖拽中间态防抖，仅在 `dragstop` 落一步                       |
-| 3   | **拆巨型组件**               | `PropertyDrawer.vue` 981 行、`App.vue` 645 行、`CanvasContainer.vue` 608 行，改一处牵动全局                                                                                   | 按职责拆子组件/组合式函数，单文件回到 250 行量级，测试盲区收窄                      |
-| 4   | **增量保存**                 | 自动保存全量 `POST /api/schemas`，页面大时数 MB Payload                                                                                                                       | RFC 6902 JSON Patch 增量提交（`0.2.0_OPTIMIZATIONS.md` 方案，可省 90%+ 传输）       |
-| 5   | **Web Component 样式注入**   | Shadow DOM 隔离下 Element Plus CSS 不穿透，导出物可能裸奔                                                                                                                     | `styles: [elementPlusCss]` 注入 + Light DOM 兜底开关                                |
-| 6   | **快捷键作用域**             | 弹窗/抽屉内按 Delete 仍可能误删画布节点                                                                                                                                       | Context Manager（`focusedZone` + `activeModalCount`），仅画布聚焦时响应画布级快捷键 |
-
-**第二轮（v2.6.0 / v2.7.0）— 正确性与结构债务 ✅ 全部完成**
-
-| #   | 优化点                       | 改造前                                                                                                                          | 目标                                                                                   |
-| :-- | :--------------------------- | :------------------------------------------------------------------------------------------------------------------------------ | :------------------------------------------------------------------------------------- |
-| 7   | **PATCH 并发竞态**           | `patchSchema` 在写队列外读底稿并校验版本，并发 PATCH 同基线互相覆盖（TOCTOU 静默丢更新）                                        | 「读-校验-应用-写」整体入写队列；并发一 200 一 409，不丢更新                           |
-| 8   | **导出代码 SSRF 防护分歧**   | 嵌入 JS 的 `blockedHost` 缺 IPv4-mapped `::ffff:` 链路本地地址，导出产物弱于设计器                                              | 两侧同一套检查，导出页面不可绕过访问云元数据                                           |
-| 9   | **自动保存失败静默**         | `performAutoSave` 仅 `console.error`，后端长期不可用时用户无感、静默丢工作                                                      | 失败一次性通知用户（节流）                                                             |
-| 10  | **shortHash 三处重复**       | FNV-1a 在 `codegen/shared.ts` / `materialPacker.ts` / `versionClassify.ts` 三份拷贝，注释互称「与前端一致」                      | 收敛为 `@lowcode/shared` 单一导出，三处引用同一来源                                    |
-| 11  | **`as any` 类型逃逸**        | 版本判定 / 布局列表 / 表达式解析器用 `any` 逃逸类型检查                                                                         | 最小结构类型（`VersionTreeNode` / `GridLayoutItem`）+ 受限运算视图，生产代码 `as any` 清零 |
-| 12  | **watch 全量 stringify**     | `watch(() => JSON.stringify(pageSchema))` 每次响应式变更 O(n) 全量序列化，拖拽 move/resize 事件也在跑                            | 手势期间短路 getter 返回常量，手势结束一次性求值                                       |
-| 13  | **静默 catch**               | `materialResolver` 拉取失败吞异常；出码语法高亮失败无痕迹                                                                       | 留痕告警（高亮按语言只告警一次），异常不再被隐藏                                        |
-
-**第三轮（v2.8.0）— 类型收口与表达式分层 ✅**
-
-| #   | 优化点                      | 改造前                                                                                          | 目标                                                                                 |
-| :-- | :------------------------ | :-------------------------------------------------------------------------------------------- | :----------------------------------------------------------------------------------- |
-| 14  | **`catch (err: any)` 逃逸**  | 生产代码 47 处显式 `catch (err: any)`，错误处理绕过类型检查，`err.message` 可能为 `undefined`        | 统一 `catch (err: unknown)` + `@lowcode/shared` 的 `errorMessage` / `errorText` 提取助手 |
-| 15  | **表达式求值器单文件过载**     | `expression.ts` 473 行混排词法/求值/门面，且用 `evaluator['peek']()` 绕过 private                  | 拆为 tokenizer / evaluator / index 三层，各文件 ≤400 行，消除括号逃逸                    |
-| 16  | **巨型文件超标**             | `designerStore.ts` 648 行、`MaterialManager.vue` 500 行、`expression.ts` 473 行 均超 400 行目标，改一处牵动全局 | 按「只抽纯函数」边界拆分：store 拆为 Schema/State/NodeFactory 三个模块，组件拆出两个 composable，全部 ≤400 行 |
-
-### 🧊 冻结清单（非核心功能 — 先冻结，不投入）
-
-> **冻结不等于删除**：这些能力不进 v2.x 主线，不写代码、不立项、不接受 PR。解冻须走"新增功能的准入检查"并指定归属大版本。
-
-**A. 明确非目标（禁止在本项目主线扩展，永久红线）**
-
-- ❌ **后端业务逻辑生成**（BFF / CRUD 脚手架）—— 不是本项目职责
-- ❌ **通用运行时渲染引擎**（在线执行任意第三方组件源码 / `vue3-sfc-loader` 动态编译）—— 超出 v2.x 边界，留待单独评估
-- ❌ **为单个业务场景定制的专用组件** —— 应由用户以"自定义物料"自行打包，不进内置物料
-- ❌ **表达式求值引入 `eval` / `new Function`** —— 安全红线，绝不触碰
-
-**B. 归属 v3.0 / v4.0 的能力 —— 冻结到对应大版本**
-
-- 🧊 **管道编排 / Event Flow Orchestrator / 页面路由跳转** —— v3.0
-- 🧊 **GraphQL 数据源** —— v3.0
-- 🧊 **物料市场 / 远程物料 SDK / Module Federation / 可视化逻辑流** —— v3.0
-- 🧊 **VS Code 插件 / `@lowcode/cli` 脚手架** —— v3.0
-- 🧊 **多人实时协同 / RBAC / SSO** —— v4.0
-- 🧊 **数据库 / 云存储 / 发布流水线 / 分布式存储（PostgreSQL / Redis / OSS）** —— v4.0
-
-**C. 锦上添花项 —— 低优先级冻结（[`FUTURE_DIRECTIONS.md`](docs/roadmap/FUTURE_DIRECTIONS.md) 中未落地部分）**
-
-- 🧊 标尺 / 吸附辅助线、右键上下文菜单、可视化联动规则、流程图编辑器
-- 🧊 全局主题 CSS 变量系统、i18n Key-Path 字典引擎、正则规则构建器、离线 Mock 沙箱
-
-**冻结期唯一开放的工作面**：「核心功能」表 7 项能力的正确性与持续打磨（「核心优化点」三轮 16 项与「自测遗留」7 项已全部清零，见 v2.4.0–v2.8.0 变更历史）。其余一切新能力走上面的准入检查。
-
-### 新增功能的准入检查（每次扩展前自问）
-
-1. 它是否服务于"JSON 桥梁 + 可运行产物"这一核心命题？
-2. 它是否能用现有 Schema / 物料 / 版本模型表达，而非新增一套并行机制？
-3. 它是否会在产物里引入不可读或不可往返的内容？
-4. 它是否越过了上面的「冻结清单」（非目标 / v3.0+ 归属 / 锦上添花）？
-5. 任一答案为"否"或"是"，先立项讨论，不要直接写代码。
-
-> **版本节奏**：`0.x → 1.x` 打基础，`2.x` 做闭环与体验打磨，`3.x` 做物料生态与复杂编排，`4.x` 才上企业级协同与基础设施。**主线只做闭环内的打磨；复杂生态与企业级放到对应大版本。**
+- **三轮 16 项核心债务**（v2.4–v2.8）已全部收口；改造前快照与测试增量见 **[`docs/implemented/CORE_DEBT_ROUNDS.md`](docs/implemented/CORE_DEBT_ROUNDS.md)**。
+- **红线 / 冻结线 / PR 五问** 以 **[`docs/spec-red-green-lines.md`](docs/spec-red-green-lines.md)** 为单一事实源（含 v3/v4 归属与锦上添花清单）。
+- **版本节奏**：`2.x` 只做护城河打磨；`3.x` 物料生态与编排；`4.x` 企业协同 —— 详见 **[`docs/roadmap/README.md`](docs/roadmap/README.md)**。
 
 ---
 
@@ -359,51 +291,14 @@ npm run format      # Prettier 全仓格式化
 
 ---
 
-## 🗓️ 待规划项与本轮收口 (v2.7.0 / v2.8.0 · 结构债务与类型收口)
+## 🗓️ 近期维护收口
 
-> **版本主题**：消除重复逻辑、收窄类型逃逸、优化性能热点、补齐核心测试、超标文件拆层。不动功能面，全部条目服务于「核心功能更稳、产物更可信、代码更好维护」。
->
-> 详见 [`2.7.0_PLAN.md`](docs/roadmap/2.7.0_PLAN.md)（结构债务收口）与 [`2.8.0_PLAN.md`](docs/roadmap/2.8.0_PLAN.md)（类型收口与结构分层）。
-
-### 本轮已收口（v2.6.0 / v2.7.0）— 核心优化项
-
-| 优先级 | 条目                   | 改造内容                                                                                                       | 状态       |
-| :----- | :--------------------- | :------------------------------------------------------------------------------------------------------------- | :--------- |
-| **P0** | PATCH 并发 TOCTOU 竞态 | 「读-校验-应用-写」整体移入写队列，并发一 200 一 409 不丢更新                                                  | ✅ v2.6.0  |
-| **P0** | 导出代码 SSRF 防护分歧 | `FETCH_CHECKED_SOURCE` 补 IPv4-mapped `::ffff:` 链路本地地址，导出产物与设计器同强度                           | ✅ v2.6.0  |
-| **P0** | 自动保存失败静默       | 失败一次性通知用户（节流），不再只 `console.error`                                                              | ✅ v2.6.0  |
-| **P1** | shortHash 三处重复     | FNV-1a 收敛为 `@lowcode/shared` 单一导出，三处引用同一来源                                                     | ✅ v2.7.0  |
-| **P1** | `as any` 类型逃逸      | 最小结构类型（`VersionTreeNode` / `GridLayoutItem`）+ 受限运算视图，生产代码 `as any` 清零（测试文件除外）      | ✅ v2.7.0  |
-| **P1** | watch 全量 stringify   | 手势期间短路 getter 返回常量，手势结束一次性求值，拖拽中不再 O(n) 全量序列化                                    | ✅ v2.7.0  |
-| **P1** | 静默 catch             | 物料解析拉取失败 / 出码语法高亮失败均留痕告警（高亮按语言只告警一次）                                           | ✅ v2.7.0  |
-| **P2** | 核心测试补齐           | jsonPatch 边界语义、designerStore 黑盒路径、materialController 引用门禁、版本升级与存储非保存路径               | ✅ v2.7.0  |
-
-### 本轮已收口（v2.8.0）— 类型收口与结构分层
-
-| 优先级 | 条目                   | 改造内容                                                                                                       | 状态        |
-| :----- | :--------------------- | :------------------------------------------------------------------------------------------------------------- | :---------- |
-| **P1** | `catch (err: any)` 逃逸 | 生产代码 47 处改 `catch (err: unknown)`；`@lowcode/shared` 新增 `errorMessage` / `errorText` / `errorStatus` / `isRecord`，前端兜底文案原样保留 | ✅ v2.8.0   |
-| **P1** | 表达式求值器单文件过载 | `expression.ts` 473 → `tokenizer` 134 + `evaluator` 302 + `index` 61；消除 `evaluator['peek']()` 括号绕 private | ✅ v2.8.0   |
-| **P1** | 巨型文件超标           | `designerStore` 648→381（拆 `designerSchema` / `designerState` / `designerNodeFactory`）、`MaterialManager` 500→342（拆 `useMaterialVersions` / `useMaterialIO`）、`expression` 473→三文件；**超 400 行文件数归零** | ✅ v2.8.0   |
-
-> 拆分纪律：只抽不带 `this` 的代码，action 体不动；三道护栏（独立性 / 尺寸 / action 计数 40→40）见 `2.8.0_PLAN.md`。
-
-### 测试增量（v2.7.0）
-
-| 套件                          | 新增  | 覆盖                                                                                                                                                                    |
-| :---------------------------- | :---- | :---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `jsonPatch` 边界语义          | **+15** | 根路径 `''` 整文档替换与拒绝整文档删除、空 ops 深拷贝、非容器目标 / 非容器穿越、add 越界 vs `=== length` 追加、数组 replace 越界、`/-` 误用于 remove/replace、前导零下标、invert 错误路径、网络边界拒绝根路径 |
-| `designerStore` 黑盒路径      | **+8**  | `addBlackBoxFromMaterial`（含缺省版本回退 1.0.0）、`addMaterialSmart` 三形态分发、`setPageSchema` 整页替换、`enterLayerEdit` / `exitLayerEdit` 作用域切换             |
-| `materialController` 引用门禁 | **+7**  | refs 409（删除被引用物料 / 归档被引用版本）、`?force=true` 强删、无引用直删、`GET refs` 计数与页面明细、跨页累计、图层内实例计入                                                     |
-| 版本升级与存储                | **+14** | `pageUpgradeService` 批量升级（pin 改写 / follow 跳过 / 版本递增 / 图层内实例）6 项；`StorageService` 非保存路径（get / list / delete / type 分流 / backups / restore）8 项     |
-
-### 本轮已收口（v2.11.0）— 快捷键可测化
-
-| 条目 | 状态 |
-| :--- | :--- |
-| `handleDesignerKeydown` 抽出 + 单测 | ✅ v2.11.0 |
-
-详见 **[`docs/roadmap/2.11.0_PLAN.md`](docs/roadmap/2.11.0_PLAN.md)**。
+| 版本 | 主题 | 文档 |
+|------|------|------|
+| v2.11.0 | 画布快捷键 `handleDesignerKeydown` 可测化 | [2.11.0_PLAN.md](docs/roadmap/2.11.0_PLAN.md) |
+| v2.10.0 | 工厂 + `useDrawerNode` 单测 | [2.10.0_PLAN.md](docs/roadmap/2.10.0_PLAN.md) |
+| v2.9.0 | `catch` 口径 + 拆分模块单测 | [2.9.0_PLAN.md](docs/roadmap/2.9.0_PLAN.md) |
+| v2.4–v2.8 | 三轮结构债务（16 项） | [CORE_DEBT_ROUNDS.md](docs/implemented/CORE_DEBT_ROUNDS.md) |
 
 ---
 
@@ -426,176 +321,17 @@ npm run format      # Prettier 全仓格式化
 - **拆分模块单测**：新增 `designerSchema` / `designerState` / `designerNodeFactory` 与 `useMaterialIO` / `useMaterialVersions` 单测，覆盖主画布同源、版本 IO 与导入路径。
 - **文档**：[`docs/roadmap/2.9.0_PLAN.md`](docs/roadmap/2.9.0_PLAN.md) 含任务验收与 CI 自测表（T1–T4 全部 ✅）。
 
-### 📌 v2.8.0 (2026-11) — 类型收口与表达式分层
+### 📌 v2.4.0 – v2.8.0
 
-- **`catch (err: any)` 全面收窄**：生产代码 47 处 `catch (err: any)` / `catch (forceErr: any)` 全部改为 `catch (err: unknown)`，从根上消除类型逃逸。`@lowcode/shared` 新增四个配套工具：`errorMessage`（按「服务端 message > 字符串 > Error.message > 对象 message」提取可读信息）、`errorText`（同上但取不到时用调用方兜底文案）、`errorStatus`（取 axios 风格 HTTP 状态码）、`isRecord`（unknown 上的安全字段收窄）。前端提示统一走 `errorText(err, '中文兜底')`，保留原有降级文案；后端 500 响应不再出现 `message: undefined`。
-- **表达式解析器分层**：`expression.ts`（473 行）拆为 `expression/tokenizer.ts`（134 行，词法）、`expression/evaluator.ts`（302 行，受限递归下降求值器）、`expression/index.ts`（61 行，模板扫描门面），三个文件均低于 400 行门槛。import 路径不变，7 个调用点零改动。顺带消除了 `evaluator['peek']()` 这种绕过 private 的括号访问。**安全模型未变**：仍不引入 `new Function` / `eval`，18 项既有安全测试（拒绝函数调用、原型链敏感属性、赋值、模板字符串、恶意函数构造链）全部通过。
-- **巨型文件拆分**：三个超标文件全部压到 400 行以下。`designerStore.ts` 648→**381**，按「只抽不带 `this` 的代码」的边界拆为 `designerSchema.ts`（108 行，历史条目/主画布同源/id 与 target 重写）、`designerState.ts`（93 行，初始状态 + getter）、`designerNodeFactory.ts`（177 行，节点与图层工厂）；`MaterialManager.vue` 500→**342**，拆出 `useMaterialVersions.ts`（140 行，版本列表/回滚/归档/差异/fork/批量升级）与 `useMaterialIO.ts`（96 行，导入导出 IO）两个 composable；`expression.ts` 473→三文件。拆分以「抽纯函数、不碰 action 体」为硬约束，并以「action 数量前后不变（40→40）」作为越界护栏。
-- **范围说明**：首次尝试按动作体抽取时，正则越界误删了相邻 action、导致 store 缺能力，已整体回退后改用纯函数边界重做；本轮未触碰冻结清单。
+结构债务三轮 16 项已全部收口（出码拆分、Patch 保存与历史、并发 PATCH、类型/`catch`、表达式分层、巨型文件拆分等）。**条目级复盘**见 [`CORE_DEBT_ROUNDS.md`](docs/implemented/CORE_DEBT_ROUNDS.md)；**发布纪要**见 [`docs/roadmap/README.md`](docs/roadmap/README.md) 中对应 `*_PLAN.md`。
 
-### 📌 v2.7.0 (2026-11) — 结构债务收口
+### 📌 v2.0.0 – v2.3.0
 
-- **shortHash 单一来源**：FNV-1a 短哈希从 `codegen/shared.ts` / `materialPacker.ts` / `backend/versionClassify.ts` 三份拷贝收敛为 `@lowcode/shared` 导出，出码标识符冲突消解、物料 type 稳定后缀、契约/结构签名共用同一实现。
-- **`as any` 类型逃逸收窄**：版本判定引入 `VersionTreeNode`（只声明实际访问字段，`ComponentNode` 结构可赋值给它，调用方零改动），`updateNodeLayout` 用 `GridLayoutItem`，图层 props 用 `LayerProps`；表达式解析器全链路改 `unknown`，算术/关系运算走编译期受限视图（`num()` 在编译后擦除，生成的运行时代码与原生运算符逐字节一致）。生产代码 `as any` 清零（测试文件除外）。
-- **watch 全量 stringify 优化**：`App.vue` 的 schema 监听在拖拽/缩放手势期间短路 getter（返回常量 `''`），手势结束一次性求值；大页面拖拽不再每步 O(n) 全量序列化。
-- **静默 catch 留痕**：`materialResolver` 版本列表 / 快照拉取失败改为 `console.warn` 后降级为缺失占位；出码语法高亮失败按语言只告警一次并回退纯文本，网络与高亮异常不再被吞掉。
-- **核心测试补齐**：jsonPatch 边界语义 **+15**（根路径整文档替换 / 拒绝整文档删除、空 ops 深拷贝、非容器目标与非容器穿越、add 越界 vs `=== length` 追加、数组 replace 越界、`/-` 误用于 remove/replace、前导零下标、invert 错误路径、网络边界拒绝根路径）；designerStore 黑盒路径 **+8**；materialController 引用门禁 **+7**（refs 409 ×2 端点、`?force=true` 强删、无引用直删、`GET refs` 计数与明细、跨页累计、图层内实例计入）；`pageUpgradeService` 批量升级 **+6**；`StorageService` 非保存路径 **+8**。`materialRefScan` 的扫描语义（含图层内节点）由 materialController 用例直接覆盖。
+自我循环物料、黑盒契约与版本线、设计器分栏与手势体验 —— 能力说明仍见上文「能做什么」；实施细节见 `2.0.0`–`2.3.0` 的 roadmap 与 [`implemented/`](docs/implemented/README.md) 物料规范。
 
-### 📌 v2.6.0 (2026-10) — 正确性加固
+### 📌 v0.0.1 – v1.12.0
 
-- **PATCH 并发 TOCTOU 竞态修复**：`storageService.patchAndSave` 把「读底稿-校验版本-应用补丁-写盘」整体移入写队列，消除两个并发 PATCH（同 `baseVersion`）都通过校验、后者静默覆盖前者的丢更新问题；并发场景现为一 200 一 409。附并发竞态回归测试。
-- **导出代码 SSRF 防护对齐**：`FETCH_CHECKED_SOURCE` 补 IPv4-mapped `::ffff:` 链路本地地址判定，导出产物的 `blockedHost` 与设计器 `isBlockedFetchHost` 同强度，堵住绕过防护访问云元数据的路径。
-- **自动保存失败不再静默**：`performAutoSave` 失败时按节流一次性通知用户，后端长时间不可用时可感知，不再静默丢工作。
-
-### 📌 v2.5.0 (2026-10) — 核心维护性
-
-- **`jsonPatch` 双实现合并**：前后端两份分叉的 JSON Patch 实现统一进 `@lowcode/shared/jsonPatch`（workspace 转发保留原 import 路径）；`applyPatch` 全面收紧为严格 RFC 6902 子集（数组 add 为插入、边界/路径校验、`JsonPatchError`），并新增 `invertPatch` 撤销翻转语义。统一后 diff 为逐下标粒度——审计日志与物料版本差异逐项可读（`/children/0/label` 级别），版本判定走 `structuralSignature` 不受影响。
-- **快捷键浮层检测补全**：Context Manager 枚举 Element Plus 门户浮层根（`.el-popper` 系 / 下拉 / 日期面板），焦点进入任一浮层即非画布；可见的交互型浮层（popover、下拉、级联面板等）打开期间阻断画布快捷键，hover tooltip 不误伤。
-- **网格控件历史步修正**：`onColsPreset` / `onRowHeightChange` 改为**变更前**落历史步（不再产生空 pending 步、不再无谓清空 redo），无变化直接跳过。
-
-### 📌 v2.4.0 (2026-10) — 内功优化版
-
-- **出码引擎拆分 + 格式化管线**：`codeGenerator.ts` 单体拆为 `codegen/` 多目标模块（Vue / WC / HTML + 共享渲染层）与门面；输出统一走 `format.ts` 缩进归一，三产物可 diff、逐字节稳定。
-- **Patch 式撤销历史**：历史条目改存正/反向 patch 对（100 步内存降 81×），一次拖拽/缩放手势恰好落一步历史。
-- **增量自动保存**：JSON Patch 提交（35 节点页面 payload 7838B → 71B，降 110×），后端 `PATCH /api/schemas/:id` 应用并审计差异；自测修复三连——保存基线以提交时快照为准、PATCH 乐观并发（baseVersion 不符 409 回退全量）、无变更跳过保存。
-- **拆巨型组件**：`PropertyDrawer` 981→110 行、`App` 696→381、`CanvasContainer` 608→399，全部拆至 ≤400 行的子面板与 composable。
-- **Web Component 样式注入**：导出 WC 以 `styles: [elementPlusCss]` 注入核心样式（`?inline`），并提供 Light DOM 兜底注册。
-- **快捷键 Context Manager**：`focusedZone` + `activeModalCount` 门禁，弹窗/抽屉/输入态不再误触发画布级快捷键。
-- **范围治理**：核心优化点、冻结清单（非目标 / v3.0+ / 锦上添花）与自测遗留项入 README 宪法。
-
-### 📌 v2.3.0 (2026-09) — 设计器手势与反馈
-
-- 节点条网格 ±、右键/双击开属性、常驻快捷键提示；拖拽淡虚线网格可见（手势计时修复）。
-- Props+Attrs 合并编辑、数据源 Tab 置末、表格行操作友好提示（默认 view/delete 消息链 + `rowActionMessage`）。
-- 属性抽屉 IO 契约警告（必填/类型）与事件 payload 提示（原子与黑盒输出）。
-
-### 📌 v2.2.0 (2026-09) — 设计器体验
-
-- 分栏属性栏（选中不挡画布）、真组件画布、可视可选网格、Schema JSON 可编。
-- Spacer、ProForm 逐项宽高、Element Plus 可画布物料覆盖（通用 `el-*` 渲染）。
-- 草稿契约编辑与 major 发布确认。
-
-### 📌 v2.1.0 (2026-09)
-
-- **黑盒引用**：复合物料可打包为"黑盒"（`materialRef` 单一实例节点），渲染/出码按引用解析物料定义；实例本身可作为事件目标。
-- **契约 (inputs / outputs)**：打包黑盒时自动生成契约——inputs 声明注入点（nodeId + 字段路径），outputs 声明事件出口；属性面板可配置 inputs 值并在「事件」面板为 outputs 绑定动作链。
-- **版本管理**：每个物料独立版本线；**草稿 + 不可变发布版本**（发布后永不改写）。版本号自动判定（契约签名变化 = major / 结构增删 = minor / 纯值变化 = patch）。
-- **实例锁定与升级**：实例默认 `pin` 具体版本，可选 `follow-minor` / `follow-patch`；版本切换（升级/回滚）、差异对比（契约层 + 结构层）、归档、fork、批量升级实例。
-- **引用保护**：删除被引用物料 / 归档被引用版本会被阻止（附引用列表）；缺版本容错回退当前版本并渲染占位，页面不崩溃。
-- **存储与接口**：`materials/<id>/{manifest.json, draft.json, versions/<v>.json}`，兼容 v2.0 单文件惰性迁移；`/api/materials/:id/{versions,draft,rollback,fork,refs}` + `/api/pages/upgrade-material`，全部 Zod 校验 + SQLite 审计。
-
-### 📌 v2.0.0 (2026-09)
-
-- **自我循环物料机制**：画布上任意组件组可一键打包为自定义物料，出现在「自定义物料」面板。
-- **拖拽复用**：自定义物料拖入画布即实例化为等价子树（坐标平移 + id / 事件引用重写，多选 + Ctrl/Shift 追加选择）。
-- **自描述出码**：物料导出 Vue / 独立 HTML 时内嵌 `@lowcode-material` 定义注释块——导出文件 = 可运行代码 + 可导入物料定义。
-- **导入还原**：物料管理支持导入 `.json` / `.vue` / `.html`（内嵌注释块零猜测还原；无注释的第三方源码降级为空快照物料并提示）。
-- **循环幂等**：打包 → 出码 → 导入 → 再打包 结构逐轮稳定（`instantiate(package(nodes)) ≅ nodes` 回归测试锁定）。
-- **物料治理**：运行时注册表（`custom-` 命名空间隔离、内置物料只读）、后端 `/api/materials` CRUD + Zod 强校验（前缀 / 长度 / 节点数 / 嵌套深度）+ SQLite 审计、物料管理器（导入 / 导出 / 编辑 / 删除）。
-
-### 📌 v1.12.0 (2026-09)
-
-- **语料库导出**：同一页面写成 JSONL 里的两行，一行是 Vue 单文件组件，一行是独立 HTML。默认收当前画布，也可以并入已保存页面。
-
-### 📌 v1.11.0 (2026-09)
-
-- **出码跟画布用同一份配置**：表单占位提示、必填、标签宽度和内联布局会写进 Vue 组件、Web Component 配套组件和独立 HTML。
-- **表格不再另写一套**：分页大小跟配置走，请求参数使用同一个 `size`。没有行按钮时不再补一列「查看」。
-
-### 📌 v1.10.0 (2026-09)
-
-- **改数据源不再丢掉 Mock**：打开组件或修改参数时，地址没变就保留响应示例。参数还不是合法 JSON 时，沿用上次保存的参数并给出提示。
-- **配置可以排序**：表格列和表单项可以上移、下移，表单项可以改占位提示。画布按这个顺序渲染。
-- **抽屉不再挡住顶栏**：顶栏按钮在属性面板打开时仍可点击。设计器界面和抽屉里的选项改为中文。
-
-### 📌 v1.9.0 (2026-09)
-
-- **一键 Mock**：还没填地址的高端表格和高端表单会补上 `/api/mock/` 数据源。设计器直接返回响应示例，已有地址不会被覆盖。出码仍只请求该路径，不把示例写进脚本。
-- **接口文档**：同一操作和导出对话框都会给出方法、路径、参数和响应示例，可复制或下载 `api.md`。
-
-### 📌 v1.8.0 (2026-09)
-
-- **已保存页面可收尾**：画布上可以直接改标题。载入读取完整 Schema。列表里可以删除，也可以恢复上一份备份。
-- **纯预览不再露出搭建控件**：预览时不能拖拽、缩放或删除组件，按钮和表单仍然可以操作。退出预览后编辑能力恢复。
-- **下拉选项可编辑**：表单 Select 可以增删选项的显示文字和值，设计器与出码使用同一份选项。
-
-### 📌 v1.7.0 (2026-09)
-
-- **表单必填拦截提交**：输入框、下拉框和日期为空时，设计器和导出页面都停住并指出未填项；填完才执行 `submit` 动作。开关的 `false` 不算未填。
-- **按表达式显隐**：组件可写 `{{ state.show === true }}`。无法安全求值的表达式保持显示，不会写进生成代码。
-- **动作按条件跳过**：动作上的 `when` 为假时跳过这一条，后面的动作继续执行。
-- **页面初始状态**：物料面板可以增删改 `state` 的键和 JSON 值，显隐和动作立刻按新值求值。
-
-### 📌 v1.6.0 (2026-09)
-
-- **出码不再被用户字符串打断**：URL 换行留在注释里，非法属性名丢弃，样式值去掉会闭合声明的字符。
-- **多表单按 id 分支**：提交和重置按 `formId` 取对应表单数据；输入框和开关各自声明数据。
-- **表格占位与分页**：未绑定数据源时设计器和出码使用同一组占位行；导出页面翻页会再次请求。
-- **行操作与弹窗载荷**：表格行按钮执行对应事件动作链；打开弹窗时把载荷写入页面状态。
-- **表达式与图层初始可见性**：能通过白名单的 `{{ }}` 内联进模板，其余保持转义字符串；新建弹窗和 Loading 默认隐藏，导出初始值跟 `layer.visible`。
-- **粘贴、变量名与存储**：粘贴重写子孙 id；页面级标识符冲突时加短哈希；页面和组件备份分目录，版本递增和删除走同一写队列。
-- **请求与状态写入**：跟随重定向时重新检查每一跳；`__proto__` 等键不会写进页面状态。
-- **自定义 HTML 与密钥比较**：设计器和出码共用同一份 srcdoc 清洗；启用 `API_KEY` 时用哈希后的定长时间比较。`VITE_API_KEY` 会打进前端包，不是用户口令。
-- **审计差异与撤销**：第二次保存记下 JSON Patch；拖拽松手记一步，历史栈以快照加补丁存储。
-- **组件入参提示**：表格列、表单项、容器标题缺失时抽屉给出警告，不拦截保存。
-
-### 📌 v1.5.0 (2026-09)
-
-- **出码表达式白名单**：只有受限解释器能完整解析的 `{{ }}` 才会内联进生成代码；响应路径只接受标识符和下标，非法片段不会拼进 JavaScript。
-- **属性修改可撤销**：直接改属性、数据源和事件时记下变更前快照，连续输入合并成一步；历史栈按体积丢弃最早的快照。
-- **大纲跟随当前图层**：进入弹窗或其它图层编辑时，大纲显示该图层的节点树，嵌套子节点可删除。
-- **事件目标改为选择**：动作链从组件和图层列表里选目标；某一步失败后停止后续动作。
-- **容器内排序**：弹性容器里的子节点可以前移、后移。
-- **自定义 HTML 导出隔离**：出码改为 sandbox iframe 的 srcdoc，不再把脚本用 `new Function` 放进页面。
-- **数据源请求约束**：仅允许 http(s) 和站内相对路径，拦截云元数据地址，请求 10 秒超时。
-- **工具链对齐**：后端与 shared 的 TypeScript 升到 6.x，与前端一致。
-
-### 📌 v1.3.0
-
-- **数据驱动能力**：组件支持 `apiBinding` 接口数据源绑定（URL/方法/参数/响应路径/分页路径/自动请求），设计器"试请求"实时预览，出码产物生成真实前端 `fetch` 调用（不生成后端代码）。
-- **表达式绑定真实渲染**：`{{ state.xxx }}` 表达式从属性面板预览升级为画布组件实时求值。
-- **事件动作链 (Action Chain)**：组件 `click` 事件可编排动作链（刷新数据 / 打开/关闭弹窗 / Loading 控制 / 消息提示 / 状态更新），页面从展示变为可交互。
-- **配套加固**：后端 `X-Api-Key` 认证（可配置开关）、Schema 版本化保存与回滚、备份轮转与恢复接口、并发写保护、嵌套容器递归渲染、导出代码语法高亮、docs 分区、axios 统一错误降级。
-- **同一版本内的补强**：主画布与 canvas 图层共用一份 `children`；弹窗出码带上图层内组件；容器可拖入子节点；自定义 HTML 预览改为 sandbox iframe；出码把 HTML/脚本放进转义字符串；备份路径拒绝 `../`；API 默认只监听本机并收紧 CORS。
-
-### 📌 v1.2.0
-
-- **多图层堆叠架构**：新增弹窗 (Dialog)、Loading 遮罩、自定义 HTML 三种业务图层，支持图层显隐切换与 zIndex 层级管理。
-- **图层生命周期钩子**：自定义 HTML 图层支持 `onMounted` / `onUpdated` / `onUnmounted` 生命周期脚本注入，实现数据加载、DOM 操作与清理逻辑。
-- **出码引擎完整渲染**：Web Component（配套 PageTemplate.vue）与独立 HTML（CDN 渲染）由演示级升级为**完整渲染**。
-- **工程化与安全加固**：Vitest 单元测试（59 用例）、ESLint + Prettier（0 error / 0 warning）、GitHub Actions CI、Zod 落盘强校验、受限表达式求值器（移除 `new Function`）、DOMPurify HTML 消毒、`@lowcode/shared` 共享类型包、Element Plus 按需引入（业务代码体积 -95%）、出码输入转义（防注入破坏生成代码）。
-
-### 📌 v1.1.0
-
-- **画布对齐参考线与吸附指示**：拖拽/缩放组件时实时计算与相邻组件的边缘/中心对齐参考线并高亮吸附。
-- **键盘方向键微调**：支持方向键 (可组合 Shift 加速) 精确微调选中组件的网格位置。
-- **操作审计日志可视化**：操作日志详情支持 JSON 结构化快照查看。
-
-### 📌 v1.0.0 (Base GA)
-
-- **基础正式版发布**：可视化拖拽布局、分类物料库与属性配置抽屉、双通道存储 (JSON 文件 + SQLite 审计) 全链路打通。
-- **30 步撤销/重做历史栈**：集成 `Ctrl+Z` / `Ctrl+Y` / `Ctrl+C` / `Ctrl+V` / `Delete` 快捷键。
-- **静默 3 分钟自动保存**：无感后台 JSON 保存机制，右下角淡雅加载指示器。
-- **多目标出码引擎**：一键生成 Vue 3 Composition API SFC (`.vue`) 源码；Web Component 与独立 HTML 导出当前为**演示级渲染**（规划中升级为完整渲染）。
-
-### 📌 v0.3.0
-
-- **多端响应式视图切换**：画布顶部支持一键切换桌面端 (100%)、笔记本 (1366px)、平板 (768px) 及移动端 (375px) 预览，网格列数自适应缩放。
-- **动态 JS 表达式解析**：新增 `frontend/src/utils/expression.ts`，支持组件属性绑定 `{{ ... }}` 动态模板表达式。
-- **嵌套弹性容器**：新增 `pro-container` (FlexContainer) 嵌套容器物料，支持组件自由嵌套与布局调整。
-- **全项目版本同步**：全量升级 Monorepo (`root`, `frontend`, `backend`) 版本标签至 `v0.3.0`。
-
-### 📌 v0.2.0
-
-- **静默 3 分钟自动保存**：实现无感后台 JSON 保存机制，右下角带有淡雅的加载指示器。
-- **多目标零废码出码引擎**：支持一键生成 Vue 3 Composition API SFC (`.vue`)、W3C Web Components (`.js`) 与单页独立 HTML (`.html`)。
-- **30 步撤销/重做历史栈**：Pinia 全局撤销/重做支持，集成 `Ctrl+Z` / `Ctrl+Y` / `Ctrl+C` / `Ctrl+V` / `Delete` 快捷键，且自动排除文本输入框焦点。
-
-### 📌 v0.0.1
-
-- **低代码平台基础Scaffold**：搭建基于 Vue 3 + Element Plus + Pinia + `vue3-grid-layout-next` + Node.js + Express + SQLite 的全栈 Monorepo。
-- **核心物料与属性抽屉**：实现 `ProTable`（高端表格）、`ProForm`（高端表单）及 Element Plus 原生 UI 物料。
-- **存储与审计双通道**：页面 Schema 直接存为本地 `.json` 文件，操作审计日志自动落盘 SQLite (`logs.db`)。
+基础拖拽、多图层、数据源与动作链、Mock/语料库、工程化与安全基线等。**按版本浏览**请打开 **[`docs/roadmap/README.md`](docs/roadmap/README.md)**（semver 总表 + 各 `*_PLAN.md` / `*_IMPLEMENTATION.md`）。
 
 ---
 
@@ -606,7 +342,7 @@ npm run format      # Prettier 全仓格式化
 | **[docs/README.md](docs/README.md)** | 文档中心：分区地图、读者路径 |
 | **[spec-red-green-lines.md](docs/spec-red-green-lines.md)** | 红绿线 · 范围裁决（**PR 前必读**） |
 | **[spec-doc-conventions.md](docs/spec-doc-conventions.md)** | 命名、文首元数据、修订纪律 |
-| **[implemented/README.md](docs/implemented/README.md)** | 技术规范一览（CAE / 物料 / I/O / 管道） |
+| **[implemented/README.md](docs/implemented/README.md)** | 技术规范一览（CAE / 物料 / I/O / 结构债务档案） |
 | **[roadmap/README.md](docs/roadmap/README.md)** | **版本总表**（0.0.1 → 4.0，含 v2.9 维护） |
 
 当前发布线：**v2.11.0**；维护记录见 **[v2.11.0_PLAN.md](docs/roadmap/2.11.0_PLAN.md)**。

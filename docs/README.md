@@ -76,3 +76,4 @@ docs/
 |------|------|
 | 2026-11-20 | 初版索引 + spec-red-green-lines |
 | 2026-11-20 | 增 spec-doc-conventions、implemented/roadmap 子索引、2.9.0 plan、读者路径 |
+| 2026-11-20 | CORE_DEBT_ROUNDS 迁出自 README，根 README 精简 |
