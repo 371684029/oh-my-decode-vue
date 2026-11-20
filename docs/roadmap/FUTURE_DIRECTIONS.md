@@ -1,6 +1,12 @@
-# 低代码前端平台演进与优化方向指南 (Low-Code Platform Future Directions)
+# 平台演进与优化方向指南
 
-> **范围状态（v2.8.0+）**：下文未落地条目默认 **冻结**；是否可做以 [`spec-red-green-lines.md`](../spec-red-green-lines.md) 为准。v2.x 仅允许核心护城河维护（见该文 §2.1）。
+| 属性 | 内容 |
+|------|------|
+| 类别 | roadmap（横向） |
+| 状态 | **未落地项冻结**（v2.8.0+） |
+| 索引 | [roadmap/README.md](./README.md) |
+
+> **范围**：下文未落地条目默认 **冻结**；以 [spec-red-green-lines.md](../spec-red-green-lines.md) 为准。v2.x 仅核心维护。
 
 为了推动低代码平台向**企业级生产环境、高性能搭建与极佳开发者体验**迈进，本文档对平台未来的技术优化方向、架构升级路径与核心功能拓展进行了系统性梳理。
 

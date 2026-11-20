@@ -1,7 +1,15 @@
-# 自制组件入参/出参规范与契约强校验指南 (Component I/O Parameter Contract)
+# 自制组件入参/出参规范与契约强校验
 
-> **文档定位**：低代码平台自制物料（Custom / Pro Components）入参 (Inputs/Props) 与 出参 (Outputs/Emits) 的强约束定义标准与属性抽屉校验规范
-> **状态**：已落盘 (Active Specification)
+| 属性 | 内容 |
+|------|------|
+| 类别 | implemented |
+| 状态 | **已落地**（黑盒契约 + 抽屉警告） |
+| 版本 | 产品 v2.8.0 |
+| 范围 | 绿线 C07 |
+| 关联代码 | `contractValidator.ts`、`MaterialBlackBox.vue` |
+| 索引 | [implemented/README.md](./README.md) |
+
+> **一句话**：inputs/outputs JSON Schema 与属性抽屉强校验规则。
 
 ---
 

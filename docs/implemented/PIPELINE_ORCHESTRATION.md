@@ -1,6 +1,15 @@
 # 数据与事件管道编排技术规范 (Data & Event Pipeline Orchestration Specification)
 
-> **实现状态**：本文为 **v3.0 远期架构规范**；v2.x **实现冻结**（不接 PR）。范围见 [`spec-red-green-lines.md`](../spec-red-green-lines.md) §4.1。
+| 属性 | 内容 |
+|------|------|
+| 类别 | implemented（远期规范） |
+| 状态 | **远期规范 · v2.x 实现冻结** |
+| 版本 | 目标 v3.0 |
+| 范围 | 冻结 |
+| 关联 | [3.0.0_PLAN.md](../roadmap/3.0.0_PLAN.md)、[spec-red-green-lines.md](../spec-red-green-lines.md) §4.1 |
+| 索引 | [implemented/README.md](./README.md) |
+
+> **范围**：v2.x 不接受实现 PR；见 [spec-red-green-lines.md](../spec-red-green-lines.md)。
 
 ## 1. 概述与设计理念
 

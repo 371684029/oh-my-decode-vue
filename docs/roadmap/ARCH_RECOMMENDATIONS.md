@@ -1,10 +1,15 @@
-# 低代码前端平台架构演进与体验优化深度建议 (Platform Architecture & Recommendations)
+# 架构演进与体验优化深度建议
 
-> **文档版本**: 2.0.0 (详细技术落地版)
-> **状态**: 持续跟进与演进中 (Active & Evolving)
-> **适用技术栈**: Vue 3 (Composition API) + Element Plus + Pinia + Express + SQLite
+| 属性 | 内容 |
+|------|------|
+| 类别 | roadmap（横向） |
+| 状态 | **建议集**；采纳须先改 plan + 红绿线 |
+| 文档版本 | 2.0.0 |
+| 索引 | [roadmap/README.md](./README.md) |
 
-结合本项目（Vue 3 + Element Plus + Node.js/Express + SQLite）的实际落地情况与企级低代码平台的演进经验，本文对 **5 大架构演进方向** 做出极致详尽的技术落地说明、代码结构规范与实现方案流程图：
+> **范围**：未写入已发布 plan 的条目视为 **冻结**；见 [spec-red-green-lines.md](../spec-red-green-lines.md)。
+
+结合本项目技术栈与企级低代码演进经验，对 **5 大架构方向** 给出技术落地说明（**非全部承诺实现**）：
 
 ---
 

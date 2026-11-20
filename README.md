@@ -398,12 +398,9 @@ npm run format      # Prettier 全仓格式化
 | `materialController` 引用门禁 | **+7**  | refs 409（删除被引用物料 / 归档被引用版本）、`?force=true` 强删、无引用直删、`GET refs` 计数与页面明细、跨页累计、图层内实例计入                                                     |
 | 版本升级与存储                | **+14** | `pageUpgradeService` 批量升级（pin 改写 / follow 跳过 / 版本递增 / 图层内实例）6 项；`StorageService` 非保存路径（get / list / delete / type 分流 / backups / restore）8 项     |
 
-### 🔜 下一步待规划项（v2.9.0 候选 — 均为核心维护性，不新增功能面）
+### 🔜 下一步待规划项（v2.9.0 — 均为核心维护性，不新增功能面）
 
-| 条目                 | 说明                                                                                                       | 归属    |
-| :------------------- | :--------------------------------------------------------------------------------------------------------- | :------ |
-| 未标注 catch 收口    | `catch (err)` 未写类型的 17 处，建议显式 `unknown` 与 v2.8.0 的 47 处口径统一                                | v2.9.0  |
-| 拆分后的模块测试     | `designerSchema` / `designerNodeFactory` / `designerState` / 两个 composable 已可独立测试，补单测收窄盲区    | v2.9.0  |
+详见 **[`docs/roadmap/2.9.0_PLAN.md`](docs/roadmap/2.9.0_PLAN.md)**（未标注 `catch` 收口、拆分模块单测）。
 
 > 「巨型文件拆分」「`catch (err: any)` 收口」「表达式解析器分层」三项已在 v2.8.0 全部完成。
 
@@ -586,52 +583,12 @@ npm run format      # Prettier 全仓格式化
 
 ## 📄 文档索引 (Documentation Index)
 
-完整索引见 **[`docs/README.md`](docs/README.md)**。范围裁决见 **[`docs/spec-red-green-lines.md`](docs/spec-red-green-lines.md)**。
+| 入口 | 内容 |
+|------|------|
+| **[docs/README.md](docs/README.md)** | 文档中心：分区地图、读者路径 |
+| **[spec-red-green-lines.md](docs/spec-red-green-lines.md)** | 红绿线 · 范围裁决（**PR 前必读**） |
+| **[spec-doc-conventions.md](docs/spec-doc-conventions.md)** | 命名、文首元数据、修订纪律 |
+| **[implemented/README.md](docs/implemented/README.md)** | 技术规范一览（CAE / 物料 / I/O / 管道） |
+| **[roadmap/README.md](docs/roadmap/README.md)** | **版本总表**（0.0.1 → 4.0，含 v2.9 维护） |
 
-文档按类型分为三个分区，版本规划与技术规范不混放：
-
-- **`docs/spec-*`**：规范类（红绿线、工程纪律）
-- **`docs/implemented/`**：技术规范与优化报告（契约、物料、组件 I/O、管道编排）
-- **`docs/roadmap/`**：各版本规划与路线图（含已发布版本的规划记录，以及尚未落地的方向）
-
-### 📕 范围规范 (docs/)
-
-0. **[红绿线范围规范](docs/spec-red-green-lines.md)**：核心 / 非核心 / 冻结 / 红线；v2.x 开发策略与 PR 准入（**必须先读**）。
-
-### 📘 技术规范 (docs/implemented/)
-
-1. **[Component - API - Event 三角解耦规范](docs/implemented/COMPONENT_API_EVENT_MAPPING.md)**：包含完整的 Schema 契约与 JSON 桥梁模型（部分能力见 v1.3.0 数据驱动实现）。
-2. **[低代码物料解析规范与技术对比指南](docs/implemented/MATERIAL_SPECIFICATION.md)**：包含 Vue 源码 (.vue) 与编译 JS (.js) 的解析机制、兼容性、扩展性对比及混合架构最佳落地建议。
-3. **[自制组件入参/出参规范与契约强校验指南](docs/implemented/COMPONENT_IO_SPECIFICATION.md)**：包含自制物料组件必填 Inputs/Outputs 参数定义、类型约束、属性抽屉强校验规则。
-4. **[数据与事件管道编排技术规范](docs/implemented/PIPELINE_ORCHESTRATION.md)**：包含组件、图层（弹窗/遮罩）、页面路由跳转、生命周期钩子与异步 API 数据流的可视化管道编排架构规范。
-5. **[v0.2.0 已实现功能排查与优化报告](docs/implemented/0.2.0_OPTIMIZATIONS.md)**：包含 Web Component Shadow DOM 样式穿透、增量保存、历史栈优化、快捷键上下文隔离与代码美化解析器落地方案。
-
-### 🗺️ 版本规划 (docs/roadmap/)
-
-6. **[0.0.1 里程碑规划](docs/roadmap/0.0.1_PLAN.md)**：包含基础拖拽、属性面板与双存储方案。
-7. **[0.1.0 接口与事件联动规划](docs/roadmap/0.1.0_PLAN.md)**：包含 API 数据源绑定、参数映射与事件动作链条。
-8. **[架构演进与体验优化深度建议](docs/roadmap/ARCH_RECOMMENDATIONS.md)**：包含零废码源码生成器、沙箱预览、时间旅行撤销历史栈、远程物料插件与规则引擎的落地方案。
-9. **[平台演进与优化方向指南](docs/roadmap/FUTURE_DIRECTIONS.md)**：包含画布标尺、可视化联动、微前端发布、协同锁、远程物料等尚未落地的方向。文首标明了 v1.3.0 之前已经完成的条目。
-10. **[v0.4.0 功能规划与路线图](docs/roadmap/0.4.0_PLAN.md)**：包含节点式可视化逻辑流编排、在线 API 数据源建模与 Mock 仿真、可视化 CSS 与样式微调编辑器、Schema 版本对比与 Diff 工具、第三方物料 SDK。
-11. **[v0.5.0 功能规划与路线图](docs/roadmap/0.5.0_PLAN.md)**：包含多工作区多项目物理隔离、自制组件入参/出参强校验规范、简易操作日志可视化控制台。
-12. **[v1.0.0 基础正式版 (Base GA) 规划与路线图](docs/roadmap/1.0.0_PLAN.md)**：包含基础拖拽布局、组件 I/O 契约强校验、JSON 文件存储与 SQLite 审计日志控制台、多目标出码与基础页面发布。
-13. **[v1.1.0 体验增强版规划](docs/roadmap/1.1.0_PLAN.md)**：包含画布对齐参考线/吸附指示、键盘方向键微调、操作日志可视化 JSON Diff 比对。
-14. **[v1.2.0 多图层架构与生命周期规划](docs/roadmap/1.2.0_PLAN.md)**：包含对话框图层、Loading 加载框图层、自定义 HTML 图层及 JavaScript 生命周期钩子。
-15. **[v1.3.0 数据驱动能力与体验加固记录](docs/roadmap/1.3.0_PLAN.md)**：数据源绑定、表达式渲染、事件动作链、E2E、后端认证/版本化/备份轮转。该版本已合入 `main`。
-16. **[v1.6.0 正确性与一致性加固](docs/roadmap/1.6.0_PLAN.md)**：出码换行注入、多表单分支、输入框状态、表格占位、行操作与分页、表达式出码、图层可见性、备份隔离、重定向校验、审计差异与撤销补丁。已实现。
-17. **[v1.7.0 条件交互](docs/roadmap/1.7.0_PLAN.md)**：表单必填拦截提交、组件显隐表达式、动作条件跳过、页面初始状态面板。已实现。
-18. **[v1.8.0 核心闭环收尾](docs/roadmap/1.8.0_PLAN.md)**：页面改名、删除与恢复上一份、纯预览去掉搭建控件、表单下拉选项可编辑。已实现。
-19. **[v1.9.0 Mock 与接口文档](docs/roadmap/1.9.0_PLAN.md)**：一键为未填地址的表格和表单补 Mock，并产出前端实际调用的接口文档。已实现。
-20. **[v1.10.0 交互打磨](docs/roadmap/1.10.0_PLAN.md)**：编辑数据源时保留 Mock 示例、配置项排序、抽屉不再挡住顶栏。已实现。
-21. **[v1.11.0 出码与画布对齐](docs/roadmap/1.11.0_PLAN.md)**：Vue、Web Component 配套组件和独立 HTML 使用画布上的占位、标签宽度、分页和行按钮。已实现。
-22. **[v1.12.0 语料库导出](docs/roadmap/1.12.0_PLAN.md)**：同一页面导出为 Vue 组件和 HTML 组件两条语料。已实现。
-23. **[v2.0.0 自我循环物料机制规划](docs/roadmap/2.0.0_PLAN.md)**：画布生成物料的自我循环闭环、映射规则、关系模型、自描述出码与导入管道。已实现。
-24. **[v2.1.0 物料版本管理与黑盒引用规划](docs/roadmap/2.1.0_PLAN.md)**：黑盒引用、版本发布/锁定/升级/回滚、引用保护与 fork。已实现。
-25. **[v2.1.0 版本管理实现解析](docs/roadmap/2.1.0_IMPLEMENTATION.md)**：版本管理的函数级实现方案（存储/判定/解析链/测试）。已实现。
-26. **v2.2.0 设计器体验与物料覆盖规划** / **实施纪要**（规划文档未留存，仅存条目）：分栏 Inspector、真组件画布、可视可选网格、JSON 可编、Spacer、ProForm 逐项布局、Element Plus 可画布全量、v2.1 债务收口。已落地（M1–M3）。
-27. **[v2.3.0 设计器手势与交互反馈规划](docs/roadmap/2.3.0_PLAN.md)** / **[实施纪要](docs/roadmap/2.3.0_IMPLEMENTATION.md)**：节点网格 ±、右键菜单开属性、快捷键提示、Inspector Tab 重组、拖拽淡网格、行操作友好提示、jsonPatch/原子写去重。已落地（M1–M6）。
-28. **[v2.6.0 正确性加固规划](docs/roadmap/2.6.0_PLAN.md)**：PATCH 并发 TOCTOU 竞态、导出代码 SSRF 防护分歧、自动保存失败静默（P0），以及结构债务与测试缺口盘点。P0 已实现；P1/P2 滚入 v2.7.0。
-29. **[v2.7.0 结构债务收口规划](docs/roadmap/2.7.0_PLAN.md)**：shortHash 单一来源、`as any` 收窄、watch stringify 优化、静默 catch 留痕、核心测试补齐（jsonPatch 边界 / 黑盒路径 / 引用门禁）。已落地（M1–M2）。
-30. **[v2.8.0 类型收口与结构分层规划](docs/roadmap/2.8.0_PLAN.md)**：`catch (err: any)` 收口、表达式解析器分层、巨型文件拆分（designerStore / MaterialManager / expression）。已落地（M1 全部完成，M2 留待 v2.9.0）。
-31. **[v3.0.0 物料生态与复杂编排规划](docs/roadmap/3.0.0_PLAN.md)**：物料市场、远程 SDK、Module Federation、管道编排、可视化逻辑流、GraphQL。远期。
-32. **v4.0.0 远期企业级架构规划**（尚未编写）：RBAC/SSO、分布式存储、CRDT 协同、CI/CD 灰度发布。远期。
+当前维护线：**[v2.9.0_PLAN.md](docs/roadmap/2.9.0_PLAN.md)**（仅测试与 catch 口径，无新功能）。

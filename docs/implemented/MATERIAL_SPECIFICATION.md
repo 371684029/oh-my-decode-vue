@@ -1,7 +1,15 @@
-# 低代码物料解析规范与技术对比指南 (Material Specification & Parsing Guide)
+# 低代码物料解析规范与技术对比
 
-> **文档定位**：低代码前端平台待选组件（物料）解析机制、Vue SFC vs JS 产物对比与混合架构落地建议
-> **状态**：已落盘 (Active Specification)
+| 属性 | 内容 |
+|------|------|
+| 类别 | implemented |
+| 状态 | **已落地**（v2.x 内置 + 自定义 + 自描述导入） |
+| 版本 | 产品 v2.8.0 |
+| 范围 | 绿线 C02、C06 |
+| 关联代码 | `frontend/src/registry/`、`materialImport.ts`、`materialPacker.ts` |
+| 索引 | [implemented/README.md](./README.md) |
+
+> **一句话**：`.vue` 与编译 `.js` 物料的解析策略与混合架构建议。
 
 ---
 

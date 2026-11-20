@@ -1,8 +1,15 @@
-# 架构技术规范文档：组件、接口与事件 (Component - API - Event) 三角映射模型规范
+# 架构技术规范：Component - API - Event（CAE）三角映射
 
-> **文档版本**: 1.1.0
-> **状态**: 持续跟进与演进中 (Active & Evolving)
-> **适用范围**: 低代码前端平台核心渲染器 (Renderer)、设计器 (Designer) 与出码引擎 (Code Generator)
+| 属性 | 内容 |
+|------|------|
+| 类别 | implemented |
+| 状态 | **部分落地**（v1.3+ 最小闭环；GraphQL / 全量管道远期） |
+| 版本 | 文档 1.1.0 · 产品 v2.8.0 |
+| 范围 | 绿线 C03–C04 |
+| 关联 | [1.3.0_PLAN.md](../roadmap/1.3.0_PLAN.md)、[PIPELINE_ORCHESTRATION.md](./PIPELINE_ORCHESTRATION.md)（冻结） |
+| 索引 | [implemented/README.md](./README.md) |
+
+> **一句话**：JSON Schema 连接组件、数据源与事件动作；实现以 REST + 动作链为准。
 
 ---
 

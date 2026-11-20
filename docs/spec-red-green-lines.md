@@ -4,7 +4,7 @@
 |------|------|
 | 状态 | **已采纳**；v2.8.0 起为范围裁决的单一事实源 |
 | 当前版本 | **v2.8.0**（`package.json`） |
-| 关联 | [README.md](../README.md)、[roadmap/3.0.0_PLAN.md](./roadmap/3.0.0_PLAN.md)、[roadmap/FUTURE_DIRECTIONS.md](./roadmap/FUTURE_DIRECTIONS.md) |
+| 关联 | [README.md](../README.md)、[roadmap/2.9.0_PLAN.md](./roadmap/2.9.0_PLAN.md)、[spec-doc-conventions.md](./spec-doc-conventions.md) |
 | 参考纪律 | 文档分区与冻结表述对齐 [oh-my-co-work](https://github.com/371684029/oh-my-co-work) 的 `docs/README.md` 维护原则 |
 
 > **怎么用本文**：写代码、开 Issue、提 PR、排版本计划之前，先对照本节。  
@@ -223,6 +223,7 @@
 | 文档索引 | [docs/README.md](./README.md) |
 | 某版本执行计划 | `docs/roadmap/<version>_PLAN.md` |
 | 技术契约（CAE / 物料） | `docs/implemented/*.md` |
+| 文档写法 | `docs/spec-doc-conventions.md` |
 
 ---
 
