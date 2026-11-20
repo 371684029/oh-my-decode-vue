@@ -2,8 +2,8 @@
 
 | 属性 | 内容 |
 |------|------|
-| 产品版本 | **v2.10.0**（`package.json`） |
-| 维护线 | v2.10.0 已收口；见 [2.10.0_PLAN.md](./roadmap/2.10.0_PLAN.md) |
+| 产品版本 | **v2.11.0**（`package.json`） |
+| 维护线 | v2.11.0 已收口；见 [2.11.0_PLAN.md](./roadmap/2.11.0_PLAN.md) |
 
 上手见 [README.md](../README.md)。**能不能做** → [spec-red-green-lines.md](./spec-red-green-lines.md)。**怎么写文档** → [spec-doc-conventions.md](./spec-doc-conventions.md)。
 

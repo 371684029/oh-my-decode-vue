@@ -1,6 +1,6 @@
 # 低代码前端可视化平台
 
-拖拽搭页面，再导出成能运行的前端代码。当前版本 **v2.10.0**。
+拖拽搭页面，再导出成能运行的前端代码。当前版本 **v2.11.0**。
 
 页面在设计器里是一份 JSON Schema。表格、表单和按钮都由这份 Schema 渲染。导出时，同一份 Schema 生成 Vue 单文件组件、独立 HTML，以及由这两种组件组成的语料库。平台不生成后端业务代码。页面 JSON 存在本地文件里，SQLite 只记操作日志。
 
@@ -315,7 +315,7 @@ npm run build
 ```bash
 npm run typecheck   # 前后端类型检查
 npm run lint        # ESLint（0 error / 0 warning 门槛）
-npm run test        # Vitest：前端 242 项 + 后端 104 项
+npm run test        # Vitest：前端 247 项 + 后端 104 项
 npm run format      # Prettier 全仓格式化
 ```
 
@@ -398,18 +398,22 @@ npm run format      # Prettier 全仓格式化
 | `materialController` 引用门禁 | **+7**  | refs 409（删除被引用物料 / 归档被引用版本）、`?force=true` 强删、无引用直删、`GET refs` 计数与页面明细、跨页累计、图层内实例计入                                                     |
 | 版本升级与存储                | **+14** | `pageUpgradeService` 批量升级（pin 改写 / follow 跳过 / 版本递增 / 图层内实例）6 项；`StorageService` 非保存路径（get / list / delete / type 分流 / backups / restore）8 项     |
 
-### 本轮已收口（v2.10.0）— 测试盲区
+### 本轮已收口（v2.11.0）— 快捷键可测化
 
-| 优先级 | 条目 | 状态 |
-| :----- | :----- | :--- |
-| **P2** | `designerNodeFactory` 黑盒/快照/图层工厂 | ✅ v2.10.0 |
-| **P2** | `useDrawerNode` composable | ✅ v2.10.0 |
+| 条目 | 状态 |
+| :--- | :--- |
+| `handleDesignerKeydown` 抽出 + 单测 | ✅ v2.11.0 |
 
-详见 **[`docs/roadmap/2.10.0_PLAN.md`](docs/roadmap/2.10.0_PLAN.md)**。
+详见 **[`docs/roadmap/2.11.0_PLAN.md`](docs/roadmap/2.11.0_PLAN.md)**。
 
 ---
 
 ## 📝 版本变更历史 (Changelog)
+
+### 📌 v2.11.0 (2026-11) — 画布快捷键逻辑单测
+
+- 将快捷键处理从 `useDesignerHotkeys` 抽到 `designerKeydown.ts`，监听注册仍由 composable 负责，**用户可见行为不变**。
+- 新增 `designerKeydown.test.ts`：门禁、`Delete`、撤销、方向键步长（含 Shift×2）。
 
 ### 📌 v2.10.0 (2026-11) — 工厂与抽屉 composable 单测
 
@@ -606,4 +610,4 @@ npm run format      # Prettier 全仓格式化
 | **[implemented/README.md](docs/implemented/README.md)** | 技术规范一览（CAE / 物料 / I/O / 管道） |
 | **[roadmap/README.md](docs/roadmap/README.md)** | **版本总表**（0.0.1 → 4.0，含 v2.9 维护） |
 
-当前发布线：**v2.10.0**；维护记录见 **[v2.10.0_PLAN.md](docs/roadmap/2.10.0_PLAN.md)**。
+当前发布线：**v2.11.0**；维护记录见 **[v2.11.0_PLAN.md](docs/roadmap/2.11.0_PLAN.md)**。

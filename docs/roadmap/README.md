@@ -3,8 +3,8 @@
 | 属性 | 内容 |
 |------|------|
 | 类别 | roadmap 子索引 |
-| 当前发布线 | **v2.10.0** |
-| 进行中 | —（见 [2.10.0_PLAN.md](./2.10.0_PLAN.md)） |
+| 当前发布线 | **v2.11.0** |
+| 进行中 | —（见 [2.11.0_PLAN.md](./2.11.0_PLAN.md)） |
 
 **范围冻结**见 [spec-red-green-lines.md](../spec-red-green-lines.md)。**写法规范**见 [spec-doc-conventions.md](../spec-doc-conventions.md)。
 
@@ -38,6 +38,7 @@
 | 2.8.0 | [2.8.0_PLAN.md](./2.8.0_PLAN.md) | ✅ 已落地 | catch、表达式分层、拆文件 |
 | **2.9.0** | [2.9.0_PLAN.md](./2.9.0_PLAN.md) | ✅ 已落地 | catch 口径、store/composable 单测 |
 | **2.10.0** | [2.10.0_PLAN.md](./2.10.0_PLAN.md) | ✅ 已落地 | 工厂扩测、useDrawerNode |
+| **2.11.0** | [2.11.0_PLAN.md](./2.11.0_PLAN.md) | ✅ 已落地 | 快捷键 `designerKeydown` 可测化 |
 | 3.0.0 | [3.0.0_PLAN.md](./3.0.0_PLAN.md) | 🧊 远期 | 物料生态、管道、GraphQL |
 | 4.0.0 | — | 🧊 未编写 | 协同、RBAC、分布式 |
 
