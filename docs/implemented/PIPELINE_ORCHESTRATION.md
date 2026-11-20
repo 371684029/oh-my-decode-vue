@@ -1,5 +1,7 @@
 # 数据与事件管道编排技术规范 (Data & Event Pipeline Orchestration Specification)
 
+> **实现状态**：本文为 **v3.0 远期架构规范**；v2.x **实现冻结**（不接 PR）。范围见 [`spec-red-green-lines.md`](../spec-red-green-lines.md) §4.1。
+
 ## 1. 概述与设计理念
 
 在低代码前端平台中，组件交互、弹窗跳转、页面路由跳转、数据转换以及异步 API 请求往往散落在不同组件的事件处理逻辑中。为了实现高内聚、低耦合、可视化及可审计的低代码交互系统，平台将**弹窗跳转、页面跳转、组件联动与数据响应**统一抽象为 **管道编排 (Pipeline Orchestration)** 模式。

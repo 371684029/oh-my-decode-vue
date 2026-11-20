@@ -61,7 +61,8 @@
 
 ## 🎯 核心理念与范围边界 (Core Principles & Scope Guardrails)
 
-> **本节是项目的"宪法"**：新增功能前先对照。**任何不服务于核心命题的功能都属于过度扩展。**
+> **单一事实源**：严格红绿线与冻结纪律见 [`docs/spec-red-green-lines.md`](docs/spec-red-green-lines.md)；文档总索引见 [`docs/README.md`](docs/README.md)。  
+> **本节是 README 摘要**：新增功能前先对照。**任何不服务于核心命题的功能都属于过度扩展。**
 
 ### 一句话核心命题
 
@@ -585,10 +586,17 @@ npm run format      # Prettier 全仓格式化
 
 ## 📄 文档索引 (Documentation Index)
 
-文档按类型分为两个分区，版本规划与技术规范不混放：
+完整索引见 **[`docs/README.md`](docs/README.md)**。范围裁决见 **[`docs/spec-red-green-lines.md`](docs/spec-red-green-lines.md)**。
 
+文档按类型分为三个分区，版本规划与技术规范不混放：
+
+- **`docs/spec-*`**：规范类（红绿线、工程纪律）
 - **`docs/implemented/`**：技术规范与优化报告（契约、物料、组件 I/O、管道编排）
 - **`docs/roadmap/`**：各版本规划与路线图（含已发布版本的规划记录，以及尚未落地的方向）
+
+### 📕 范围规范 (docs/)
+
+0. **[红绿线范围规范](docs/spec-red-green-lines.md)**：核心 / 非核心 / 冻结 / 红线；v2.x 开发策略与 PR 准入（**必须先读**）。
 
 ### 📘 技术规范 (docs/implemented/)
 
