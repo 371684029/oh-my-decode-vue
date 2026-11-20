@@ -315,7 +315,7 @@ npm run build
 ```bash
 npm run typecheck   # 前后端类型检查
 npm run lint        # ESLint（0 error / 0 warning 门槛）
-npm run test        # Vitest：前端 229 项 + 后端 104 项
+npm run test        # Vitest：前端 236 项 + 后端 104 项
 npm run format      # Prettier 全仓格式化
 ```
 
@@ -414,8 +414,8 @@ npm run format      # Prettier 全仓格式化
 ### 📌 v2.9.0 (2026-11) — 维护性与文档收口
 
 - **`catch` 口径统一**：生产路径中剩余未标注类型的 `catch` 全部改为 `unknown`（与 v2.8.0 已清零的 `catch (err: any)` 对齐）；出码字符串模板内 `catch (err)` 为生成 JavaScript，不计入 TypeScript 口径。
-- **拆分模块单测**：新增 `designerSchema.test.ts`、`designerState.test.ts`、`designerNodeFactory.test.ts`，覆盖主画布同源、历史剥离、id/target 重写与工厂默认值。
-- **文档**：[`docs/roadmap/2.9.0_PLAN.md`](docs/roadmap/2.9.0_PLAN.md) 含任务验收与 CI 自测表；删除 `designerState.ts` 重复注释。
+- **拆分模块单测**：新增 `designerSchema` / `designerState` / `designerNodeFactory` 与 `useMaterialIO` / `useMaterialVersions` 单测，覆盖主画布同源、版本 IO 与导入路径。
+- **文档**：[`docs/roadmap/2.9.0_PLAN.md`](docs/roadmap/2.9.0_PLAN.md) 含任务验收与 CI 自测表（T1–T4 全部 ✅）。
 
 ### 📌 v2.8.0 (2026-11) — 类型收口与表达式分层
 

@@ -76,7 +76,7 @@
 | ID | 条目 | 说明 | 归属 |
 |----|------|------|------|
 | **M01** | 未标注 `catch` 收口 | 生产代码 `catch` 显式 `unknown`（v2.9.0 ✅） | — |
-| **M02** | 拆分模块单测 | `designerSchema` / `designerState` / `designerNodeFactory` 单测（v2.9.0 ✅）；composable 延 v2.10 | v2.10 |
+| **M02** | 拆分模块单测 | store 三模块 + `useMaterialVersions` / `useMaterialIO`（v2.9.0 ✅） | — |
 | **M03** | 单文件 ≤400 行纪律 | 新代码不得重新堆出巨型文件；超标先拆再合 | 持续 |
 | **M04** | CI 同款质量门 | `typecheck` → `lint` → `test` → `build` 全绿才合入 | 持续 |
 
