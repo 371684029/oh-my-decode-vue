@@ -4,33 +4,32 @@
 
 页面在设计器里是一份 JSON Schema。表格、表单和按钮都由这份 Schema 渲染。导出时，同一份 Schema 生成 Vue 单文件组件、独立 HTML，以及由这两种组件组成的语料库。平台不生成后端业务代码。页面 JSON 存在本地文件里，SQLite 只记操作日志。
 
+文档与范围：**[docs/README.md](docs/README.md)** · 红绿线 **[spec-red-green-lines.md](docs/spec-red-green-lines.md)**
+
 ---
 
-## 界面
+## 界面一览
 
-拖入高端表格和高端表单后的画布。左侧是物料，中间是网格，顶栏负责预览、Mock、导出和保存。
+左侧物料、中间栅格画布、顶栏预览 / Mock / 导出 / 保存（拖入高端表格与表单后的典型画布）。
 
-![设计器画布：表格与表单](docs/assets/designer.png)
+<img src="docs/assets/designer.png" alt="设计器画布：表格与表单" width="100%" />
 
-表单项在属性抽屉里配置。可以改字段名、控件类型、必填、占位提示，并上移下移。表格列用同一套方式调整。
+<p align="center"><sub>设计器主画布</sub></p>
 
-![表单项配置](docs/assets/form-config.png)
+<table>
+  <tr>
+    <td width="50%" valign="top">
+      <img src="docs/assets/export-vue.png" alt="导出 Vue 单文件组件" width="100%" />
+      <p align="center"><sub>多目标出码（Vue / WC / HTML）</sub></p>
+    </td>
+    <td width="50%" valign="top">
+      <img src="docs/assets/preview.png" alt="纯预览" width="100%" />
+      <p align="center"><sub>纯预览（无搭建控件）</sub></p>
+    </td>
+  </tr>
+</table>
 
-纯预览去掉拖拽手柄和删除按钮，页面上的表格、表单和按钮仍可操作。
-
-![纯预览](docs/assets/preview.png)
-
-导出对话框里的 Vue 单文件组件，和画布使用同一份占位、标签宽度和分页配置。旁边还有 Web Component 和独立 HTML。
-
-![导出 Vue 组件](docs/assets/export-vue.png)
-
-语料库把当前页面写成两行 JSONL：一行 Vue 组件，一行 HTML 组件。也可以并入已经保存的页面。
-
-![语料库导出](docs/assets/corpus.png)
-
-还没填地址的表格和表单，可以一键补上 `/api/mock/` 数据源，并写出前端实际会请求的接口说明。
-
-![Mock 与接口文档](docs/assets/api-doc.png)
+更多界面截图（属性抽屉、语料库、Mock 文档等）见 **`docs/assets/`**：`form-config.png`、`corpus.png`、`api-doc.png`。
 
 ---
 
